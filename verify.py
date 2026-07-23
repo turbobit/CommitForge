@@ -13,6 +13,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parent
 REQUIRED = [
+    ".gitattributes",
     ".claude/skills/cc/SKILL.md",
     ".claude/skills/ccr/SKILL.md",
     ".claude/skills/cca/SKILL.md",
@@ -255,6 +256,14 @@ def main() -> None:
         for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
             if runner not in workflow_text:
                 errors.append(f"verify.yml: {runner} matrix 누락")
+        if 'PYTHONUTF8: "1"' not in workflow_text:
+            errors.append("verify.yml: Windows UTF-8 출력 설정 누락")
+
+    attributes = ROOT / ".gitattributes"
+    if attributes.exists() and "* text=auto eol=lf" not in attributes.read_text(
+        encoding="utf-8"
+    ):
+        errors.append(".gitattributes: LF checkout 정책 누락")
 
     eval_runner = ROOT / "evals/run_evals.py"
     if eval_runner.exists():

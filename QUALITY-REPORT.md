@@ -22,6 +22,7 @@
 - deterministic release metadata와 ZIP/TAR.GZ 재현성 검증
 - GitHub Actions 검증 workflow 포함
 - Ubuntu Python 3.9/3.13, macOS, Windows CI matrix와 SHA 고정 Action 검증
+- `.gitattributes` LF 정책과 CI `PYTHONUTF8`로 운영체제별 metadata·한글 출력 일관성 검증
 - JSON·SARIF report validator 및 baseline schema·만료 검증
 - `/cr --base`, `--range`, PR 비교 모드 계약 검증
 - 대형 diff shard/cross-file 집계 규칙 연결 검증

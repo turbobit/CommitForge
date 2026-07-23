@@ -1,5 +1,8 @@
 name: Verify
 
+env:
+  PYTHONUTF8: "1"
+
 on:
   workflow_dispatch:
   push:

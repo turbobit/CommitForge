@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.5.0",
   "reproducible": true,
-  "file_count": 71,
-  "total_bytes": 283287,
+  "file_count": 72,
+  "total_bytes": 284151,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -231,19 +231,24 @@
       "sha256": "2d981e411c7378a716e4b7fa35984e80be8f5e9b8d48461e1b0e87efceef695a"
     },
     {
+      "path": ".gitattributes",
+      "size": 98,
+      "sha256": "2cb3cd5c7b0967f81aa4080f75822babff2c3ea57db4e007d1f47620ba6b8ed7"
+    },
+    {
       "path": ".github/dependabot.yml",
       "size": 181,
       "sha256": "e5294ec6de7679cbce9dabb6a8f24958446c27e00be984eb9789ab59d5e429ea"
     },
     {
       "path": ".github/workflows/verify.yml",
-      "size": 2497,
-      "sha256": "ad7df9001da4b832a5d01f9bdaaa1a4cd90edacce2c30acf6e982693324271df"
+      "size": 2521,
+      "sha256": "e47b71f992826fbbd6c1f60144f337852bcecc6b83faa3a02748d2c2fc16133f"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 4283,
-      "sha256": "9117008f94815e14ff6236342aea5ccf2b568cf810cda05a2e97f2994e970a8b"
+      "size": 4368,
+      "sha256": "cdbc85d8704c099e899803de680a3a3d095d42a859494625e668d1eb97a00300"
     },
     {
       "path": "INSTALL.md",
@@ -257,8 +262,8 @@
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 3870,
-      "sha256": "c6e740a8546b4543955bd31a7b8112d03e64605706cd87188679bd77717904ca"
+      "size": 3978,
+      "sha256": "a343c469d4dc6d04261e2d4c731f23720baba287d12ffc30d81da7a70cd0ad66"
     },
     {
       "path": "README.md",
@@ -337,8 +342,8 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 4392,
-      "sha256": "0ab9320a5b037094bcefde4aaefd7e5b0c51832bd3e30684e48b235c6ffacab8"
+      "size": 4570,
+      "sha256": "e915f1d74b261133e3df854bdb055c3537fee02da74c642272a8f539da744c91"
     },
     {
       "path": "uninstall.ps1",
@@ -357,8 +362,8 @@
     },
     {
       "path": "verify.py",
-      "size": 12427,
-      "sha256": "3496ce854bcfc3dfdfe06bede53a031eb92d797fcc4d9121e3a177e3bcd45b2f"
+      "size": 12798,
+      "sha256": "5beae34b80a04ef1c612f3be2d47941e70091a33ffa0e2150cbee264f0d4aa85"
     }
   ]
 }

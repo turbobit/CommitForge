@@ -10,6 +10,7 @@
 - snapshot 파일별 크기·SHA-256 inventory와 삭제 전 무결성 감사 추가
 - 실제 Claude Code `/cr --no-fix` opt-in 평가 harness와 회귀 scenario 추가
 - Ubuntu Python 3.9/3.13, macOS, Windows CI matrix 추가
+- LF checkout과 UTF-8 Python 출력을 고정해 Windows 검증의 재현성 확보
 - GitHub Actions를 전체 commit SHA로 고정하고 Dependabot 업데이트 설정 추가
 
 ## 1.4.0 — 2026-07-23

@@ -118,6 +118,9 @@ class ReviewFeatureTest(unittest.TestCase):
         self.assertNotRegex(text, r"uses:\s+[^\s]+@v\d")
         self.assertRegex(text, r"actions/checkout@[0-9a-f]{40}")
         self.assertRegex(text, r"actions/setup-python@[0-9a-f]{40}")
+        self.assertIn('PYTHONUTF8: "1"', text)
+        attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+        self.assertIn("* text=auto eol=lf", attributes)
 
 
 if __name__ == "__main__":
