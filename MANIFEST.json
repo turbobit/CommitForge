@@ -3,7 +3,7 @@
   "version": "1.4.0",
   "reproducible": true,
   "file_count": 59,
-  "total_bytes": 242491,
+  "total_bytes": 242509,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -203,12 +203,12 @@
     {
       "path": ".github/workflows/verify.yml",
       "size": 1379,
-      "sha256": "7a15a47ccbb46519fdb89cb23e48e3aa3f2c224b5660950f3324db6244a7f0b6"
+      "sha256": "afbc51370decaacff4f23b24d9b22603f84d166efefdf299baf9075c5fbc3fe9"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 3437,
-      "sha256": "57af0eae1145acadc351e39f3dc2fb82f6ce931aa9174b8fa029f78a29fa1369"
+      "size": 3455,
+      "sha256": "68cf3cb985ac107429ebd62dd4e3ad9e22b3cb9c40d89cd6ced03b9c8476630a"
     },
     {
       "path": "INSTALL.md",
