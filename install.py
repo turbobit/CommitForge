@@ -12,13 +12,19 @@ import sys
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 SOURCE_CLAUDE = PACKAGE_ROOT / ".claude"
-SKILLS = ("cc", "ccr", "cca", "_git-atomic-core")
+SKILLS = ("cc", "ccr", "cr", "cca", "_git-atomic-core")
 AGENTS = (
     "cca-git-reviewer.md",
     "cca-correctness-reviewer.md",
     "cca-security-reviewer.md",
     "cca-performance-reviewer.md",
     "cca-testing-reviewer.md",
+    "cca-line-reviewer.md",
+    "cca-architecture-reviewer.md",
+    "cca-language-api-reviewer.md",
+    "cca-ux-accessibility-reviewer.md",
+    "cca-observability-reviewer.md",
+    "cca-quality-reviewer.md",
 )
 
 
@@ -87,7 +93,7 @@ def main() -> None:
     if backup_root.exists() or args.dry_run:
         print(f"기존 파일 백업: {backup_root}")
     print("CommitForge 설치 완료")
-    print("사용 명령: /ccr, /cc, /cca")
+    print("사용 명령: /ccr, /cc, /cr, /cca")
     print("확장 모드: /cca today, /cca release, /cca emergency, /cca learn")
     print("새 .claude/agents 디렉터리를 처음 만든 실행 중 세션에서는 Claude Code 재시작을 권장합니다.")
 

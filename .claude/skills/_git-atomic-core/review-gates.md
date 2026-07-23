@@ -1,4 +1,4 @@
-# `/cca` 리뷰 및 품질 게이트
+# `/cr`·`/cca` 리뷰 및 품질 게이트
 
 ## 1. 리뷰 원칙
 
@@ -113,9 +113,49 @@
 - config/env example
 - generated artifact consistency
 
+### Line-by-line/Removed Behavior
+
+- 모든 hunk의 의도와 부작용
+- 삭제된 guard/default/fallback/cleanup/API
+- cross-file symbol·contract 영향
+- wrapper/proxy 인자·반환·오류·취소·context 보존
+
+### Architecture
+
+- 계층·domain boundary와 dependency direction
+- public API와 내부 타입 누수
+- 데이터 소유권·transaction·cache
+- failure domain·rollback·배포 순서
+
+### Language/API
+
+- 타입·nullability·generic·cast
+- async·lifecycle·resource
+- serialization·timezone·numeric precision
+- framework·runtime·platform contract
+
+### UX/Accessibility
+
+- loading/empty/error/pending 상태
+- keyboard·focus·semantics·screen reader
+- contrast·text scaling·localization·RTL
+
+### Observability
+
+- log·metric·trace·alert
+- correlation·cardinality·sampling
+- 실패·retry·queue·rollback 가시성
+
+### Quality/Reuse
+
+- 기존 구현 재사용과 의미 중복
+- 복잡도·책임·dead code
+- hidden side effect·testability
+- 국소적 동작 보존 리팩터링
+
 ## 4. 자동 수정 정책
 
-`/cca` 기본 동작은 다음 범위의 확정적 문제를 안전하게 수정할 수 있다.
+`/cr`과 `/cca` 기본 동작은 다음 범위의 확정적 문제를 안전하게 수정할 수 있다.
 
 - diff가 의도한 동작과 명백히 모순되는 오류
 - 누락된 직접 호출부·타입 오류
@@ -149,5 +189,7 @@
 - 적절한 검증 명령 식별
 - 사용자 작업 스냅샷 확보
 - 예상치 못한 외부 변경 없음
+- 미검토 hunk 0
+- 적용 가능한 심층 reviewer 상태가 모두 PASS/FINDING/N/A
 
 조건을 충족하지 못하면 커밋을 시작하지 않는다.

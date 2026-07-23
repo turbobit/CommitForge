@@ -10,13 +10,19 @@ import shutil
 import sys
 
 
-SKILLS = ("cc", "ccr", "cca", "_git-atomic-core")
+SKILLS = ("cc", "ccr", "cr", "cca", "_git-atomic-core")
 AGENTS = (
     "cca-git-reviewer.md",
     "cca-correctness-reviewer.md",
     "cca-security-reviewer.md",
     "cca-performance-reviewer.md",
     "cca-testing-reviewer.md",
+    "cca-line-reviewer.md",
+    "cca-architecture-reviewer.md",
+    "cca-language-api-reviewer.md",
+    "cca-ux-accessibility-reviewer.md",
+    "cca-observability-reviewer.md",
+    "cca-quality-reviewer.md",
 )
 
 

@@ -233,7 +233,7 @@ def acquire_lock(ctx: dict[str, Path], session: str) -> tuple[str, Path]:
     except FileExistsError:
         existing = read_json(owner_file)
         raise GuardError(
-            "이 작업 트리에서 다른 /cc 또는 /cca 실행이 진행 중입니다. "
+            "이 작업 트리에서 다른 /cc, /cr 또는 /cca 실행이 진행 중입니다. "
             f"lock={lock_dir}, owner={existing or 'unreadable'}"
         )
     try:

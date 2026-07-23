@@ -6,6 +6,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import re
+import runpy
 import subprocess
 import sys
 
@@ -15,7 +16,10 @@ REQUIRED = [
     ".claude/skills/cc/SKILL.md",
     ".claude/skills/ccr/SKILL.md",
     ".claude/skills/cca/SKILL.md",
+    ".claude/skills/cr/SKILL.md",
     ".claude/skills/_git-atomic-core/extended-modes.md",
+    ".claude/skills/_git-atomic-core/deep-review-protocol.md",
+    ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
     ".claude/agents/cca-git-reviewer.md",
@@ -23,6 +27,12 @@ REQUIRED = [
     ".claude/agents/cca-security-reviewer.md",
     ".claude/agents/cca-performance-reviewer.md",
     ".claude/agents/cca-testing-reviewer.md",
+    ".claude/agents/cca-line-reviewer.md",
+    ".claude/agents/cca-architecture-reviewer.md",
+    ".claude/agents/cca-language-api-reviewer.md",
+    ".claude/agents/cca-ux-accessibility-reviewer.md",
+    ".claude/agents/cca-observability-reviewer.md",
+    ".claude/agents/cca-quality-reviewer.md",
 ]
 
 
@@ -42,7 +52,7 @@ def main() -> None:
         if not path.is_file():
             errors.append(f"필수 파일 누락: {rel}")
 
-    for command in ("cc", "ccr", "cca"):
+    for command in ("cc", "ccr", "cr", "cca"):
         path = ROOT / f".claude/skills/{command}/SKILL.md"
         if not path.exists():
             continue
@@ -57,6 +67,25 @@ def main() -> None:
                 errors.append(f"{path}: frontmatter 필드 누락 {field}")
         if len(text.splitlines()) > 500:
             errors.append(f"{path}: SKILL.md 500줄 초과")
+
+    valid_colors = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
+    for path in sorted((ROOT / ".claude/agents").glob("cca-*.md")):
+        text = path.read_text(encoding="utf-8")
+        try:
+            fm = frontmatter(text)
+        except ValueError as exc:
+            errors.append(f"{path}: {exc}")
+            continue
+        for field in ("name:", "description:", "tools:", "disallowedTools:", "model:"):
+            if field not in fm:
+                errors.append(f"{path}: frontmatter 필드 누락 {field}")
+        color_match = re.search(r"^color:\s*([a-z]+)\s*$", fm, re.MULTILINE)
+        if not color_match:
+            errors.append(f"{path}: color 누락 또는 형식 오류")
+        elif color_match.group(1) not in valid_colors:
+            errors.append(f"{path}: 지원하지 않는 color {color_match.group(1)}")
+        if re.search(r"^\s*-\s*Bash(?:\(|\s|$)", fm, re.MULTILINE):
+            errors.append(f"{path}: reviewer에 Bash 도구가 허용됨")
 
     readme = ROOT / "README.md"
     if readme.exists() and not readme.read_text(encoding="utf-8").startswith("# CommitForge"):
@@ -81,6 +110,48 @@ def main() -> None:
                 errors.append(f"cca/SKILL.md: {mode} 모드 분기 누락")
             if f"## " not in modes_text or f"`{mode}`" not in modes_text:
                 errors.append(f"extended-modes.md: {mode} 모드 설명 누락")
+
+    if cca_path.exists():
+        cca_text = cca_path.read_text(encoding="utf-8")
+        deep_reviewers = (
+            "cca-line-reviewer",
+            "cca-architecture-reviewer",
+            "cca-language-api-reviewer",
+            "cca-ux-accessibility-reviewer",
+            "cca-observability-reviewer",
+            "cca-quality-reviewer",
+        )
+        for reviewer in deep_reviewers:
+            if reviewer not in cca_text:
+                errors.append(f"cca/SKILL.md: {reviewer} 연결 누락")
+        for reference in ("deep-review-protocol.md", "language-api-pitfalls.md"):
+            if reference not in cca_text:
+                errors.append(f"cca/SKILL.md: {reference} 연결 누락")
+
+    cr_path = ROOT / ".claude/skills/cr/SKILL.md"
+    if cr_path.exists():
+        cr_text = cr_path.read_text(encoding="utf-8")
+        for reviewer in (
+            "cca-line-reviewer",
+            "cca-architecture-reviewer",
+            "cca-language-api-reviewer",
+            "cca-ux-accessibility-reviewer",
+            "cca-observability-reviewer",
+            "cca-quality-reviewer",
+        ):
+            if reviewer not in cr_text:
+                errors.append(f"cr/SKILL.md: {reviewer} 연결 누락")
+        for forbidden in ("Bash(git add ", "Bash(git commit "):
+            if forbidden in frontmatter(cr_text):
+                errors.append(f"cr/SKILL.md: 금지 도구 허용 {forbidden.strip()}")
+
+    actual_agents = tuple(
+        path.name for path in sorted((ROOT / ".claude/agents").glob("cca-*.md"))
+    )
+    for registry_file in ("install.py", "uninstall.py"):
+        registry = tuple(runpy.run_path(str(ROOT / registry_file))["AGENTS"])
+        if tuple(sorted(registry)) != actual_agents:
+            errors.append(f"{registry_file}: AGENTS 목록이 실제 agent 파일과 불일치")
 
     guard = ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
     if guard.exists():

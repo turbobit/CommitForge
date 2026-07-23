@@ -2,12 +2,13 @@
 
 > Atomic Git Assistant for Claude Code
 
-CommitForge는 Claude Code에서 변경 분석, Atomic Commit 계획, 다각도 리뷰와 안전한 커밋 실행을 제공하는 Skills 패키지입니다.
+CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Commit 계획과 안전한 커밋 실행을 제공하는 Skills 패키지입니다.
 
 | 명령 | 역할 | Git 상태 변경 | 소스 수정 |
 |---|---|---:|---:|
 | `/ccr` | Atomic Commit 계획, 분리 기준, 순서, 한글 메시지 초안 | 없음 | 없음 |
 | `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
+| `/cr` | 11개 관점 심층 리뷰, 확정적 수정, 재리뷰, 검증 | 없음 | 필요 시 있음 |
 | `/cca` | 병렬 다각도 리뷰, 확정적 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
 `/cca`는 `today`, `release`, `emergency`, `learn` 확장 모드도 제공합니다.
@@ -32,10 +33,11 @@ type(scope): 한글 제목
 ```text
 .claude/skills/cc/SKILL.md   → /cc
 .claude/skills/ccr/SKILL.md  → /ccr
+.claude/skills/cr/SKILL.md   → /cr
 .claude/skills/cca/SKILL.md  → /cca
 ```
 
-세 명령은 모두 `disable-model-invocation: true`이므로 사용자가 직접 입력할 때만 실행됩니다.
+네 명령은 모두 `disable-model-invocation: true`이므로 사용자가 직접 입력할 때만 실행됩니다.
 
 ## 요구사항
 
@@ -44,13 +46,13 @@ type(scope): 한글 제목
 - 최신 Claude Code 권장
 - `/cca`의 custom subagent를 새로 설치한 현재 세션에서 찾지 못하면 Claude Code를 한 번 재시작
 
-Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`와 `/cca`는 Git 변경을 시작하지 않도록 설계했습니다.
+Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
 
 ## 설치
 
 ### 프로젝트에 설치
 
-현재 저장소에만 `/cc`, `/ccr`, `/cca`를 제공합니다.
+현재 저장소에만 `/cc`, `/ccr`, `/cr`, `/cca`를 제공합니다.
 
 macOS / Linux / WSL / Git Bash:
 
@@ -97,14 +99,21 @@ Windows PowerShell:
 ├── skills/
 │   ├── cc/
 │   ├── ccr/
+│   ├── cr/
 │   ├── cca/
 │   └── _git-atomic-core/
 └── agents/
     ├── cca-git-reviewer.md
     ├── cca-correctness-reviewer.md
+    ├── cca-line-reviewer.md
     ├── cca-security-reviewer.md
     ├── cca-performance-reviewer.md
-    └── cca-testing-reviewer.md
+    ├── cca-testing-reviewer.md
+    ├── cca-architecture-reviewer.md
+    ├── cca-language-api-reviewer.md
+    ├── cca-ux-accessibility-reviewer.md
+    ├── cca-observability-reviewer.md
+    └── cca-quality-reviewer.md
 ```
 
 패키지의 `.claude` 내용을 대상 저장소의 `.claude`에 병합하면 됩니다.
@@ -145,6 +154,18 @@ Windows PowerShell:
 
 `/cc`는 소스 코드를 수정하지 않습니다. 현재 변경을 분석하고 index만 구성하여 여러 commit을 만듭니다. 검증 실패나 코드 문제를 발견하면 수정하지 않고 중단하여 snapshot을 보존합니다.
 
+### 심층 코드 리뷰만 실행
+
+```text
+/cr
+```
+
+```text
+/cr --strict 인증 및 세션 처리 변경
+```
+
+`/cr`은 `/cca`와 같은 11개 관점의 심층 리뷰, 확정적 결함의 국소 수정, 전면 재리뷰와 테스트·검증까지만 수행합니다. Atomic Commit 계획과 메시지 초안을 만들지 않으며 Git index, commit, push도 변경하지 않습니다. `--no-fix`를 사용하면 소스까지 완전한 읽기 전용으로 검토합니다.
+
 ### 전체 파이프라인
 
 ```text
@@ -164,7 +185,7 @@ Windows PowerShell:
 ```text
 Guard + 원본 Diff 보존
 → 변경 전체 분석
-→ Git/정확성/보안/성능/테스트 병렬 리뷰
+→ Git/정확성/line-by-line/보안/성능/테스트/architecture/API/UX·A11y/observability/품질 병렬 리뷰
 → finding 근거 검증
 → 확정적 CRITICAL/MAJOR 문제의 안전한 국소 수정
 → 재리뷰(최대 반복 횟수)
@@ -177,6 +198,22 @@ Guard + 원본 Diff 보존
 ```
 
 요구가 불명확한 설계 변경, 광범위한 리팩터링, 새 의존성 설치, 데이터 파괴 migration은 자동 수정하지 않습니다.
+
+### 심층 리뷰 범위
+
+`/cr`과 `/cca`는 모든 diff hunk를 변경 원장에 배정하고 `PASS`, `FINDING`, `N/A`로 판정합니다. 미검토 hunk가 있으면 성공 처리하지 않습니다.
+
+추가 검토 영역:
+
+- 제거된 guard·fallback·cleanup·API 동작
+- cross-file 정의·구현·호출자·테스트 contract
+- wrapper/proxy/adapter의 인자·반환·오류·취소·context 보존
+- 기존 구현 재사용과 의미 중복
+- architecture·domain·dependency·데이터 소유권
+- UX 상태와 keyboard·focus·screen reader 접근성
+- log·metric·trace·alert·correlation·cardinality
+- 복잡도·책임·dead code·유지보수성
+- 언어·프레임워크별 타입·lifecycle·async·serialization API 함정
 
 ### 확장 모드
 
@@ -214,7 +251,7 @@ Guard + 원본 Diff 보존
 /cca learn --commits 200
 ```
 
-최근 non-merge commit을 분석해 `.commitforge/profile.md`에 제목·본문·scope·분리·검증 선호를 기록합니다. 이 모드는 소스나 Git index를 변경하거나 commit하지 않습니다. 이후 `/ccr`, `/cc`, `/cca`가 프로필을 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
+최근 non-merge commit을 분석해 `.commitforge/profile.md`에 제목·본문·scope·분리·검증 선호를 기록합니다. 이 모드는 소스나 Git index를 변경하거나 commit하지 않습니다. 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로필을 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
 
 ## 인자 규약
 
@@ -224,11 +261,11 @@ Guard + 원본 Diff 보존
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
 | `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
-| `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
-| `--no-verify` | `/cc`, `/cca` | 프로젝트 검증 및 hook 우회 허용 |
-| `--strict` | `/cca` | 확인된 MINOR도 엄격하게 처리 |
-| `--iterations 1-5` | `/cca` | 리뷰-수정 반복 상한, 기본 3 |
-| `--keep-snapshot` | `/cc`, `/cca` | 성공 후에도 Diff snapshot 보존 |
+| `--no-fix` | `/cr`, `/cca` | 소스 수정 금지; blocker에서 중단 |
+| `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |
+| `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
+| `--iterations 1-5` | `/cr`, `/cca` | 리뷰-수정 반복 상한, 기본 3 |
+| `--keep-snapshot` | `/cc`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
 | `--all-authors` | `/cca today` | 오늘 commit의 작성자 제한 제거 |
 | `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정 |
 | `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
@@ -261,7 +298,7 @@ Guard + 원본 Diff 보존
 
 ### 같은 worktree
 
-`/cc`와 `/cca`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
+`/cc`, `/cr`, `/cca`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
 
 다만 이 lock은 다른 IDE, terminal, Git GUI를 강제로 막지 못합니다. 실행 중 다른 세션이 파일이나 index를 바꾸면 fingerprint 불일치로 재분석 또는 중단합니다.
 
@@ -278,7 +315,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 ## 작업 전 Diff 보존
 
-`/cc`와 `/cca` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다.
+`/cc`, `/cr`, `/cca` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다.
 
 ```text
 <git-dir>/claude-atomic-snapshots/<timestamp-session-random>/
@@ -397,6 +434,8 @@ Windows PowerShell:
 │       ├── validation-strategy.md
 │       ├── project-profiles.md
 │       ├── extended-modes.md
+│       ├── deep-review-protocol.md
+│       ├── language-api-pitfalls.md
 │       ├── reporting.md
 │       ├── recovery.md
 │       ├── examples.md
@@ -404,7 +443,13 @@ Windows PowerShell:
 └── agents/
     ├── cca-git-reviewer.md
     ├── cca-correctness-reviewer.md
+    ├── cca-line-reviewer.md
     ├── cca-security-reviewer.md
     ├── cca-performance-reviewer.md
-    └── cca-testing-reviewer.md
+    ├── cca-testing-reviewer.md
+    ├── cca-architecture-reviewer.md
+    ├── cca-language-api-reviewer.md
+    ├── cca-ux-accessibility-reviewer.md
+    ├── cca-observability-reviewer.md
+    └── cca-quality-reviewer.md
 ```

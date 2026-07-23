@@ -22,11 +22,12 @@
 
 ## 확인
 
-대상 프로젝트에서 Claude Code를 실행하고 `/`를 입력해 `cc`, `ccr`, `cca`를 확인합니다.
+대상 프로젝트에서 Claude Code를 실행하고 `/`를 입력해 `cc`, `ccr`, `cr`, `cca`를 확인합니다.
 
 ```text
 /ccr
 /cc
+/cr
 /cca
 /cca today
 /cca release
@@ -53,7 +54,7 @@
 전체 리뷰 자동화는:
 
 ```text
-/cca --no-fix 테스트 변경
+/cr --no-fix 테스트 변경
 ```
 
-`--no-fix`로 먼저 동작을 확인한 뒤 기본 `/cca`를 사용하는 방식이 안전합니다.
+`/cr --no-fix`로 읽기 전용 심층 리뷰를 확인한 뒤 `/cr` 또는 `/cca`를 사용하는 방식이 안전합니다.

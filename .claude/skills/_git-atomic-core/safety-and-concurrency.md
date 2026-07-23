@@ -20,7 +20,7 @@
 
 ## 2. Diff 스냅샷
 
-`/cc`와 `/cca`는 작업 시작 전에 guard를 실행한다.
+`/cc`, `/cr`, `/cca`는 작업 시작 전에 guard를 실행한다.
 
 스냅샷은 현재 worktree의 실제 Git directory 아래에 생성된다.
 
@@ -44,7 +44,7 @@
 
 guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만든다.
 
-- 같은 worktree에서 동시에 `/cc` 또는 `/cca`를 실행하면 두 번째 실행은 중단
+- 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`를 실행하면 두 번째 실행은 중단
 - 다른 Git 클라이언트까지 강제로 막는 잠금은 아님
 - `index.lock` 등 Git 자체 잠금이 있으면 중단
 - merge/rebase/cherry-pick/revert/bisect 진행 중이면 중단
@@ -68,7 +68,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 - 편집 세션과 커밋 세션을 동시에 실행하지 않음
 - `/ccr`은 read-only이지만 분석 중 변경되면 계획이 낡을 수 있음
-- `/cc`·`/cca` 시작 후 다른 세션의 Git/파일 변경을 중지
+- `/cc`·`/cr`·`/cca` 시작 후 다른 세션의 Git/파일 변경을 중지
 - 예상하지 못한 fingerprint 변화 시 중단
 
 ## 5. 진행 중 Git 작업

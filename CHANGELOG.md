@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 — 2026-07-23
+
+- 모든 diff hunk를 PASS/FINDING/N/A로 추적하는 엄격한 line-by-line 원장 추가
+- 제거된 동작과 cross-file contract 회귀 검토 강화
+- wrapper/proxy/adapter의 인자·반환·오류·취소·context 의미 보존 검사
+- Architecture, Language/API, UX/Accessibility, Observability, Quality 전문 reviewer 추가
+- 기존 구현 재사용·중복·복잡도·유지보수성 검토 추가
+- JavaScript/TypeScript, React/Next.js, Dart/Flutter, Python, Go, Rust, JVM, Swift, C/C++, SQL, Infrastructure API 함정 카탈로그 추가
+- 미검토 hunk가 있으면 commit을 차단하는 심층 Coverage Gate 추가
+- `/cr` 심층 코드 리뷰 명령 추가: 리뷰·국소 수정·전면 재리뷰·검증만 수행하고 Atomic Commit 계획·staging·commit·push는 제외
+- reviewer shell 권한 제거와 설치·제거 registry 일치 검증 강화
+
 ## 1.1.0 — 2026-07-23
 
 - 프로젝트 이름과 사용자 문서를 CommitForge로 통일

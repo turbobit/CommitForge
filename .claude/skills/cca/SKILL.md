@@ -1,6 +1,6 @@
 ---
 name: cca
-description: CommitForge의 최고 강도 Git 파이프라인이다. 기본 모드에서는 변경 전체를 리뷰·보완·검증해 한글 Atomic Commit을 생성하고, today/release/emergency/learn 확장 모드에서는 오늘 작업 분석, 릴리스 준비, 긴급 수정, 프로젝트 커밋 문화 학습을 수행한다. 사용자가 직접 /cca로 요청할 때만 실행한다.
+description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
 argument-hint: "[today|release|emergency|learn] [추가 맥락] [--scope <경로...>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
@@ -63,6 +63,9 @@ $ARGUMENTS
 7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
 8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
 9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md`
+10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
+
+변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
 안전 규칙과 품질 gate가 다른 지침보다 우선한다.
 
@@ -133,6 +136,8 @@ git log -20 --pretty=format:'%h%x09%s'
 - 프로젝트 규칙(`CLAUDE.md`, `AGENTS.md`, 기여 가이드)
 - 검증 명령 정의
 
+`${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`에 따라 모든 hunk를 내부 변경 원장에 배정한다. 삭제된 라인과 wrapper/proxy/adapter는 별도 항목으로 추적한다.
+
 분류:
 
 - feat/fix/refactor/perf/test/docs/build/ci/style/chore
@@ -150,18 +155,26 @@ git log -20 --pretty=format:'%h%x09%s'
 
 1. `cca-git-reviewer`
 2. `cca-correctness-reviewer`
-3. `cca-security-reviewer`
-4. `cca-performance-reviewer`
-5. `cca-testing-reviewer`
+3. `cca-line-reviewer`
+4. `cca-security-reviewer`
+5. `cca-performance-reviewer`
+6. `cca-testing-reviewer`
+7. `cca-architecture-reviewer`
+8. `cca-language-api-reviewer`
+9. `cca-ux-accessibility-reviewer`
+10. `cca-observability-reviewer`
+11. `cca-quality-reviewer`
 
-각 agent에 사용자 맥락, scope, staged/unstaged 구분, “파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다.
+각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다.
 
 - Agent가 설치되지 않았거나 실행할 수 없으면 main agent가 동일 관점을 직접 수행한다.
+- UI가 없으면 UX/A11y, 운영 동작이 없으면 Observability처럼 적용 불가능한 관점은 생략하지 말고 `N/A`와 근거를 반환한다.
 - reviewer가 반환한 내용을 사실로 가정하지 않는다.
 - main agent가 각 finding을 코드와 diff로 재현·검증한다.
 - 중복 finding은 하나로 통합한다.
 - 범위 밖 기존 문제와 현재 변경이 만든 문제를 구분한다.
 - secret 후보 값은 출력하지 않고 마스킹한다.
+- 모든 hunk가 Line reviewer 원장에 있고 적용 가능한 각 관점이 `PASS`, `FINDING`, `N/A` 중 하나인지 확인한다. 미검토 hunk가 있으면 commit을 차단한다.
 
 ## 4. 품질 Gate와 수정 반복
 
@@ -173,6 +186,15 @@ git log -20 --pretty=format:'%h%x09%s'
 - 확인된 MAJOR: 기본적으로 차단 또는 안전하게 수정
 - MINOR: 현재 scope와 위험에 따라 수정/기록
 - NOTE: scope를 확대하지 않고 기록
+
+### 심층 Coverage Gate
+
+- 모든 hunk 판정 완료
+- 모든 삭제 동작의 의도·대체 경로 확인
+- 변경 contract의 정의·구현·호출자·테스트 추적
+- wrapper/proxy의 인자·반환·오류·취소·context 보존 확인
+- 적용 가능한 Architecture, Language/API, UX/A11y, Observability, Quality 관점 완료
+- API 함정은 실제 언어·버전·코드 근거로 검증
 
 ### 자동 수정 허용 범위
 
@@ -211,8 +233,9 @@ git log -20 --pretty=format:'%h%x09%s'
 
 1. 전체 diff를 다시 읽는다.
 2. guard fingerprint를 갱신한다.
-3. 변경한 관점 reviewer와 Git reviewer를 다시 실행한다.
-4. 기존 계획과 finding을 폐기하고 새 상태로 판단한다.
+3. 이전 reviewer 상태를 모두 무효화한다.
+4. 새 fingerprint의 전체 diff로 11개 reviewer를 다시 실행한다. 적용 불가능한 관점도 새 상태 기준 `N/A`를 반환한다.
+5. 기존 계획과 finding을 폐기하고 새 상태로 판단한다.
 
 상한은 `--iterations`다. 상한까지 blocking finding이 남으면 commit하지 않고 snapshot을 보존한다.
 
@@ -301,6 +324,8 @@ main agent가 다음을 다시 확인한다.
 - secret/debug/임시 코드 없음
 - 독립 적용·되돌림 가능
 - 메시지 초안과 diff 일치
+- 모든 staged hunk가 변경 원장과 일치
+- 삭제·cross-file·wrapper/proxy finding이 재발하지 않음
 
 고위험 unit이면 관련 reviewer를 staged diff에 대해 한 번 더 실행한다.
 

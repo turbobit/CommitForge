@@ -1,6 +1,6 @@
 # Shared Git Atomic Core
 
-이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cca`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
+이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cr`, `/cca`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
 
 `SKILL.md`가 없으므로 독립 slash command로 등록되지 않습니다.
 
@@ -8,8 +8,10 @@
 - `staging-strategy.md`: hunk/index 구성
 - `commit-message-guide.md`: 한글 메시지
 - `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
-- `review-gates.md`: `/cca` 품질 gate
+- `review-gates.md`: `/cr`·`/cca` 품질 gate
 - `extended-modes.md`: `/cca today|release|emergency|learn` 동작과 프로젝트 프로필
+- `deep-review-protocol.md`: line-by-line, removed behavior, cross-file, wrapper/proxy, UX·observability 검토
+- `language-api-pitfalls.md`: 언어·프레임워크별 타입·lifecycle·API 함정
 - `validation-strategy.md`: 테스트/빌드
 - `project-profiles.md`: 언어·프레임워크
 - `reporting.md`: 결과 형식

@@ -169,7 +169,7 @@ git diff --stat <from>..HEAD
 목적:
 
 - 저장소의 실제 commit history에서 메시지·scope·Atomic 분리·검증 문화를 학습한다.
-- 결과를 `.commitforge/profile.md`에 저장해 이후 `/ccr`, `/cc`, `/cca`가 참고하게 한다.
+- 결과를 `.commitforge/profile.md`에 저장해 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 참고하게 한다.
 
 입력 범위:
 
@@ -227,7 +227,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 
 ## 6. 프로젝트 프로필
 
-`/ccr`, `/cc`, `/cca`는 저장소 루트의 `.commitforge/profile.md`가 존재하면 읽는다.
+`/ccr`, `/cc`, `/cr`, `/cca`는 저장소 루트의 `.commitforge/profile.md`가 존재하면 읽는다.
 
 우선순위:
 

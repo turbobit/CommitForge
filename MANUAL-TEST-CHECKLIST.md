@@ -13,6 +13,7 @@ Claude Code에서 `/`를 입력해 다음이 보이는지 확인합니다.
 
 - `ccr`
 - `cc`
+- `cr`
 - `cca`
 
 custom reviewer가 보이지 않으면 Claude Code를 재시작합니다.
@@ -54,25 +55,48 @@ git log --oneline --decorate -10
 git show --stat HEAD
 ```
 
-## 4. `/cca --no-fix` 확인
+## 4. `/cr --no-fix` 확인
 
 새로운 작은 변경을 만든 뒤:
 
 ```text
-/cca --no-fix 테스트 변경
+/cr --no-fix 테스트 변경
 ```
 
 확인:
 
-- 5개 reviewer 또는 main fallback
+- 11개 reviewer 또는 main fallback
 - 근거가 있는 finding
 - 소스 자동 수정 없음
-- blocker가 없을 때 검증 후 commit
+- blocker가 없을 때 검증 후 종료
 - reviewer finding이 과장되지 않음
+- 모든 diff hunk가 PASS/FINDING/N/A로 판정
+- 제거된 동작과 cross-file contract 검토
+- 적용 가능한 Architecture/API/UX·A11y/Observability/Quality 결과
+- Atomic Commit 계획과 메시지 초안 없음
+- staged diff와 HEAD가 실행 전과 동일
+- commit과 push 없음
 
-## 5. `/cca` 자동 수정 확인
+## 5. `/cr` 자동 수정 확인
 
 의도적으로 명백하고 국소적인 회귀 테스트 누락 또는 null 경계 오류를 만든 테스트 저장소에서:
+
+```text
+/cr 테스트 변경
+```
+
+확인:
+
+- 문제를 실제 코드 근거로 검증
+- 최소 범위 수정
+- 전체 11개 관점 재리뷰
+- targeted test
+- unrelated 리팩터링 없음
+- Atomic Commit 계획·staging·commit·push 없음
+
+## 6. `/cca` 전체 실행 확인
+
+`/cr`로 검토한 변경에서:
 
 ```text
 /cca 테스트 변경
@@ -80,14 +104,12 @@ git show --stat HEAD
 
 확인:
 
-- 문제를 실제 코드 근거로 검증
-- 최소 범위 수정
-- 재리뷰
-- targeted test
-- 수정된 현재 diff로 commit 계획 재생성
-- unrelated 리팩터링 없음
+- 심층 리뷰와 검증 후 Atomic Commit 계획 생성
+- hunk/file 단위 staging과 의미별 commit
+- 최종 통합 검증
+- push 없음
 
-## 6. 동시 실행 차단
+## 7. 동시 실행 차단
 
 같은 worktree의 두 Claude Code 세션에서 `/cc`를 거의 동시에 실행합니다.
 
@@ -99,7 +121,7 @@ git show --stat HEAD
 
 실제 병렬 개발은 별도 worktree에서 시험합니다.
 
-## 7. 실패 복구
+## 8. 실패 복구
 
 commit hook 실패를 재현하거나 작업을 중단합니다.
 
@@ -110,7 +132,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - `guard.py status`에서 snapshot 확인
 - 다른 세션 snapshot 미삭제
 
-## 8. `/cca today`
+## 9. `/cca today`
 
 테스트 브랜치에서 오늘 날짜의 기존 commit과 새 미커밋 변경을 준비합니다.
 
@@ -126,7 +148,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 기존 오늘 commit과 신규 commit을 구분해 보고
 - working tree가 처음부터 clean이면 보고만 하고 commit 없음
 
-## 9. `/cca release`
+## 10. `/cca release`
 
 테스트 tag 이후 작은 변경을 준비합니다.
 
@@ -142,7 +164,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 릴리스 노트 초안과 차단 요소
 - tag, push, publish, deploy 없음
 
-## 10. `/cca emergency`
+## 11. `/cca emergency`
 
 작은 hotfix와 직접 회귀 테스트를 준비합니다.
 
@@ -157,7 +179,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 직접 회귀 테스트 또는 명확한 수동 검증
 - 배포 전후 확인 항목과 남은 위험 보고
 
-## 11. `/cca learn`
+## 12. `/cca learn`
 
 history가 있는 테스트 저장소에서 실행합니다.
 
@@ -171,4 +193,29 @@ history가 있는 테스트 저장소에서 실행합니다.
 - source/index/기존 commit 변경 없음
 - 프로필 자동 stage/commit 없음
 - 분석 범위·표본 수·확신도 표시
-- 이후 `/ccr`이 프로필의 메시지·scope 선호를 참고
+- 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로필의 관련 선호를 참고
+
+## 13. 심층 리뷰 Coverage Gate
+
+테스트 저장소에 다음 변경을 준비합니다.
+
+- 삭제된 validation 또는 fallback
+- 인자를 누락하는 wrapper
+- 기존 helper와 중복되는 새 구현
+- UI focus/label 누락
+- 실패 경로 telemetry 누락
+- 언어별 lifecycle 또는 async API 오류
+
+```text
+/cr --no-fix 심층 리뷰 시험
+```
+
+확인:
+
+- 모든 hunk 원장과 미검토 0
+- removed behavior와 wrapper/proxy 의미 보존 finding
+- 기존 재사용 후보의 정확한 위치
+- Architecture, Language/API, UX/A11y, Observability, Quality 결과
+- 적용 불가능한 관점은 근거가 있는 N/A
+- blocking finding이 있으면 실패로 보고
+- commit 계획·staging·commit 없음

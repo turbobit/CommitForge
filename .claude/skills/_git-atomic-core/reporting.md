@@ -39,6 +39,29 @@
 
 실제 Git 상태를 변경하지 않았음을 마지막에 명시한다.
 
+## `/cr`
+
+```text
+## 상태
+- 시작/종료 HEAD와 staging 불변 여부
+- working tree 변경 요약
+- 분석 범위와 사용자 인자
+
+## 심층 리뷰
+- reviewer별 PASS/N/A/finding 수
+- hunk coverage: 전체/PASS/FINDING/N/A/미검토
+- 채택·기각한 finding과 근거
+
+## 수정 및 검증
+- 자동 수정 내용과 남은 blocker
+- 실행·생략·실패한 테스트/lint/type/build
+
+## 종료
+- snapshot 삭제/보존
+- lock 해제
+- Atomic Commit 계획·staging·commit·push를 하지 않았음
+```
+
 ## `/cc`
 
 각 생성 커밋:
@@ -71,6 +94,9 @@
 - 품질 gate 결과
 - Breaking Change 여부
 - 회귀·배포·migration 주의사항
+- hunk coverage: 전체/PASS/FINDING/N/A/미검토 수
+- Architecture, Language/API, UX/A11y, Observability, Quality reviewer 결과
+- 제거된 동작·wrapper/proxy·cross-file 검증 결과
 
 ### 확장 모드 추가 항목
 
