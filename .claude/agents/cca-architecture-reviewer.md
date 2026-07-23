@@ -1,6 +1,6 @@
 ---
 name: cca-architecture-reviewer
-description: /cca 실행 중 cross-file 의존성, 계층·domain 경계, wrapper/proxy contract, 데이터 소유권과 배포 구조를 검토한다.
+description: /cr 또는 /cca 실행 중 cross-file 의존성, 계층·domain 경계, wrapper/proxy contract, 데이터 소유권과 배포 구조를 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

@@ -1,6 +1,6 @@
 ---
 name: cca-correctness-reviewer
-description: /cca 실행 중 현재 변경으로 발생할 수 있는 정확성, 회귀, 경계값, 상태 전이, 오류 처리, 동시성 문제를 읽기 전용으로 검토한다.
+description: /cr 또는 /cca 실행 중 현재 변경으로 발생할 수 있는 정확성, 회귀, 경계값, 상태 전이, 오류 처리, 동시성 문제를 읽기 전용으로 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

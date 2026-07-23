@@ -1,6 +1,6 @@
 ---
 name: cca-security-reviewer
-description: /cca 실행 중 현재 diff의 secret, 인증·인가, 입력 검증, injection, 경로·네트워크·데이터 보안 위험을 읽기 전용으로 검토한다.
+description: /cr 또는 /cca 실행 중 현재 diff의 secret, 인증·인가, 입력 검증, injection, 경로·네트워크·데이터 보안 위험을 읽기 전용으로 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

@@ -23,6 +23,11 @@ AGENTS = (
     "cca-ux-accessibility-reviewer.md",
     "cca-observability-reviewer.md",
     "cca-quality-reviewer.md",
+    "cca-data-migration-reviewer.md",
+    "cca-dependency-supply-chain-reviewer.md",
+    "cca-reliability-recovery-reviewer.md",
+    "cca-privacy-governance-reviewer.md",
+    "cca-requirements-product-reviewer.md",
 )
 
 

@@ -1,6 +1,6 @@
 ---
 name: cca-line-reviewer
-description: /cca 실행 중 모든 diff hunk와 삭제된 동작을 원장 방식으로 검토하고 cross-file·wrapper·proxy 의미 보존 누락을 찾는다.
+description: /cr 또는 /cca 실행 중 모든 diff hunk와 삭제된 동작을 원장 방식으로 검토하고 cross-file·wrapper·proxy 의미 보존 누락을 찾는다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

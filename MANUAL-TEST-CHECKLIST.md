@@ -65,7 +65,7 @@ git show --stat HEAD
 
 확인:
 
-- 11개 reviewer 또는 main fallback
+- 기본 10개 reviewer 또는 main fallback
 - 근거가 있는 finding
 - 소스 자동 수정 없음
 - blocker가 없을 때 검증 후 종료
@@ -73,6 +73,7 @@ git show --stat HEAD
 - 모든 diff hunk가 PASS/FINDING/N/A로 판정
 - 제거된 동작과 cross-file contract 검토
 - 적용 가능한 Architecture/API/UX·A11y/Observability/Quality 결과
+- 조건부 reviewer의 활성/N/A 근거
 - Atomic Commit 계획과 메시지 초안 없음
 - staged diff와 HEAD가 실행 전과 동일
 - commit과 push 없음
@@ -89,7 +90,7 @@ git show --stat HEAD
 
 - 문제를 실제 코드 근거로 검증
 - 최소 범위 수정
-- 전체 11개 관점 재리뷰
+- 기본 10개와 활성 조건부 관점 전체 재리뷰
 - targeted test
 - unrelated 리팩터링 없음
 - Atomic Commit 계획·staging·commit·push 없음
@@ -219,3 +220,24 @@ history가 있는 테스트 저장소에서 실행합니다.
 - 적용 불가능한 관점은 근거가 있는 N/A
 - blocking finding이 있으면 실패로 보고
 - commit 계획·staging·commit 없음
+
+## 14. 조건부 Reviewer
+
+각각 별도 테스트 변경으로 다음 trigger를 준비합니다.
+
+- schema migration 또는 backfill
+- dependency manifest와 lockfile
+- retry/queue/failover 경로
+- analytics 또는 개인정보 수집
+- 명시적인 acceptance criteria와 구현
+
+```text
+/cr --no-fix 조건부 reviewer 시험
+```
+
+확인:
+
+- 관련 reviewer만 활성화
+- 비관련 reviewer는 근거가 있는 N/A
+- Requirements/Product는 명시적 기준이 없을 때 추측하지 않음
+- 수정 후 trigger를 다시 판정하고 활성 reviewer를 재실행

@@ -19,7 +19,7 @@
 
 ### CRITICAL
 
-다음 중 하나면 자동 커밋을 차단한다.
+다음 중 하나면 `/cr` 완료 또는 `/cca` 자동 커밋을 차단한다.
 
 - 명백한 secret/credential 노출
 - 인증·인가 우회
@@ -153,6 +153,14 @@
 - hidden side effect·testability
 - 국소적 동작 보존 리팩터링
 
+### 조건부 전문 관점
+
+- Data/Migration: 데이터 보존, 구·신 version 호환, backfill, lock, rollback
+- Dependency/Supply Chain: manifest/lockfile, provenance, CI 권한, 재현 build
+- Reliability/Recovery: partial failure, retry, DLQ, failover, graceful degradation
+- Privacy/Governance: 최소 수집, 동의, 보존·삭제, 데이터 경계
+- Requirements/Product: 명시적 acceptance criteria와 관찰 가능한 동작 일치
+
 ## 4. 자동 수정 정책
 
 `/cr`과 `/cca` 기본 동작은 다음 범위의 확정적 문제를 안전하게 수정할 수 있다.
@@ -178,7 +186,22 @@
 
 수정 후에는 모든 reviewer 결과를 폐기하고 현재 diff를 다시 리뷰한다.
 
-## 5. 최종 Gate
+## 5. `/cr` 완료 Gate
+
+- 확인된 CRITICAL 0
+- 미해결 MAJOR 0 또는 명백히 범위 밖인 이유 기록
+- secret 가능성 0
+- 적절한 검증 명령 식별 및 가능한 검증 완료
+- 사용자 작업 스냅샷 확보
+- 예상치 못한 외부 변경 없음
+- 미검토 hunk 0
+- 적용 가능한 기본·조건부 reviewer 상태가 모두 PASS/FINDING/N/A
+- HEAD와 staged diff가 시작 상태와 동일
+- Atomic Commit 계획·메시지 초안·staging·commit 없음
+
+조건을 충족하지 못하면 성공으로 보고하지 않는다.
+
+## 6. `/cca` Commit Gate
 
 커밋 실행 조건:
 
@@ -190,6 +213,6 @@
 - 사용자 작업 스냅샷 확보
 - 예상치 못한 외부 변경 없음
 - 미검토 hunk 0
-- 적용 가능한 심층 reviewer 상태가 모두 PASS/FINDING/N/A
+- 적용 가능한 기본·조건부 reviewer 상태가 모두 PASS/FINDING/N/A
 
 조건을 충족하지 못하면 커밋을 시작하지 않는다.

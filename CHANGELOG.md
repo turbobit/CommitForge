@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.3.0 — 2026-07-23
+
+- `/cr`에서 Atomic Commit 전용 Git reviewer와 staging plan Gate를 제거해 순수 review-only 경계 보장
+- `/cr` 종료 Gate에 HEAD·staged diff 불변과 Commit 계획·메시지·staging 금지 조건 추가
+- Testing reviewer가 `review-only` 모드에서 Atomic Commit 배치 제안을 생략하도록 분기
+- Data/Migration, Dependency/Supply Chain, Reliability/Recovery 전문 reviewer 추가
+- Privacy/Governance, Requirements/Product 전문 reviewer를 명시적 trigger 기반으로 추가
+- 조건부 reviewer 활성화·N/A 근거·수정 후 trigger 재평가 규칙 추가
+
 ## 1.2.0 — 2026-07-23
 
 - 모든 diff hunk를 PASS/FINDING/N/A로 추적하는 엄격한 line-by-line 원장 추가

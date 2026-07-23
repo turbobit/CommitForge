@@ -20,6 +20,7 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/extended-modes.md",
     ".claude/skills/_git-atomic-core/deep-review-protocol.md",
     ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
+    ".claude/skills/_git-atomic-core/conditional-reviewers.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
     ".claude/agents/cca-git-reviewer.md",
@@ -33,6 +34,11 @@ REQUIRED = [
     ".claude/agents/cca-ux-accessibility-reviewer.md",
     ".claude/agents/cca-observability-reviewer.md",
     ".claude/agents/cca-quality-reviewer.md",
+    ".claude/agents/cca-data-migration-reviewer.md",
+    ".claude/agents/cca-dependency-supply-chain-reviewer.md",
+    ".claude/agents/cca-reliability-recovery-reviewer.md",
+    ".claude/agents/cca-privacy-governance-reviewer.md",
+    ".claude/agents/cca-requirements-product-reviewer.md",
 ]
 
 
@@ -144,6 +150,28 @@ def main() -> None:
         for forbidden in ("Bash(git add ", "Bash(git commit "):
             if forbidden in frontmatter(cr_text):
                 errors.append(f"cr/SKILL.md: 금지 도구 허용 {forbidden.strip()}")
+        if "cca-git-reviewer" in cr_text:
+            errors.append("cr/SKILL.md: Atomic Commit 전용 git reviewer 연결")
+        if "Atomic Commit 계획이나 메시지 후보를 만들지 않는다" not in cr_text:
+            errors.append("cr/SKILL.md: review-only 출력 경계 누락")
+
+    conditional_path = ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
+    conditional_reviewers = (
+        "cca-data-migration-reviewer",
+        "cca-dependency-supply-chain-reviewer",
+        "cca-reliability-recovery-reviewer",
+        "cca-privacy-governance-reviewer",
+        "cca-requirements-product-reviewer",
+    )
+    if conditional_path.exists():
+        conditional_text = conditional_path.read_text(encoding="utf-8")
+        for reviewer in conditional_reviewers:
+            if reviewer not in conditional_text:
+                errors.append(f"conditional-reviewers.md: {reviewer} trigger 누락")
+            if cca_path.exists() and reviewer not in cca_text:
+                errors.append(f"cca/SKILL.md: {reviewer} 조건부 연결 누락")
+            if cr_path.exists() and reviewer not in cr_text:
+                errors.append(f"cr/SKILL.md: {reviewer} 조건부 연결 누락")
 
     actual_agents = tuple(
         path.name for path in sorted((ROOT / ".claude/agents").glob("cca-*.md"))

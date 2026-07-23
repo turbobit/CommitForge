@@ -42,7 +42,7 @@ $ARGUMENTS
 
 결과 경계:
 
-- 수행: 전체 diff 분석, 11개 관점 심층 리뷰, 확정적 결함의 국소 수정, 재리뷰, 테스트·검증
+- 수행: 전체 diff 분석, 기본 10개 관점과 변경 유형별 조건부 전문 리뷰, 확정적 결함의 국소 수정, 재리뷰, 테스트·검증
 - 금지: Atomic Commit 계획, commit 메시지 초안, `git add`, index 변경, `git commit`, push, amend, rebase, squash, history rewrite
 - 종료 시 HEAD와 staging area는 시작 상태와 같아야 한다.
 - 소스를 수정했다면 working tree에는 검증된 수정 결과가 남을 수 있다.
@@ -51,13 +51,13 @@ $ARGUMENTS
 
 작업 전에 다음 파일을 읽는다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/atomic-commit-rules.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-gates.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
-5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
-6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
-7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
+1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
+2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-gates.md`
+3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
+4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
+5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
+6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
+7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -106,23 +106,32 @@ git log -20 --pretty=format:'%h%x09%s'
 
 변경이 없으면 Guard `finish` 후 “검토 대상 없음”으로 종료한다.
 
-## 3. 11개 관점 심층 리뷰
+## 3. 기본 10개 관점과 조건부 심층 리뷰
 
 가능하면 동일 fingerprint를 기준으로 병렬 실행한다.
 
-1. `cca-git-reviewer`
-2. `cca-correctness-reviewer`
-3. `cca-line-reviewer`
-4. `cca-security-reviewer`
-5. `cca-performance-reviewer`
-6. `cca-testing-reviewer`
-7. `cca-architecture-reviewer`
-8. `cca-language-api-reviewer`
-9. `cca-ux-accessibility-reviewer`
-10. `cca-observability-reviewer`
-11. `cca-quality-reviewer`
+1. `cca-correctness-reviewer`
+2. `cca-line-reviewer`
+3. `cca-security-reviewer`
+4. `cca-performance-reviewer`
+5. `cca-testing-reviewer`
+6. `cca-architecture-reviewer`
+7. `cca-language-api-reviewer`
+8. `cca-ux-accessibility-reviewer`
+9. `cca-observability-reviewer`
+10. `cca-quality-reviewer`
 
-각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 제공한다. Agent는 shell과 파일 수정을 하지 않고 근거·정확한 위치·심각도·실패 시나리오를 반환해야 한다.
+Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실행하지 않는다.
+
+`conditional-reviewers.md`의 trigger를 판정해 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product reviewer를 필요한 경우에만 추가한다. 비활성 조건도 `N/A`와 근거를 남긴다.
+
+- `cca-data-migration-reviewer`
+- `cca-dependency-supply-chain-reviewer`
+- `cca-reliability-recovery-reviewer`
+- `cca-privacy-governance-reviewer`
+- `cca-requirements-product-reviewer`
+
+각 agent에 `review-only` 모드, 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 제공한다. Agent는 shell과 파일 수정을 하지 않고 근거·정확한 위치·심각도·실패 시나리오를 반환하며 Atomic Commit 계획이나 메시지 후보를 만들지 않는다.
 
 - 설치되지 않은 agent 관점은 main agent가 직접 수행한다.
 - 적용 불가능한 관점도 `N/A`와 근거를 남긴다.
@@ -143,8 +152,8 @@ git log -20 --pretty=format:'%h%x09%s'
 수정 후에는:
 
 1. 전체 diff와 fingerprint를 다시 수집한다.
-2. 이전 11개 reviewer 결과를 모두 무효화한다.
-3. 새 상태로 11개 관점을 전부 다시 실행한다.
+2. 이전 기본·활성 조건부 reviewer 결과를 모두 무효화한다.
+3. trigger를 다시 판정하고 새 상태로 기본 10개와 활성 조건부 reviewer를 전부 다시 실행한다.
 4. 새 문제와 회귀가 없는지 검증한다.
 
 반복 상한까지 blocker가 남으면 실패로 종료하며 snapshot을 보존한다.

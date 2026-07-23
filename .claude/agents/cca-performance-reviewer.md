@@ -1,6 +1,6 @@
 ---
 name: cca-performance-reviewer
-description: /cca 실행 중 현재 diff의 시간·공간 복잡도, I/O, DB, 렌더링, 캐시, 동시성 관련 성능 회귀를 읽기 전용으로 검토한다.
+description: /cr 또는 /cca 실행 중 현재 diff의 시간·공간 복잡도, I/O, DB, 렌더링, 캐시, 동시성 관련 성능 회귀를 읽기 전용으로 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

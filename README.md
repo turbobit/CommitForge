@@ -8,8 +8,8 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 |---|---|---:|---:|
 | `/ccr` | Atomic Commit 계획, 분리 기준, 순서, 한글 메시지 초안 | 없음 | 없음 |
 | `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
-| `/cr` | 11개 관점 심층 리뷰, 확정적 수정, 재리뷰, 검증 | 없음 | 필요 시 있음 |
-| `/cca` | 병렬 다각도 리뷰, 확정적 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
+| `/cr` | 기본 10개+조건부 전문 심층 리뷰, 확정적 수정, 재리뷰, 검증 | 없음 | 필요 시 있음 |
+| `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
 `/cca`는 `today`, `release`, `emergency`, `learn` 확장 모드도 제공합니다.
 
@@ -44,7 +44,7 @@ type(scope): 한글 제목
 - Git
 - Python 3.9 이상
 - 최신 Claude Code 권장
-- `/cca`의 custom subagent를 새로 설치한 현재 세션에서 찾지 못하면 Claude Code를 한 번 재시작
+- `/cr`·`/cca`의 custom subagent를 새로 설치한 현재 세션에서 찾지 못하면 Claude Code를 한 번 재시작
 
 Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
 
@@ -113,7 +113,12 @@ Windows PowerShell:
     ├── cca-language-api-reviewer.md
     ├── cca-ux-accessibility-reviewer.md
     ├── cca-observability-reviewer.md
-    └── cca-quality-reviewer.md
+    ├── cca-quality-reviewer.md
+    ├── cca-data-migration-reviewer.md
+    ├── cca-dependency-supply-chain-reviewer.md
+    ├── cca-reliability-recovery-reviewer.md
+    ├── cca-privacy-governance-reviewer.md
+    └── cca-requirements-product-reviewer.md
 ```
 
 패키지의 `.claude` 내용을 대상 저장소의 `.claude`에 병합하면 됩니다.
@@ -164,7 +169,7 @@ Windows PowerShell:
 /cr --strict 인증 및 세션 처리 변경
 ```
 
-`/cr`은 `/cca`와 같은 11개 관점의 심층 리뷰, 확정적 결함의 국소 수정, 전면 재리뷰와 테스트·검증까지만 수행합니다. Atomic Commit 계획과 메시지 초안을 만들지 않으며 Git index, commit, push도 변경하지 않습니다. `--no-fix`를 사용하면 소스까지 완전한 읽기 전용으로 검토합니다.
+`/cr`은 Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 심층 리뷰, 확정적 결함의 국소 수정, 전면 재리뷰와 테스트·검증까지만 수행합니다. Atomic Commit 계획과 메시지 초안을 만들지 않으며 Git index, commit, push도 변경하지 않습니다. `--no-fix`를 사용하면 소스까지 완전한 읽기 전용으로 검토합니다.
 
 ### 전체 파이프라인
 
@@ -185,7 +190,8 @@ Windows PowerShell:
 ```text
 Guard + 원본 Diff 보존
 → 변경 전체 분석
-→ Git/정확성/line-by-line/보안/성능/테스트/architecture/API/UX·A11y/observability/품질 병렬 리뷰
+→ Git/정확성/line-by-line/보안/성능/테스트/architecture/API/UX·A11y/observability/품질 기본 리뷰
+→ 변경 trigger에 맞는 데이터·공급망·복구·privacy·요구사항 전문 리뷰
 → finding 근거 검증
 → 확정적 CRITICAL/MAJOR 문제의 안전한 국소 수정
 → 재리뷰(최대 반복 횟수)
@@ -214,6 +220,18 @@ Guard + 원본 Diff 보존
 - log·metric·trace·alert·correlation·cardinality
 - 복잡도·책임·dead code·유지보수성
 - 언어·프레임워크별 타입·lifecycle·async·serialization API 함정
+
+변경 의미에 따라 다음 reviewer만 조건부로 추가합니다.
+
+| 조건부 관점 | 활성화 예 |
+|---|---|
+| Data/Migration | schema, migration, ORM, index, backfill, 저장 형식 |
+| Dependency/Supply Chain | manifest, lockfile, registry, CI 권한, container image |
+| Reliability/Recovery | queue, job, retry, failover, distributed lock, graceful shutdown |
+| Privacy/Governance | 개인정보, analytics, consent, retention, export/deletion |
+| Requirements/Product | 비교 가능한 ticket, ADR, acceptance criteria, API 명세가 제공됨 |
+
+활성화하지 않은 관점도 생략 사실과 근거를 `N/A`로 남깁니다. 명시적인 요구나 privacy 정책이 없으면 제품 의도나 법률 준수를 추측하지 않습니다.
 
 ### 확장 모드
 
@@ -451,5 +469,10 @@ Windows PowerShell:
     ├── cca-language-api-reviewer.md
     ├── cca-ux-accessibility-reviewer.md
     ├── cca-observability-reviewer.md
-    └── cca-quality-reviewer.md
+    ├── cca-quality-reviewer.md
+    ├── cca-data-migration-reviewer.md
+    ├── cca-dependency-supply-chain-reviewer.md
+    ├── cca-reliability-recovery-reviewer.md
+    ├── cca-privacy-governance-reviewer.md
+    └── cca-requirements-product-reviewer.md
 ```

@@ -161,5 +161,6 @@ finding은 다음을 포함한다.
 - 모든 삭제 동작에 대체·의도 판정
 - 변경 contract의 호출자·구현 추적
 - 적용 가능한 전문 관점에 `PASS/FINDING/N/A`
+- 조건부 reviewer trigger와 활성/N/A 근거 기록
 - 중복 finding 통합
 - 근거 없는 일반론·취향·범위 밖 개선 제거

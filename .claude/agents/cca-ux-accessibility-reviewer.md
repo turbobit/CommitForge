@@ -1,6 +1,6 @@
 ---
 name: cca-ux-accessibility-reviewer
-description: /cca 실행 중 사용자 상호작용 변경의 UX 상태, keyboard·focus·semantics·screen reader·localization 접근성 위험을 검토한다.
+description: /cr 또는 /cca 실행 중 사용자 상호작용 변경의 UX 상태, keyboard·focus·semantics·screen reader·localization 접근성 위험을 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

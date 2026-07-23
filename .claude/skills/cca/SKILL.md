@@ -64,6 +64,7 @@ $ARGUMENTS
 8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
 9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md`
 10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
+11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
 
 변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -165,6 +166,16 @@ git log -20 --pretty=format:'%h%x09%s'
 10. `cca-observability-reviewer`
 11. `cca-quality-reviewer`
 
+`conditional-reviewers.md`의 trigger를 판정해 다음 reviewer를 필요한 경우에만 추가한다.
+
+- `cca-data-migration-reviewer`
+- `cca-dependency-supply-chain-reviewer`
+- `cca-reliability-recovery-reviewer`
+- `cca-privacy-governance-reviewer`
+- `cca-requirements-product-reviewer`
+
+비활성 조건도 `N/A`와 근거를 coverage에 남긴다.
+
 각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다.
 
 - Agent가 설치되지 않았거나 실행할 수 없으면 main agent가 동일 관점을 직접 수행한다.
@@ -194,6 +205,7 @@ git log -20 --pretty=format:'%h%x09%s'
 - 변경 contract의 정의·구현·호출자·테스트 추적
 - wrapper/proxy의 인자·반환·오류·취소·context 보존 확인
 - 적용 가능한 Architecture, Language/API, UX/A11y, Observability, Quality 관점 완료
+- 변경 trigger에 해당하는 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 관점 완료
 - API 함정은 실제 언어·버전·코드 근거로 검증
 
 ### 자동 수정 허용 범위
@@ -234,7 +246,7 @@ git log -20 --pretty=format:'%h%x09%s'
 1. 전체 diff를 다시 읽는다.
 2. guard fingerprint를 갱신한다.
 3. 이전 reviewer 상태를 모두 무효화한다.
-4. 새 fingerprint의 전체 diff로 11개 reviewer를 다시 실행한다. 적용 불가능한 관점도 새 상태 기준 `N/A`를 반환한다.
+4. 조건부 trigger를 다시 판정하고 새 fingerprint의 전체 diff로 기본 11개와 활성 조건부 reviewer를 다시 실행한다. 적용 불가능한 관점도 새 상태 기준 `N/A`를 반환한다.
 5. 기존 계획과 finding을 폐기하고 새 상태로 판단한다.
 
 상한은 `--iterations`다. 상한까지 blocking finding이 남으면 commit하지 않고 snapshot을 보존한다.

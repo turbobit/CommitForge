@@ -49,6 +49,7 @@
 
 ## 심층 리뷰
 - reviewer별 PASS/N/A/finding 수
+- 조건부 reviewer별 trigger와 활성/N/A 근거
 - hunk coverage: 전체/PASS/FINDING/N/A/미검토
 - 채택·기각한 finding과 근거
 
@@ -96,6 +97,7 @@
 - 회귀·배포·migration 주의사항
 - hunk coverage: 전체/PASS/FINDING/N/A/미검토 수
 - Architecture, Language/API, UX/A11y, Observability, Quality reviewer 결과
+- 조건부 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 결과
 - 제거된 동작·wrapper/proxy·cross-file 검증 결과
 
 ### 확장 모드 추가 항목

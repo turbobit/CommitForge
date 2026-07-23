@@ -1,6 +1,6 @@
 ---
 name: cca-quality-reviewer
-description: /cca 실행 중 기존 코드 재사용 가능성, 중복, 복잡도, 책임, 유지보수성, dead code와 안전한 리팩터링 필요성을 검토한다.
+description: /cr 또는 /cca 실행 중 기존 코드 재사용 가능성, 중복, 복잡도, 책임, 유지보수성, dead code와 안전한 리팩터링 필요성을 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

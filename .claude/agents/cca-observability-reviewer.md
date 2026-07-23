@@ -1,6 +1,6 @@
 ---
 name: cca-observability-reviewer
-description: /cca 실행 중 변경된 동작과 실패 경로의 log, metric, trace, alert, correlation, cardinality와 운영 가시성을 검토한다.
+description: /cr 또는 /cca 실행 중 변경된 동작과 실패 경로의 log, metric, trace, alert, correlation, cardinality와 운영 가시성을 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit

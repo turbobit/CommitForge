@@ -50,11 +50,22 @@ class PackageMetadataTest(unittest.TestCase):
         frontmatter = cr.split("\n---\n", 1)[0]
 
         self.assertTrue(cr_path.is_file())
-        self.assertIn("11개 관점 심층 리뷰", cr)
+        self.assertIn("기본 10개 관점과 조건부 심층 리뷰", cr)
         self.assertIn("Atomic Commit 계획, staging, commit, push를 하지 않았음", cr)
         self.assertNotIn("## 6. Atomic Commit 계획", cr)
+        self.assertNotIn("`cca-git-reviewer`", cr)
+        self.assertIn("Atomic Commit 계획이나 메시지 후보를 만들지 않는다", cr)
         self.assertNotIn("Bash(git add ", frontmatter)
         self.assertNotIn("Bash(git commit ", frontmatter)
+
+        gates = (
+            ROOT / ".claude/skills/_git-atomic-core/review-gates.md"
+        ).read_text(encoding="utf-8")
+        cr_gate = gates.split("## 5. `/cr` 완료 Gate", 1)[1].split(
+            "## 6. `/cca` Commit Gate", 1
+        )[0]
+        self.assertNotIn("staging plan 완성", cr_gate)
+        self.assertIn("HEAD와 staged diff가 시작 상태와 동일", cr_gate)
 
     def test_installer_agent_registries_match_package(self) -> None:
         actual = tuple(
@@ -114,6 +125,27 @@ class PackageMetadataTest(unittest.TestCase):
             "SQL·Database",
         ):
             self.assertIn(language, catalog)
+
+    def test_conditional_reviewers_have_triggers_and_connections(self) -> None:
+        conditional = (
+            ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
+        ).read_text(encoding="utf-8")
+        cr = (ROOT / ".claude/skills/cr/SKILL.md").read_text(encoding="utf-8")
+        cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
+        reviewers = (
+            "cca-data-migration-reviewer",
+            "cca-dependency-supply-chain-reviewer",
+            "cca-reliability-recovery-reviewer",
+            "cca-privacy-governance-reviewer",
+            "cca-requirements-product-reviewer",
+        )
+        for reviewer in reviewers:
+            self.assertIn(reviewer, conditional)
+            self.assertIn(reviewer, cr)
+            self.assertIn(reviewer, cca)
+            self.assertTrue((ROOT / f".claude/agents/{reviewer}.md").is_file())
+        self.assertIn("명시적 기준이 없으면", conditional)
+        self.assertIn("비활성화 근거", conditional)
 
 
 if __name__ == "__main__":

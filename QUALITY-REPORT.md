@@ -12,7 +12,8 @@
 - guard 통합 테스트 3개
 - CommitForge 브랜딩·버전·확장 모드 정적 검증
 - 심층 리뷰 reference와 전문 reviewer 6종 연결 검증
-- `/cr`의 11개 관점 리뷰와 Atomic 계획·staging·commit 금지 검증
+- `/cr`의 기본 10개 리뷰와 Atomic 계획·staging·commit 금지 검증
+- `/cca` 기본 11개와 조건부 전문 reviewer 5종 trigger 연결 검증
 - 설치·제거 agent registry와 실제 파일 목록 일치 검증
 - 모든 reviewer의 shell 실행 권한 부재 검증
 
@@ -38,6 +39,8 @@
 - Line-by-line hunk 원장과 미검토 차단 규칙
 - Removed behavior, cross-file, wrapper/proxy 프로토콜
 - Architecture, Language/API, UX/A11y, Observability, Quality reviewer 설치 대상 포함
+- Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 조건부 reviewer 포함
+- `/cr` Gate에서 staging plan 조건이 제거되고 HEAD/index 불변 조건이 적용되는지 확인
 - 11개 언어·플랫폼 카탈로그 섹션 확인
 
 ## 검증하지 못한 항목

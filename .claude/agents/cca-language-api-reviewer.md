@@ -1,6 +1,6 @@
 ---
 name: cca-language-api-reviewer
-description: /cca 실행 중 변경 언어·프레임워크의 타입, 표준 라이브러리, lifecycle, async, serialization, API 함정을 검토한다.
+description: /cr 또는 /cca 실행 중 변경 언어·프레임워크의 타입, 표준 라이브러리, lifecycle, async, serialization, API 함정을 검토한다.
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
