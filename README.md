@@ -10,6 +10,8 @@ CommitForge는 Claude Code에서 변경 분석, Atomic Commit 계획, 다각도 
 | `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
 | `/cca` | 병렬 다각도 리뷰, 확정적 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
+`/cca`는 `today`, `release`, `emergency`, `learn` 확장 모드도 제공합니다.
+
 커밋 메시지는 기본적으로 다음 형태를 사용합니다.
 
 ```text
@@ -176,6 +178,44 @@ Guard + 원본 Diff 보존
 
 요구가 불명확한 설계 변경, 광범위한 리팩터링, 새 의존성 설치, 데이터 파괴 migration은 자동 수정하지 않습니다.
 
+### 확장 모드
+
+#### 오늘 작업 전체 분석
+
+```text
+/cca today
+/cca today 인증 처리 작업
+```
+
+현재 브랜치에서 Claude Code 실행 호스트의 로컬 자정 이후 현재 Git 작성자가 만든 commit과 미커밋 변경을 함께 분석합니다. 기존 commit은 재작성하지 않으며 현재 미커밋 변경만 `/cca` 파이프라인으로 commit합니다. `--all-authors`를 지정하면 작성자 제한 없이 오늘의 commit을 분석합니다.
+
+#### 릴리스 준비
+
+```text
+/cca release
+/cca release --from v1.1.0
+```
+
+최근 도달 가능한 tag 또는 `HEAD`의 조상으로 검증된 `--from` 기준 이후의 변경과 현재 작업을 검토합니다. 현재 변경을 commit한 뒤 권장 Semantic Version, 릴리스 노트 초안, migration·배포 주의사항을 보고합니다. tag, push, GitHub Release, publish, deploy는 수행하지 않습니다.
+
+#### 긴급 수정
+
+```text
+/cca emergency 결제 승인 중복 처리
+/cca emergency --scope src/payments test/payments
+```
+
+운영 장애나 hotfix를 가장 작은 안전 범위로 제한합니다. working tree가 깨끗해도 구체적인 장애 요청과 재현 가능한 근거가 있으면 최소 수정과 직접 회귀 테스트를 구현할 수 있습니다. 정확성·보안·데이터 무결성을 우선하며 무관한 리팩터링이나 의존성 변경을 포함하지 않습니다.
+
+#### 프로젝트 스타일 학습
+
+```text
+/cca learn
+/cca learn --commits 200
+```
+
+최근 non-merge commit을 분석해 `.commitforge/profile.md`에 제목·본문·scope·분리·검증 선호를 기록합니다. 이 모드는 소스나 Git index를 변경하거나 commit하지 않습니다. 이후 `/ccr`, `/cc`, `/cca`가 프로필을 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
+
 ## 인자 규약
 
 이 옵션들은 별도 shell parser가 아니라 Skill이 해석하는 명시적 프롬프트 규약입니다.
@@ -189,6 +229,9 @@ Guard + 원본 Diff 보존
 | `--strict` | `/cca` | 확인된 MINOR도 엄격하게 처리 |
 | `--iterations 1-5` | `/cca` | 리뷰-수정 반복 상한, 기본 3 |
 | `--keep-snapshot` | `/cc`, `/cca` | 성공 후에도 Diff snapshot 보존 |
+| `--all-authors` | `/cca today` | 오늘 commit의 작성자 제한 제거 |
+| `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정 |
+| `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
 
 `--no-verify`여도 staged diff 직접 검토, whitespace, secret, 저장소 안전 검사는 생략하지 않습니다.
 
@@ -353,6 +396,7 @@ Windows PowerShell:
 │       ├── review-gates.md
 │       ├── validation-strategy.md
 │       ├── project-profiles.md
+│       ├── extended-modes.md
 │       ├── reporting.md
 │       ├── recovery.md
 │       ├── examples.md

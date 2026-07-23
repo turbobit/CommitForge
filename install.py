@@ -86,7 +86,9 @@ def main() -> None:
     print(f"설치 위치: {claude_dir}")
     if backup_root.exists() or args.dry_run:
         print(f"기존 파일 백업: {backup_root}")
+    print("CommitForge 설치 완료")
     print("사용 명령: /ccr, /cc, /cca")
+    print("확장 모드: /cca today, /cca release, /cca emergency, /cca learn")
     print("새 .claude/agents 디렉터리를 처음 만든 실행 중 세션에서는 Claude Code 재시작을 권장합니다.")
 
 

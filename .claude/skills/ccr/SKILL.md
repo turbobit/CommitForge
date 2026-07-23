@@ -43,6 +43,8 @@ $ARGUMENTS
 4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
 5. 필요하면 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/examples.md`
 
+저장소 루트에 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 메시지·scope·분리 선호를 적용한다.
+
 ## 1. 인자 해석
 
 - 일반 문장은 작업 목적과 분리 의도에 참고한다.

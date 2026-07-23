@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 — 2026-07-23
+
+- 프로젝트 이름과 사용자 문서를 CommitForge로 통일
+- `/cca today`로 오늘의 기존 commit과 미커밋 변경 통합 분석
+- `/cca release`로 tag 기준 릴리스 검토·버전 제안·릴리스 노트 초안 지원
+- `/cca emergency`로 최소 범위 hotfix 리뷰·검증·commit 지원
+- `/cca learn`으로 최근 history 기반 `.commitforge/profile.md` 생성
+- `/ccr`, `/cc`, `/cca`에서 CommitForge 프로젝트 프로필 자동 반영
+- 설치·제거 백업 디렉터리를 CommitForge 명칭으로 변경
+
 ## 1.0.0 — 2026-07-23
 
 - 권장 Claude Code Skills 형식으로 `/cc`, `/ccr`, `/cca` 제공

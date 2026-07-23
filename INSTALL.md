@@ -1,4 +1,4 @@
-# 설치 요약
+# CommitForge 설치
 
 ## 프로젝트 설치
 
@@ -28,6 +28,10 @@
 /ccr
 /cc
 /cca
+/cca today
+/cca release
+/cca emergency
+/cca learn
 ```
 
 새 `.claude/agents` 디렉터리를 실행 중 세션에서 처음 만들었다면 한 번 재시작하십시오.

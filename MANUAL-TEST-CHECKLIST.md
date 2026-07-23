@@ -109,3 +109,66 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - snapshot 보존 위치 보고
 - `guard.py status`에서 snapshot 확인
 - 다른 세션 snapshot 미삭제
+
+## 8. `/cca today`
+
+테스트 브랜치에서 오늘 날짜의 기존 commit과 새 미커밋 변경을 준비합니다.
+
+```text
+/cca today 테스트 작업
+```
+
+확인:
+
+- 로컬 자정 이후 현재 작성자의 기존 commit 표시
+- 기존 commit은 amend/rebase/재생성하지 않음
+- 미커밋 변경만 신규 Atomic Commit으로 생성
+- 기존 오늘 commit과 신규 commit을 구분해 보고
+- working tree가 처음부터 clean이면 보고만 하고 commit 없음
+
+## 9. `/cca release`
+
+테스트 tag 이후 작은 변경을 준비합니다.
+
+```text
+/cca release --from <test-tag>
+```
+
+확인:
+
+- 지정 ref부터 HEAD까지의 범위 표시
+- 현재 미커밋 변경만 commit
+- major/minor/patch 제안과 근거
+- 릴리스 노트 초안과 차단 요소
+- tag, push, publish, deploy 없음
+
+## 10. `/cca emergency`
+
+작은 hotfix와 직접 회귀 테스트를 준비합니다.
+
+```text
+/cca emergency --scope <hotfix-path> 장애 재현 설명
+```
+
+확인:
+
+- 장애 원인과 직접 관련된 최소 범위만 수정
+- 무관한 formatting/refactor/dependency 변경 없음
+- 직접 회귀 테스트 또는 명확한 수동 검증
+- 배포 전후 확인 항목과 남은 위험 보고
+
+## 11. `/cca learn`
+
+history가 있는 테스트 저장소에서 실행합니다.
+
+```text
+/cca learn --commits 20
+```
+
+확인:
+
+- `.commitforge/profile.md`만 생성 또는 갱신
+- source/index/기존 commit 변경 없음
+- 프로필 자동 stage/commit 없음
+- 분석 범위·표본 수·확신도 표시
+- 이후 `/ccr`이 프로필의 메시지·scope 선호를 참고

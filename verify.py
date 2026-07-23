@@ -15,6 +15,7 @@ REQUIRED = [
     ".claude/skills/cc/SKILL.md",
     ".claude/skills/ccr/SKILL.md",
     ".claude/skills/cca/SKILL.md",
+    ".claude/skills/_git-atomic-core/extended-modes.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
     ".claude/agents/cca-git-reviewer.md",
@@ -56,6 +57,30 @@ def main() -> None:
                 errors.append(f"{path}: frontmatter 필드 누락 {field}")
         if len(text.splitlines()) > 500:
             errors.append(f"{path}: SKILL.md 500줄 초과")
+
+    readme = ROOT / "README.md"
+    if readme.exists() and not readme.read_text(encoding="utf-8").startswith("# CommitForge"):
+        errors.append("README.md: CommitForge 제목 누락")
+
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    manifest_path = ROOT / "MANIFEST.json"
+    if manifest_path.exists():
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("name") != "CommitForge":
+            errors.append("MANIFEST.json: name이 CommitForge가 아님")
+        if manifest.get("version") != version:
+            errors.append("MANIFEST.json: VERSION과 version 불일치")
+
+    cca_path = ROOT / ".claude/skills/cca/SKILL.md"
+    modes_path = ROOT / ".claude/skills/_git-atomic-core/extended-modes.md"
+    if cca_path.exists() and modes_path.exists():
+        cca_text = cca_path.read_text(encoding="utf-8")
+        modes_text = modes_path.read_text(encoding="utf-8")
+        for mode in ("today", "release", "emergency", "learn"):
+            if f"`{mode}`" not in cca_text:
+                errors.append(f"cca/SKILL.md: {mode} 모드 분기 누락")
+            if f"## " not in modes_text or f"`{mode}`" not in modes_text:
+                errors.append(f"extended-modes.md: {mode} 모드 설명 누락")
 
     guard = ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
     if guard.exists():

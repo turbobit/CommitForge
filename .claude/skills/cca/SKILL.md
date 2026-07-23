@@ -1,7 +1,7 @@
 ---
 name: cca
-description: Git 변경 전체를 다각도로 리뷰하고 확정적 문제를 안전하게 보완한 뒤 검증하여, 최적 순서의 한글 Atomic Commit을 모두 생성하는 최고 강도 파이프라인이다. 사용자가 직접 /cca로 전체 자동화를 요청할 때만 실행한다.
-argument-hint: "[추가 맥락] [--scope <경로...>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+description: CommitForge의 최고 강도 Git 파이프라인이다. 기본 모드에서는 변경 전체를 리뷰·보완·검증해 한글 Atomic Commit을 생성하고, today/release/emergency/learn 확장 모드에서는 오늘 작업 분석, 릴리스 준비, 긴급 수정, 프로젝트 커밋 문화 학습을 수행한다. 사용자가 직접 /cca로 요청할 때만 실행한다.
+argument-hint: "[today|release|emergency|learn] [추가 맥락] [--scope <경로...>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -15,8 +15,12 @@ allowed-tools:
   - Bash(git status *)
   - Bash(git diff *)
   - Bash(git log *)
+  - Bash(git merge-base *)
   - Bash(git show *)
   - Bash(git branch *)
+  - Bash(git config *)
+  - Bash(git describe *)
+  - Bash(git tag *)
   - Bash(git rev-parse *)
   - Bash(git ls-files *)
   - Bash(git check-attr *)
@@ -30,10 +34,11 @@ allowed-tools:
   - Bash(git apply --check *)
   - Bash(git commit *)
   - Bash(git diff-tree *)
+  - Bash(cmp *)
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
 ---
 
-# `/cca` — Ultimate Atomic Git Assistant
+# `/cca` — CommitForge All
 
 사용자 참고 맥락:
 
@@ -57,11 +62,16 @@ $ARGUMENTS
 6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
 7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
 8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
+9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md`
 
 안전 규칙과 품질 gate가 다른 지침보다 우선한다.
 
+저장소 루트에 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
+
 ## 0. 인자 해석
 
+- 첫 번째 위치 인자가 `today`, `release`, `emergency`, `learn`이면 `extended-modes.md`의 해당 흐름을 적용한다.
+- 확장 모드가 아니면 아래 기본 `/cca` 흐름을 적용한다.
 - 일반 문장은 구현 의도, 사용자 요구, commit 메시지 맥락으로 사용한다.
 - `--scope <경로...>`: 지정 범위 중심으로 처리하되 필수 의존성은 분석한다.
 - `--no-fix`: 소스 파일을 수정하지 않는다. blocking finding이 있으면 commit 전에 중단한다.
@@ -72,6 +82,17 @@ $ARGUMENTS
 - `--keep-snapshot`: 성공 후 snapshot을 보존한다.
 - 알 수 없는 옵션은 자연어 맥락으로 취급한다.
 - 새 dependency 설치, 외부 서비스 변경, 데이터 파괴 작업은 인자로 명시돼도 별도 안전 판단 없이 수행하지 않는다.
+
+### 확장 모드 분기
+
+- `today`: 오늘의 기존 commit을 읽기 전용으로 분석하고 현재 미커밋 변경만 아래 기본 파이프라인으로 commit한다. 기존 commit은 재작성하지 않는다.
+- `release`: 최근 tag 또는 `--from <ref>` 이후와 현재 변경을 검토한다. 현재 변경만 commit하고 버전 제안·릴리스 노트 초안을 반환한다.
+- `emergency`: 아래 파이프라인을 최소 hotfix 범위로 제한하고 보안·정확성·데이터 무결성·직접 회귀 검증을 우선한다.
+- `learn`: 기본 리뷰/commit 파이프라인을 실행하지 않는다. history를 분석해 `.commitforge/profile.md`만 생성·갱신하고 stage/commit하지 않는다.
+
+`today`, `release`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
+
+`allowed-tools`에 없는 프로젝트별 테스트·lint·build 명령은 사용할 수 없는 것이 아니다. Claude Code 권한 설정에 따라 사용자 승인을 요청한 뒤 실행한다. 승인을 받지 못하거나 실행할 수 없으면 해당 검증을 생략했다고 명시하며, 필수 검증이 없는 `emergency` 작업을 성공으로 처리하지 않는다.
 
 ## 1. Guard 및 원본 상태 보존
 
@@ -121,7 +142,7 @@ git log -20 --pretty=format:'%h%x09%s'
 - 위험 파일과 binary/submodule/LFS
 - scope 밖 의존성
 
-변경이 없으면 guard `finish`로 정리하고 종료한다.
+변경이 없으면 기본 모드와 `today`·`release`는 guard `finish`로 정리한다. 기본 모드는 종료하고, `today`와 `release`는 사전 분석한 기존 commit 범위의 모드별 보고를 완료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
 
 ## 3. 병렬 전문 리뷰
 

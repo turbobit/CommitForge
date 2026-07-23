@@ -10,6 +10,7 @@
 - 설치 → 재설치 backup → 제거 backup 통합 시험
 - 공백이 포함된 경로에서 guard launcher 및 설치 시험
 - guard 통합 테스트 3개
+- CommitForge 브랜딩·버전·확장 모드 정적 검증
 
 ### Guard 통합 테스트
 
@@ -20,6 +21,13 @@
 5. 성공 시 snapshot 삭제 + lock 해제
 6. merge 등 진행 중 Git operation에서 시작 차단
 7. 서로 다른 linked worktree의 독립 lock/snapshot
+
+### 확장 모드 검증
+
+- `/cca today`, `release`, `emergency`, `learn` 분기 존재
+- 확장 모드 공통 규칙 파일 설치 대상 포함
+- `learn` 프로필을 `/ccr`, `/cc`, `/cca`가 참조
+- README·MANIFEST·VERSION의 CommitForge 브랜딩과 버전 일치
 
 ## 검증하지 못한 항목
 
