@@ -1,0 +1,32 @@
+[
+  {
+    "name": "python mutable default regression",
+    "base_files": {
+      "service.py": "def collect(item, values=None):\n    values = [] if values is None else values\n    values.append(item)\n    return values\n"
+    },
+    "changed_files": {
+      "service.py": "def collect(item, values=[]):\n    values.append(item)\n    return values\n"
+    },
+    "prompt": "/cr --no-fix Python 기본 인자 변경을 엄격히 리뷰",
+    "expected_terms": [
+      ["mutable default", "기본 인자"],
+      ["공유", "shared", "상태"]
+    ],
+    "expected_reviewers": ["cca-correctness-reviewer", "cca-language-api-reviewer"]
+  },
+  {
+    "name": "destructive migration",
+    "base_files": {
+      "db/migrations/001_users.sql": "CREATE TABLE users (id INTEGER PRIMARY KEY, email TEXT, legacy_name TEXT);\n"
+    },
+    "changed_files": {
+      "db/migrations/002_drop_legacy.sql": "ALTER TABLE users DROP COLUMN legacy_name;\n"
+    },
+    "prompt": "/cr --no-fix 데이터 마이그레이션 위험을 엄격히 리뷰",
+    "expected_terms": [
+      ["데이터", "data"],
+      ["drop", "삭제", "손실", "rollback"]
+    ],
+    "expected_reviewers": ["cca-data-migration-reviewer"]
+  }
+]

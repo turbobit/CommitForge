@@ -1,0 +1,12 @@
+{
+  "schema": "commitforge-baseline/v1",
+  "entries": [
+    {
+      "id": "cca-quality-reviewer:src/legacy.py:legacy_handler:complexity",
+      "reason": "현재 변경과 무관한 기존 부채이며 별도 작업에서 제거",
+      "owner": "platform-team",
+      "expires": "2099-12-31",
+      "fingerprint": null
+    }
+  ]
+}

@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.5.0 — 2026-07-23
+
+- `/cr --base`, `--range`, `pr`로 branch·commit range·GitHub PR 심층 리뷰 지원
+- `.commitforge/review.yml` 기반 프로젝트별 reviewer·대형 diff·출력·baseline 정책 추가
+- `commitforge-review/v1` JSON과 SARIF 2.1.0 보고서 및 계약 validator 추가
+- 소유자·사유·만료일·fingerprint 기반 finding baseline과 고위험 억제 금지 규칙 추가
+- 대형 diff의 domain shard, cross-file contract 집계, 문맥 부족 `UNKNOWN` 차단 추가
+- snapshot 파일별 크기·SHA-256 inventory와 삭제 전 무결성 감사 추가
+- 실제 Claude Code `/cr --no-fix` opt-in 평가 harness와 회귀 scenario 추가
+- Ubuntu Python 3.9/3.13, macOS, Windows CI matrix 추가
+- GitHub Actions를 전체 commit SHA로 고정하고 Dependabot 업데이트 설정 추가
+
 ## 1.4.0 — 2026-07-23
 
 - Guard `verify-review`와 `finish --review-only`로 `/cr`의 HEAD·branch·staged diff 불변 조건을 프로그램 수준에서 강제

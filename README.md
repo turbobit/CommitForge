@@ -173,6 +173,20 @@ Windows PowerShell:
 
 `/cr`은 Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 심층 리뷰, 확정적 결함의 국소 수정, 전면 재리뷰와 테스트·검증까지만 수행합니다. Atomic Commit 계획과 메시지 초안을 만들지 않으며 Git index, commit, push도 변경하지 않습니다. `--no-fix`를 사용하면 소스까지 완전한 읽기 전용으로 검토합니다.
 
+기본 working tree 외에도 비교 대상을 지정할 수 있습니다.
+
+```text
+/cr --base main
+/cr --range v1.4.0..HEAD --no-fix
+/cr pr --no-fix
+```
+
+- `--base <ref>`: merge-base부터 현재 HEAD까지의 commit과 현재 변경을 함께 검토
+- `--range <A..B>`: 명시한 commit 범위를 검토하며 `B`가 HEAD가 아니면 자동 수정 금지
+- `pr`: GitHub CLI로 현재 PR의 base/head를 확인해 PR 범위를 검토
+
+어떤 모드에서도 `/cr`은 Atomic Commit 계획·메시지·staging·commit을 만들지 않습니다.
+
 ### 전체 파이프라인
 
 ```text
@@ -244,6 +258,30 @@ Guard + 원본 Diff 보존
 - finding은 stable ID, diff fingerprint, severity, status, evidence, failure scenario, validation으로 정규화
 - 같은 root cause는 직접 owner reviewer 하나로 통합
 
+### 프로젝트별 리뷰 정책
+
+저장소의 `.commitforge/review.yml`에서 reviewer, 대형 diff 기준, 보고서 형식과 baseline 위치를 조정할 수 있습니다. 시작 예시는 [examples/review.yml](examples/review.yml)입니다.
+
+정책은 필수 안전 관점을 약화할 수 없습니다. Line·Correctness·Security reviewer와 변경 trigger로 활성화된 조건부 reviewer는 비활성화할 수 없고, 미검토 영역은 `UNKNOWN`으로 차단됩니다.
+
+### JSON·SARIF 보고서
+
+```text
+/cr --no-fix --format json --output review.json
+/cr --base main --no-fix --format sarif --output review.sarif
+/cca --format json --output .git/commitforge-reports/cca.json
+```
+
+JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생성된 결과는 `report_validator.py`로 구조를 검증합니다.
+
+### Baseline과 억제
+
+기존 finding은 `.commitforge/review-baseline.json`에 stable ID, fingerprint, 이유, 소유자, 만료일을 기록해 `BASELINED`로 분리할 수 있습니다. CRITICAL, secret, 인증 우회, 데이터 손실 위험은 baseline으로 억제할 수 없습니다. 시작 예시는 [examples/review-baseline.json](examples/review-baseline.json)입니다.
+
+### 대형 Diff
+
+기본적으로 40개 파일, 200개 hunk 또는 3,000 변경 라인 중 하나를 넘으면 대형 diff 모드가 활성화됩니다. 변경을 domain/package 단위로 나눠 리뷰하되 마지막 cross-file 집계가 공유 contract, migration, 권한, 호출 관계를 다시 연결합니다. 문맥 부족은 통과가 아니라 `UNKNOWN`입니다.
+
 ### 확장 모드
 
 #### 오늘 작업 전체 분석
@@ -295,6 +333,11 @@ Guard + 원본 Diff 보존
 | `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
 | `--iterations 1-5` | `/cr`, `/cca` | 리뷰-수정 반복 상한, 기본 3 |
 | `--keep-snapshot` | `/cc`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
+| `--base <ref>` | `/cr` | merge-base부터 HEAD 및 현재 변경 검토 |
+| `--range <A..B>` | `/cr` | 명시한 commit 범위 검토 |
+| `pr` | `/cr` | 현재 GitHub PR의 base/head 범위 검토 |
+| `--format human\|json\|sarif` | `/cr`, `/cca` | 보고서 형식 선택 |
+| `--output <path>` | `/cr`, `/cca` | machine-readable 보고서 저장 |
 | `--all-authors` | `/cca today` | 오늘 commit의 작성자 제한 제거 |
 | `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정 |
 | `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
@@ -359,8 +402,9 @@ git worktree add ../repo-feature-b -b feature/b
 - 기본 256 MiB 이내 untracked archive
 - repository fingerprint
 - 세션 소유 token
+- snapshot 파일별 크기와 SHA-256 inventory
 
-모든 의도된 commit과 검증이 성공하면 자기 snapshot만 삭제합니다.
+모든 의도된 commit과 검증이 성공하면 Guard가 snapshot inventory를 다시 감사한 뒤 자기 snapshot만 삭제합니다. 손상·누락·변조가 감지되면 삭제와 성공 처리를 차단합니다.
 
 실패, 중단, 불확실한 dirty 상태면 lock만 해제하고 snapshot은 보존합니다.
 
@@ -458,13 +502,22 @@ python3 release.py
 python3 release.py --check --archives-dir dist
 ```
 
-GitHub Actions는 push와 pull request마다 release metadata, 전체 테스트, Python syntax, SHA-256, 설치·재설치·제거를 검증합니다.
+GitHub Actions는 push와 pull request마다 release metadata, 전체 테스트, Python syntax, SHA-256, 설치·재설치·제거를 검증합니다. Ubuntu Python 3.9/3.13, macOS, Windows portability matrix도 실행하며 외부 Action은 전체 commit SHA로 고정합니다. Dependabot이 Action 업데이트를 주기적으로 제안합니다.
+
+실제 Claude Code 모델 판단은 로컬 opt-in 평가로 확인할 수 있습니다.
+
+```bash
+python3 evals/run_evals.py --check
+python3 evals/run_evals.py --live --scenario "python mutable default regression"
+```
+
+Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을 사용합니다. `--command` 또는 `COMMITFORGE_EVAL_COMMAND`로 모델·권한·비용 정책을 명시적으로 바꿀 수 있습니다.
 
 ## 한계
 
 - Atomicity는 코드 의미에 대한 모델 판단을 포함하므로 최종 `git log`와 각 diff 검토가 여전히 중요합니다.
 - 같은 worktree를 수정하는 비협조적 외부 프로세스까지 완전히 차단하지 못합니다.
-- 매우 큰 diff, 복잡한 generated source, binary, 초기 unborn branch의 부분 staging은 자동 분리가 제한될 수 있습니다.
+- 매우 큰 diff는 자동 분할하지만 복잡한 generated source, binary, 초기 unborn branch의 부분 staging은 여전히 제한될 수 있습니다.
 - 프로젝트 테스트 환경이 준비되지 않으면 일부 검증을 수행할 수 없으며 결과에 명시합니다.
 - `/cca` reviewer는 finding을 제안하며 main agent가 근거를 재검증하도록 설계했지만, 자동 리뷰가 인간의 도메인 검토를 완전히 대체하지는 않습니다.
 
@@ -487,10 +540,18 @@ GitHub Actions는 push와 pull request마다 release metadata, 전체 테스트,
 │       ├── extended-modes.md
 │       ├── deep-review-protocol.md
 │       ├── language-api-pitfalls.md
+│       ├── review-policy.md
+│       ├── reporting-formats.md
+│       ├── baseline-and-suppressions.md
+│       ├── large-diff-review.md
 │       ├── reporting.md
 │       ├── recovery.md
 │       ├── examples.md
-│       └── scripts/guard.py
+│       └── scripts/
+│           ├── guard.py
+│           ├── reviewer_triggers.py
+│           ├── report_validator.py
+│           └── baseline.py
 └── agents/
     ├── cca-git-reviewer.md
     ├── cca-correctness-reviewer.md

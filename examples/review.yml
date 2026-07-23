@@ -1,0 +1,21 @@
+required_reviewers:
+  - correctness
+  - security
+disabled_reviewers: []
+max_parallel: 4
+blocking_severity: MAJOR
+exclude:
+  - vendor/**
+  - generated/**
+large_diff:
+  files: 40
+  hunks: 200
+  lines: 3000
+output:
+  format: human
+  path: null
+baseline: .commitforge/review-baseline.json
+requirements:
+  sources:
+    - docs/requirements/**
+    - docs/adr/**

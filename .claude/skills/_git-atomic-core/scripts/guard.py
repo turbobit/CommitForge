@@ -318,6 +318,16 @@ def capture_snapshot(
             f"({untracked_total} bytes > {max_untracked_bytes} bytes)."
         )
 
+    snapshot_files = {}
+    for path in sorted(snapshot.iterdir()):
+        if not path.is_file() or path.name == MARKER_NAME:
+            continue
+        data = path.read_bytes()
+        snapshot_files[path.name] = {
+            "size": len(data),
+            "sha256": hashlib.sha256(data).hexdigest(),
+        }
+
     metadata = {
         "schema": SCHEMA_VERSION,
         "session": session,
@@ -333,6 +343,7 @@ def capture_snapshot(
         "untracked_archived": archived_untracked,
         "untracked_manifest": manifest,
         "warnings": warnings,
+        "snapshot_files": snapshot_files,
     }
     marker = snapshot / MARKER_NAME
     marker.write_text(json.dumps(metadata, ensure_ascii=True, indent=2), encoding="utf-8")
@@ -476,12 +487,70 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
     emit(result)
 
 
+def audit_snapshot(snapshot: Path, metadata: dict[str, Any]) -> dict[str, Any]:
+    expected = metadata.get("snapshot_files")
+    if not isinstance(expected, dict):
+        raise GuardError("snapshot checksum inventory가 없습니다.")
+
+    actual_names = {
+        path.name
+        for path in snapshot.iterdir()
+        if path.is_file() and path.name != MARKER_NAME
+    }
+    expected_names = set(expected)
+    missing = sorted(expected_names - actual_names)
+    unexpected = sorted(actual_names - expected_names)
+    corrupt = []
+    for name in sorted(expected_names & actual_names):
+        data = (snapshot / name).read_bytes()
+        record = expected[name]
+        if (
+            len(data) != record.get("size")
+            or hashlib.sha256(data).hexdigest() != record.get("sha256")
+        ):
+            corrupt.append(name)
+
+    return {
+        "ok": not missing and not unexpected and not corrupt,
+        "missing": missing,
+        "unexpected": unexpected,
+        "corrupt": corrupt,
+        "files": len(expected),
+    }
+
+
+def cmd_audit_snapshot(args: argparse.Namespace) -> None:
+    ctx = repo_context(Path.cwd().resolve())
+    session = safe_session(args.session)
+    verify_owner(ctx, session, args.token)
+    snapshot = Path(args.snapshot)
+    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    result = audit_snapshot(snapshot, metadata)
+    if not result["ok"]:
+        raise GuardError(
+            "snapshot 무결성 검증 실패: "
+            f"missing={result['missing']}, unexpected={result['unexpected']}, "
+            f"corrupt={result['corrupt']}"
+        )
+    emit(result)
+
+
 def cmd_finish(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
     verify_owner(ctx, session, args.token)
     snapshot = Path(args.snapshot)
     metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    audit_result = None
+    if isinstance(metadata.get("snapshot_files"), dict):
+        audit_result = audit_snapshot(snapshot, metadata)
+        if not audit_result["ok"]:
+            raise GuardError(
+                "snapshot 무결성 검증에 실패해 삭제하지 않습니다: "
+                f"missing={audit_result['missing']}, "
+                f"unexpected={audit_result['unexpected']}, "
+                f"corrupt={audit_result['corrupt']}"
+            )
 
     review_result = None
     if args.review_only:
@@ -515,6 +584,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "lock_released": True,
             "worktree_clean": not bool(dirty),
             "review_invariants": review_result,
+            "snapshot_audit": audit_result,
         }
     )
 
@@ -588,6 +658,14 @@ def build_parser() -> argparse.ArgumentParser:
     verify_review.add_argument("--token", required=True)
     verify_review.add_argument("--snapshot", required=True)
 
+    audit = sub.add_parser(
+        "audit-snapshot",
+        help="Verify owned snapshot file sizes and SHA-256 hashes",
+    )
+    audit.add_argument("--session", required=True)
+    audit.add_argument("--token", required=True)
+    audit.add_argument("--snapshot", required=True)
+
     abort = sub.add_parser("abort", help="Keep snapshot but release owned lock")
     abort.add_argument("--session", required=True)
     abort.add_argument("--token", required=True)
@@ -605,6 +683,7 @@ def main() -> None:
         "begin": cmd_begin,
         "fingerprint": cmd_fingerprint,
         "verify-review": cmd_verify_review,
+        "audit-snapshot": cmd_audit_snapshot,
         "finish": cmd_finish,
         "abort": cmd_abort,
         "status": cmd_status,

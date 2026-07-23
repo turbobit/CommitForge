@@ -265,3 +265,56 @@ python3 -m unittest tests.test_release -v
 
 - metadata가 현재 source와 일치
 - 서로 다른 임시 디렉터리에서 생성한 ZIP/TAR.GZ가 byte-identical
+
+## 17. 비교 범위와 PR 리뷰
+
+```text
+/cr --base main --no-fix
+/cr --range HEAD~2..HEAD --no-fix
+/cr pr --no-fix
+```
+
+확인:
+
+- 실제 merge-base 또는 명시 범위를 보고
+- PR 모드는 PR 번호·URL·base/head를 표시
+- 과거 commit 범위는 소스 자동 수정 없음
+- 모든 모드에서 Atomic 계획·staging·commit 없음
+
+## 18. JSON·SARIF와 Baseline
+
+```text
+/cr --no-fix --format json --output review.json
+/cr --no-fix --format sarif --output review.sarif
+```
+
+확인:
+
+- 두 파일이 `report_validator.py` 검증 통과
+- baseline의 이유·소유자·만료일이 모두 필요
+- 만료된 baseline은 `STALE`
+- CRITICAL·secret·인증 우회·데이터 손실 finding은 억제되지 않음
+
+## 19. 대형 Diff와 Snapshot 감사
+
+정책 기준을 낮춘 테스트 `.commitforge/review.yml`을 만들고 여러 domain의 변경을 준비합니다.
+
+확인:
+
+- domain/package shard별 결과와 최종 cross-file 집계
+- 누락 문맥은 `UNKNOWN`
+- snapshot metadata에 파일별 크기·SHA-256 존재
+- snapshot 파일을 변조하면 `audit-snapshot`과 `finish`가 실패하고 snapshot이 보존됨
+
+## 20. Claude Code Live Eval
+
+```bash
+python3 evals/run_evals.py --check
+python3 evals/run_evals.py --live --scenario "python mutable default regression"
+```
+
+확인:
+
+- 격리된 임시 저장소에서 `/cr --no-fix` 실행
+- 기대한 정확성 개념을 finding에서 탐지
+- HEAD와 staged diff가 실행 전후 동일

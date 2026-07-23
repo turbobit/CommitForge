@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "reproducible": true,
-  "file_count": 59,
-  "total_bytes": 242530,
+  "file_count": 71,
+  "total_bytes": 283287,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -87,13 +87,18 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 1374,
-      "sha256": "3c883d68f4e8de7dd6fde545d6343d7dc8966baf3f3a7aa587f89318455cd3f5"
+      "size": 1865,
+      "sha256": "ba46133d28733c40bf129f03498dcc7f7d81d30eb42285290fff151f1f5888cd"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
       "size": 7835,
       "sha256": "e09e82367fd2cfec18a2438598603281e9441c02a705320c54a24afa88a68105"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/baseline-and-suppressions.md",
+      "size": 947,
+      "sha256": "5591fd59733609f20bf03d83086488c720a06d44af58d98d62d5a5a86a314332"
     },
     {
       "path": ".claude/skills/_git-atomic-core/commit-message-guide.md",
@@ -126,14 +131,24 @@
       "sha256": "2b4f0c852f2b5efb96c88682cd9b9189823ef7daf85870a7e69e890a448192d5"
     },
     {
+      "path": ".claude/skills/_git-atomic-core/large-diff-review.md",
+      "size": 1219,
+      "sha256": "3a66e005e84a9527996e8f1e2543a4c0c472c11ebd55a1d7a6bfe7bef2f78911"
+    },
+    {
       "path": ".claude/skills/_git-atomic-core/project-profiles.md",
       "size": 2970,
       "sha256": "0f06d107eead0e7afe1ea7d1c4934b209f18ad3e7c6568fe50beb04c094f0d91"
     },
     {
       "path": ".claude/skills/_git-atomic-core/recovery.md",
-      "size": 1905,
-      "sha256": "497b66e6f434c27ee4292fc1a2cc1ebca67d917e8aa724b0e67d4d92af968ccf"
+      "size": 2141,
+      "sha256": "448c861e40f10228994afb641a98bade13dcb1c44b023f9175966d2b40660b76"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
+      "size": 1625,
+      "sha256": "70cc34bf77e118f4f221da2d52927efb5a00ea99a3c5d5ef3e44bb46554483b9"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
@@ -151,19 +166,34 @@
       "sha256": "7650a288977d5cfa2ac45210ed5dc6984834b642fe76e225e31df8b27b85b874"
     },
     {
+      "path": ".claude/skills/_git-atomic-core/review-policy.md",
+      "size": 1251,
+      "sha256": "cdb717a8ce12475c2e71847f11812bcc51e4b2c885f089887306520662de15ae"
+    },
+    {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 4371,
-      "sha256": "b2a7f0dce861430936e59469fe4aee1c49b4aa0349134b4f61a89952133dd5d7"
+      "size": 4683,
+      "sha256": "fa82a95c22d7623bd3ffb8715703723acb29c27f23423434153981b2ab3c24df"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/scripts/baseline.py",
+      "size": 1752,
+      "sha256": "2e7a84b648eb7b54767045318edfa3fd5bd8996fd8e92f8d9be2c78b239e52ad"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 21935,
-      "sha256": "724170a728d03c5a0a4fee600a6464185770c7bdf85fd901e4f8ca1f6b7b8de2"
+      "size": 24777,
+      "sha256": "944d243ef40d0f60edd26264b1697c306f5af585bbfd1cc666806830e72c25e8"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
       "size": 576,
       "sha256": "05cf055f32591fa8de69003b5510b8993a53724d13c93e524437a6e3adcaa2cb"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/scripts/report_validator.py",
+      "size": 3162,
+      "sha256": "759644ef53e541a7499f6f47794831e87271abfeb77fcc035a46178578309460"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
@@ -187,8 +217,8 @@
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 17453,
-      "sha256": "5717107bd0e6c612e6494d1bd204e7864882b49454d1b68e452fd03ab3b8cba8"
+      "size": 18376,
+      "sha256": "a6dcb3fc3d6f193f7617fbfef624c8660f89d8a71483ab6597bf3395c7b9afe7"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
@@ -197,48 +227,73 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 9478,
-      "sha256": "b0b3bc0951d8e1d69697fc4039da9e95a917a5705d034e654ca3280e70351386"
+      "size": 11289,
+      "sha256": "2d981e411c7378a716e4b7fa35984e80be8f5e9b8d48461e1b0e87efceef695a"
+    },
+    {
+      "path": ".github/dependabot.yml",
+      "size": 181,
+      "sha256": "e5294ec6de7679cbce9dabb6a8f24958446c27e00be984eb9789ab59d5e429ea"
     },
     {
       "path": ".github/workflows/verify.yml",
-      "size": 1400,
-      "sha256": "60bf8458365b50db7c9eb439e9287386475a4f2cde76f47015473988df72cb34"
+      "size": 2497,
+      "sha256": "ad7df9001da4b832a5d01f9bdaaa1a4cd90edacce2c30acf6e982693324271df"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 3455,
-      "sha256": "68cf3cb985ac107429ebd62dd4e3ad9e22b3cb9c40d89cd6ced03b9c8476630a"
+      "size": 4283,
+      "sha256": "9117008f94815e14ff6236342aea5ccf2b568cf810cda05a2e97f2994e970a8b"
     },
     {
       "path": "INSTALL.md",
-      "size": 972,
-      "sha256": "f9a0d60848565cad3e19b8630d15ec09d19eabdc9e1196da3132dc0311762c79"
+      "size": 1238,
+      "sha256": "c7c8ef96c13a5f5cdc26be452dda659a208c4677c84babcd203aa4d20c49ca89"
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 6632,
-      "sha256": "d6cde2693e2c6c37e515ad0f3c7a4bfdeb98fcbf9390079e6e0b0de240f292a8"
+      "size": 8100,
+      "sha256": "ae4d539f214d6e3b5ea6d111f0cd3e06c53bdfed161dd695097af5d111308ae6"
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 2968,
-      "sha256": "79a9dec21e34bc90fa13681e86068d9b661010f02d878afecb251d968faf09d1"
+      "size": 3870,
+      "sha256": "c6e740a8546b4543955bd31a7b8112d03e64605706cd87188679bd77717904ca"
     },
     {
       "path": "README.md",
-      "size": 17743,
-      "sha256": "fe51c245b9029127fd5100a30ad7869a39bb2a99f7582faff31cbf11bf36abf6"
+      "size": 21401,
+      "sha256": "d3d28991d9d89cc6083266670dbc3db5bf3493d75a8ec40643945b1ae888d515"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "78b591400c56b7b67b8cb3b2b8a8e65e9093897f02ce0878e6b5405c68620fa7"
+      "sha256": "acb57a7135b2d7d6e665f67f056e21353023b93835f54def1ae523bf76f1bfb3"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
       "size": 1343,
       "sha256": "6a17a805e17838b0c5b9761e82330d00abacdc1ec7cffd1fd21f464d1408d275"
+    },
+    {
+      "path": "evals/live-review-scenarios.json",
+      "size": 1197,
+      "sha256": "6fd1af3860570c969d231c331529eda6cb249588b87eb5171e5a06a4933d4850"
+    },
+    {
+      "path": "evals/run_evals.py",
+      "size": 6601,
+      "sha256": "98f54fd3b45165fee670e6485384681021254a66683cba4bd8327b61924c28b8"
+    },
+    {
+      "path": "examples/review-baseline.json",
+      "size": 332,
+      "sha256": "ceb8457960e6fa7adb861007eb658e607b3df333323cb3e40bfde263dd8015a7"
+    },
+    {
+      "path": "examples/review.yml",
+      "size": 355,
+      "sha256": "b8f34d78a3f68165b2334a2bb153a7a4ec3b0afe1f3507025ab3f79ae25da18f"
     },
     {
       "path": "install.ps1",
@@ -262,8 +317,8 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 9534,
-      "sha256": "065f818996e73821264e27d89869c7225ad571b1fd9f36a6875c321990a58940"
+      "size": 10414,
+      "sha256": "6cb3a3c6bbc02fa4c51e425f73667f22c991b55b7886aeb90eafbea7e7b648cc"
     },
     {
       "path": "tests/test_package.py",
@@ -279,6 +334,11 @@
       "path": "tests/test_review_evals.py",
       "size": 1549,
       "sha256": "4af6c90fe180bcea1db94f2b4c9fcd5211f07b9d06b1789ad5bc2725089c6017"
+    },
+    {
+      "path": "tests/test_review_features.py",
+      "size": 4392,
+      "sha256": "0ab9320a5b037094bcefde4aaefd7e5b0c51832bd3e30684e48b235c6ffacab8"
     },
     {
       "path": "uninstall.ps1",
@@ -297,8 +357,8 @@
     },
     {
       "path": "verify.py",
-      "size": 10398,
-      "sha256": "fc8f04032ad180559e10408cbc741231aac9498e7f9f5bc672d24d48b1dba38d"
+      "size": 12427,
+      "sha256": "3496ce854bcfc3dfdfe06bede53a031eb92d797fcc4d9121e3a177e3bcd45b2f"
     }
   ]
 }

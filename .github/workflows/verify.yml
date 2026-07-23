@@ -15,9 +15,9 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.11"
 
@@ -35,7 +35,10 @@ jobs:
           python3 -m py_compile \
             install.py uninstall.py verify.py release.py \
             .claude/skills/_git-atomic-core/scripts/guard.py \
-            .claude/skills/_git-atomic-core/scripts/reviewer_triggers.py
+            .claude/skills/_git-atomic-core/scripts/reviewer_triggers.py \
+            .claude/skills/_git-atomic-core/scripts/report_validator.py \
+            .claude/skills/_git-atomic-core/scripts/baseline.py \
+            evals/run_evals.py
 
       - name: Verify checksums
         run: sha256sum -c checksums.sha256
@@ -51,3 +54,35 @@ jobs:
           ./uninstall.sh project "$target"
           test ! -e "$target/.claude/skills/cr"
           test -d "$target/.claude/.commitforge-uninstall-backups"
+
+  portability:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python: "3.9"
+          - os: ubuntu-latest
+            python: "3.13"
+          - os: macos-latest
+            python: "3.11"
+          - os: windows-latest
+            python: "3.11"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Verify package
+        run: python verify.py
+
+      - name: Run cross-platform tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check live eval contracts
+        run: python evals/run_evals.py --check

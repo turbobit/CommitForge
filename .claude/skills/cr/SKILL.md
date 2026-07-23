@@ -1,7 +1,7 @@
 ---
 name: cr
 description: CommitForge의 최고 강도 코드 리뷰 명령이다. /cca의 심층 리뷰·확정적 수정·재리뷰·검증까지만 수행하며 Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
-argument-hint: "[추가 맥락] [--scope <경로...>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[pr] [추가 맥락] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -26,9 +26,12 @@ allowed-tools:
   - Bash(git cat-file *)
   - Bash(git submodule status *)
   - Bash(git worktree list *)
+  - Bash(gh pr view *)
   - Bash(cmp *)
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
 ---
 
 # `/cr` — CommitForge Review
@@ -60,15 +63,24 @@ $ARGUMENTS
 6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
 7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
 8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
+9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-policy.md`
+10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
+11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
+12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
 저장소 루트에 `.commitforge/profile.md`가 있으면 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
+`.commitforge/review.yml`이 있으면 `review-policy.md`에 따라 적용한다.
 
 ## 0. 인자와 수정 정책
 
 - 일반 문장은 구현 의도와 리뷰 맥락으로 사용한다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.
+- `--base <ref>`: `merge-base(<ref>, HEAD)..HEAD`와 현재 working change를 함께 리뷰한다.
+- `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 자동으로 `--no-fix`다.
+- 첫 인자가 `pr`이면 `gh pr view --json baseRefName,headRefName,number,url`로 현재 PR의 base를 읽어 `--base`처럼 처리한다. PR을 찾지 못하면 변경하지 말고 base를 요청한다.
+- `--format human|json|sarif`과 `--output`은 `reporting-formats.md`를 따른다.
 - 기본은 현재 변경이 만든 확정적 CRITICAL/MAJOR 문제만 국소 수정한다.
 - `--no-fix`는 모든 소스 수정을 금지한다.
 - `--strict`는 확인된 MINOR도 해결하거나 명시적으로 차단한다.
@@ -104,9 +116,13 @@ git ls-files --others --exclude-standard
 git log -20 --pretty=format:'%h%x09%s'
 ```
 
+`--base`, `--range`, `pr`이면 `git merge-base`, `git diff <range>`, `git log <range>`로 해당 commit range를 별도 수집하고 working tree hunk와 섞지 않고 원장에 표시한다.
+
 변경 파일뿐 아니라 관련 호출부, 타입·인터페이스, 테스트, 설정, migration, generated source, 프로젝트 규칙을 읽는다. 모든 hunk를 `deep-review-protocol.md`의 변경 원장에 배정하고 삭제 라인과 wrapper/proxy/adapter를 별도 추적한다.
 
-변경이 없으면 Guard `finish` 후 “검토 대상 없음”으로 종료한다.
+파일·hunk·changed line 수가 policy threshold를 넘으면 `large-diff-review.md`의 shard/aggregator 절차를 적용한다.
+
+working change와 선택한 commit range가 모두 비어 있을 때만 Guard `finish` 후 “검토 대상 없음”으로 종료한다.
 
 ## 3. 기본 10개 관점과 조건부 심층 리뷰
 
@@ -134,6 +150,8 @@ python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" <
 ```
 
 이 결과는 하한선이다. 실제 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단과 finding schema를 적용한다.
+
+baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppressions.md`에 따라 finding 상태만 `BASELINED`로 표시한다. finding 자체를 삭제하지 않는다.
 
 - `cca-data-migration-reviewer`
 - `cca-dependency-supply-chain-reviewer`
@@ -223,5 +241,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 - 현재 working tree 상태
 - snapshot 삭제/보존과 lock 해제
 - Atomic Commit 계획, staging, commit, push를 하지 않았음
+
+JSON/SARIF를 생성했다면 `report_validator.py` 검증 결과와 출력 경로를 포함한다.
 
 완료되지 않은 작업을 성공으로 표현하지 않는다.

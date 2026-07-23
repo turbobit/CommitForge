@@ -33,6 +33,8 @@
 
 성공적으로 모든 의도된 커밋과 검증이 끝나면 `finish`로 해당 세션 스냅샷만 제거한다.
 
+스냅샷 metadata에는 보존 파일별 크기와 SHA-256이 기록된다. `finish`는 삭제 직전에 이 inventory를 다시 감사하며 누락·크기 변화·해시 불일치가 있으면 성공 처리와 삭제를 차단한다. 필요하면 `audit-snapshot`으로 중간 상태를 별도 확인한다.
+
 `/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다.
 
 실패·중단·부분 완료 시:

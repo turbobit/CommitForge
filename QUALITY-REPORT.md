@@ -21,6 +21,13 @@
 - finding 공통 schema와 reviewer fallback·UNKNOWN 정책 검증
 - deterministic release metadata와 ZIP/TAR.GZ 재현성 검증
 - GitHub Actions 검증 workflow 포함
+- Ubuntu Python 3.9/3.13, macOS, Windows CI matrix와 SHA 고정 Action 검증
+- JSON·SARIF report validator 및 baseline schema·만료 검증
+- `/cr --base`, `--range`, PR 비교 모드 계약 검증
+- 대형 diff shard/cross-file 집계 규칙 연결 검증
+- snapshot inventory SHA-256 감사와 변조 차단 검증
+- 실제 Claude Code 평가 scenario 계약 검증
+- 실제 Claude Code CLI + Sonnet으로 Python mutable-default 회귀 `/cr --no-fix` E2E 통과
 
 ### Guard 통합 테스트
 
@@ -33,6 +40,7 @@
 7. 서로 다른 linked worktree의 독립 lock/snapshot
 8. `/cr` working tree 수정 허용 + HEAD·branch·index 불변 확인
 9. `/cr` index 변경 시 verify와 finish 모두 차단
+10. snapshot 파일 변조 시 `audit-snapshot`과 `finish` 차단
 
 ### 확장 모드 검증
 
@@ -50,8 +58,10 @@
 - `/cr` Gate에서 staging plan 조건이 제거되고 HEAD/index 불변 조건이 적용되는지 확인
 - 11개 언어·플랫폼 카탈로그 섹션 확인
 
-## 검증하지 못한 항목
+## 선택적 실제 모델 평가
 
-이 패키지 생성 환경에는 실제 Claude Code CLI 세션이 연결되어 있지 않아 `/cc`, `/ccr`, `/cr`, `/cca`를 Claude Code UI에서 end-to-end 호출하는 시험은 수행하지 못했습니다.
+`evals/run_evals.py`는 격리된 임시 Git 저장소에 CommitForge를 설치하고 실제 Claude Code CLI로 `/cr --no-fix`를 호출하는 opt-in 평가를 제공합니다. CI에서는 비용과 인증 의존성을 피하기 위해 scenario·trigger 계약만 검증합니다.
 
-대신 현재 공식 Skills/Subagent frontmatter 형식에 맞춰 작성하고, YAML과 로컬 Git guard/installer 동작을 검증했습니다. 설치 후 작은 테스트 저장소 또는 별도 worktree에서 `MANUAL-TEST-CHECKLIST.md` 순서로 최초 시험하는 것을 권장합니다.
+Claude Code 계정·권한·모델 변화가 결과에 영향을 줄 수 있으므로 live 결과는 고정적인 단위 테스트가 아니라 보조 품질 신호로 취급합니다. 중요한 저장소에서는 별도 worktree에서 수동 체크리스트도 함께 수행하십시오.
+
+이번 릴리스에서는 `python mutable default regression` 시나리오를 Sonnet으로 실행해 기대한 상태 공유 회귀를 탐지하고 HEAD·index 불변 조건을 지키는 것을 확인했습니다. destructive migration 시나리오는 계약 검증까지만 수행했습니다.

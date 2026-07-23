@@ -22,9 +22,15 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
     ".claude/skills/_git-atomic-core/conditional-reviewers.md",
     ".claude/skills/_git-atomic-core/review-execution.md",
+    ".claude/skills/_git-atomic-core/review-policy.md",
+    ".claude/skills/_git-atomic-core/reporting-formats.md",
+    ".claude/skills/_git-atomic-core/baseline-and-suppressions.md",
+    ".claude/skills/_git-atomic-core/large-diff-review.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
     ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
+    ".claude/skills/_git-atomic-core/scripts/report_validator.py",
+    ".claude/skills/_git-atomic-core/scripts/baseline.py",
     ".claude/agents/cca-git-reviewer.md",
     ".claude/agents/cca-correctness-reviewer.md",
     ".claude/agents/cca-security-reviewer.md",
@@ -42,7 +48,12 @@ REQUIRED = [
     ".claude/agents/cca-privacy-governance-reviewer.md",
     ".claude/agents/cca-requirements-product-reviewer.md",
     ".github/workflows/verify.yml",
+    ".github/dependabot.yml",
     "evals/conditional-reviewer-triggers.json",
+    "evals/live-review-scenarios.json",
+    "evals/run_evals.py",
+    "examples/review.yml",
+    "examples/review-baseline.json",
     "release.py",
 ]
 
@@ -220,6 +231,42 @@ def main() -> None:
             errors.append(f"guard.py --help 실패: {proc.stderr}")
         if "verify-review" not in proc.stdout:
             errors.append("guard.py: verify-review command 누락")
+        if "audit-snapshot" not in proc.stdout:
+            errors.append("guard.py: audit-snapshot command 누락")
+
+    for skill_path in (cr_path, cca_path):
+        if not skill_path.exists():
+            continue
+        skill_text = skill_path.read_text(encoding="utf-8")
+        for reference in (
+            "review-policy.md",
+            "reporting-formats.md",
+            "baseline-and-suppressions.md",
+            "large-diff-review.md",
+        ):
+            if reference not in skill_text:
+                errors.append(f"{skill_path}: {reference} 연결 누락")
+
+    workflow = ROOT / ".github/workflows/verify.yml"
+    if workflow.exists():
+        workflow_text = workflow.read_text(encoding="utf-8")
+        if re.search(r"uses:\s*actions/(checkout|setup-python)@v\d+", workflow_text):
+            errors.append("verify.yml: GitHub Action이 full SHA로 고정되지 않음")
+        for runner in ("ubuntu-latest", "macos-latest", "windows-latest"):
+            if runner not in workflow_text:
+                errors.append(f"verify.yml: {runner} matrix 누락")
+
+    eval_runner = ROOT / "evals/run_evals.py"
+    if eval_runner.exists():
+        proc = subprocess.run(
+            [sys.executable, str(eval_runner), "--check"],
+            cwd=ROOT,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if proc.returncode != 0:
+            errors.append(f"live eval contract 실패: {proc.stderr or proc.stdout}")
 
     release = ROOT / "release.py"
     if release.exists() and manifest_path.exists():

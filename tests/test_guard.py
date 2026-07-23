@@ -54,6 +54,29 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertTrue((snapshot / "untracked.tar.gz").is_file())
         self.assertTrue((snapshot / ".cca-snapshot.json").is_file())
 
+        _, audited = self.guard(
+            "audit-snapshot",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        )
+        self.assertTrue(audited["ok"])
+
+        working_diff = snapshot / "working.diff"
+        original_working_diff = working_diff.read_bytes()
+        working_diff.write_bytes(original_working_diff + b"tampered")
+        audit_proc, audit_failed = self.guard(
+            "audit-snapshot",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(audit_proc.returncode, 0)
+        self.assertFalse(audit_failed["ok"])
+        self.assertIn("corrupt", audit_failed["error"])
+        working_diff.write_bytes(original_working_diff)
+
         proc, blocked = self.guard("begin", "--session", "session-b", check=False)
         self.assertNotEqual(proc.returncode, 0)
         self.assertFalse(blocked["ok"])

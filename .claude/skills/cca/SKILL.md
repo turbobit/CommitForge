@@ -1,7 +1,7 @@
 ---
 name: cca
 description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
-argument-hint: "[today|release|emergency|learn] [추가 맥락] [--scope <경로...>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[today|release|emergency|learn] [추가 맥락] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -37,6 +37,8 @@ allowed-tools:
   - Bash(cmp *)
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
 ---
 
 # `/cca` — CommitForge All
@@ -67,12 +69,17 @@ $ARGUMENTS
 10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
 11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
 12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
+13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-policy.md`
+14. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
+15. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
+16. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
 
 변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
 안전 규칙과 품질 gate가 다른 지침보다 우선한다.
 
 저장소 루트에 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
+`.commitforge/review.yml`이 있으면 review policy를 적용한다.
 
 ## 0. 인자 해석
 
@@ -86,6 +93,7 @@ $ARGUMENTS
 - `--strict`: 확인된 MINOR도 가능한 범위에서 해소하거나 명시적으로 차단 판단한다.
 - `--iterations N`: 리뷰-수정 반복 상한. 기본 3, 최소 1, 최대 5.
 - `--keep-snapshot`: 성공 후 snapshot을 보존한다.
+- `--format human|json|sarif`, `--output <경로>`: 검증된 추가 보고 형식을 생성한다.
 - 알 수 없는 옵션은 자연어 맥락으로 취급한다.
 - 새 dependency 설치, 외부 서비스 변경, 데이터 파괴 작업은 인자로 명시돼도 별도 안전 판단 없이 수행하지 않는다.
 
@@ -141,6 +149,8 @@ git log -20 --pretty=format:'%h%x09%s'
 
 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`에 따라 모든 hunk를 내부 변경 원장에 배정한다. 삭제된 라인과 wrapper/proxy/adapter는 별도 항목으로 추적한다.
 
+policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 cross-file aggregator로 처리한다.
+
 분류:
 
 - feat/fix/refactor/perf/test/docs/build/ci/style/chore
@@ -179,6 +189,8 @@ git log -20 --pretty=format:'%h%x09%s'
 비활성 조건도 `N/A`와 근거를 coverage에 남긴다.
 
 변경 경로를 `reviewer_triggers.py`에 전달한 결과를 최소 활성 집합으로 사용하고, 코드 의미에서 확인된 추가 trigger를 합친다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단, finding 공통 schema와 중복 제거 규칙을 적용한다.
+
+baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인증·데이터 손실 finding은 suppress하지 않는다.
 
 각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다.
 
