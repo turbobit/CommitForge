@@ -1,0 +1,46 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Test / temporary output
+.tmp/
+tmp/
+temp/
+*.tmp
+*.log
+
+# Build / package output
+dist/
+build/
+*.zip
+*.tar.gz
+
+# Local environment / secrets
+.env
+.env.*
+!.env.example
+
+# CommitForge runtime files
+.claude-atomic.lock
+.claude-atomic-snapshots/

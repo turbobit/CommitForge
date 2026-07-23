@@ -1,0 +1,18 @@
+# Shared Git Atomic Core
+
+이 디렉터리는 `/cc`, `/ccr`, `/cca`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
+
+`SKILL.md`가 없으므로 독립 slash command로 등록되지 않습니다.
+
+- `atomic-commit-rules.md`: 분리·그룹화·순서
+- `staging-strategy.md`: hunk/index 구성
+- `commit-message-guide.md`: 한글 메시지
+- `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
+- `review-gates.md`: `/cca` 품질 gate
+- `validation-strategy.md`: 테스트/빌드
+- `project-profiles.md`: 언어·프레임워크
+- `reporting.md`: 결과 형식
+- `recovery.md`: 장애 복구
+- `examples.md`: 사례
+- `scripts/guard.py`: worktree별 lock, snapshot, fingerprint, cleanup
+- `scripts/guard.sh`: macOS/Linux/WSL/Git Bash용 Python 3 launcher
