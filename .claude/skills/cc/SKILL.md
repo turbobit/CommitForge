@@ -30,7 +30,7 @@ allowed-tools:
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
 ---
 
-# `/cc` — Atomic Commit 실행기
+# `/cc` — CommitForge Atomic Commit 실행기
 
 사용자 참고 맥락:
 

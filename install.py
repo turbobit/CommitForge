@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the CCA skills at project or personal scope with backups."""
+"""Install CommitForge skills at project or personal scope with backups."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def main() -> None:
         claude_dir = project / ".claude"
 
     timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_root = claude_dir / ".cca-backups" / timestamp
+    backup_root = claude_dir / ".commitforge-backups" / timestamp
 
     for name in SKILLS:
         copy_with_backup(

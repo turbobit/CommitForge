@@ -23,7 +23,7 @@ allowed-tools:
   - Bash(git worktree list *)
 ---
 
-# `/ccr` — Atomic Commit 계획 리뷰
+# `/ccr` — CommitForge Atomic Commit 계획 리뷰
 
 사용자 참고 맥락:
 

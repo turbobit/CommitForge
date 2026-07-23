@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Remove only files installed by this package, preserving a backup."""
+"""Remove only files installed by CommitForge, preserving a backup."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ def main() -> None:
         claude_dir = Path(args.target or Path.cwd()).expanduser().resolve() / ".claude"
 
     timestamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    backup_root = claude_dir / ".cca-uninstall-backups" / timestamp
+    backup_root = claude_dir / ".commitforge-uninstall-backups" / timestamp
 
     for name in SKILLS:
         backup_and_remove(

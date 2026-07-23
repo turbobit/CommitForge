@@ -1,6 +1,8 @@
-# Claude Code Atomic Git Skills
+# CommitForge
 
-Claude Code에서 다음 세 명령을 제공하는 완성형 Skills 패키지입니다.
+> Atomic Git Assistant for Claude Code
+
+CommitForge는 Claude Code에서 변경 분석, Atomic Commit 계획, 다각도 리뷰와 안전한 커밋 실행을 제공하는 Skills 패키지입니다.
 
 | 명령 | 역할 | Git 상태 변경 | 소스 수정 |
 |---|---|---:|---:|
@@ -82,7 +84,7 @@ Windows PowerShell:
 .\install.ps1 -Scope Global
 ```
 
-기존 같은 이름의 skill/agent는 삭제하지 않고 `.claude/.cca-backups/<timestamp>/` 아래에 먼저 백업합니다. 심볼릭 링크 대상은 자동 교체하지 않습니다.
+기존 같은 이름의 skill/agent는 삭제하지 않고 `.claude/.commitforge-backups/<timestamp>/` 아래에 먼저 백업합니다. 이전 버전의 `.cca-backups`도 제거하지 않습니다. 심볼릭 링크 대상은 자동 교체하지 않습니다.
 
 ### 수동 설치
 
@@ -325,7 +327,7 @@ Windows PowerShell:
 .\uninstall.ps1 -Scope Global
 ```
 
-알려진 skill/agent만 제거하고 `.claude/.cca-uninstall-backups/<timestamp>/`에 사본을 남깁니다.
+알려진 skill/agent만 제거하고 `.claude/.commitforge-uninstall-backups/<timestamp>/`에 사본을 남깁니다.
 
 ## 한계
 
