@@ -2,6 +2,8 @@
 
 기본 reviewer에 모든 전문 영역을 항상 추가하지 않는다. 저장소 스캔에서 아래 trigger가 하나라도 확인될 때만 해당 agent를 실행한다. 파일명만이 아니라 diff의 실제 의미를 근거로 판정한다.
 
+`scripts/reviewer_triggers.py`는 경로·명시적 맥락에서 확인 가능한 최소 활성 집합을 제공한다. 이 결과는 reviewer를 빼는 근거가 아니며 main agent의 의미 분석으로 확장한다.
+
 ## 활성화 표
 
 | Agent | Trigger |

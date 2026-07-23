@@ -432,17 +432,73 @@ def cmd_fingerprint(args: argparse.Namespace) -> None:
     emit(payload)
 
 
+def review_invariants(
+    ctx: dict[str, Path],
+    snapshot: Path,
+    metadata: dict[str, Any],
+) -> dict[str, Any]:
+    start_head = metadata.get("head", "")
+    start_branch = metadata.get("branch", "")
+    current_head_value = current_head(ctx["root"])
+    current_branch_value = branch_name(ctx["root"])
+    start_staged = (snapshot / "staged.diff").read_bytes()
+    current_staged = run_git(
+        ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"],
+        cwd=ctx["root"],
+    )
+    checks = {
+        "head_unchanged": current_head_value == start_head,
+        "branch_unchanged": current_branch_value == start_branch,
+        "staged_diff_unchanged": current_staged == start_staged,
+    }
+    return {
+        "ok": all(checks.values()),
+        "checks": checks,
+        "start_head": start_head,
+        "current_head": current_head_value,
+        "start_branch": start_branch,
+        "current_branch": current_branch_value,
+    }
+
+
+def cmd_verify_review(args: argparse.Namespace) -> None:
+    ctx = repo_context(Path.cwd().resolve())
+    session = safe_session(args.session)
+    verify_owner(ctx, session, args.token)
+    snapshot = Path(args.snapshot)
+    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    result = review_invariants(ctx, snapshot, metadata)
+    if not result["ok"]:
+        failed = [name for name, passed in result["checks"].items() if not passed]
+        raise GuardError(
+            "/cr 불변 조건을 충족하지 못했습니다: " + ", ".join(failed)
+        )
+    emit(result)
+
+
 def cmd_finish(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
     verify_owner(ctx, session, args.token)
     snapshot = Path(args.snapshot)
-    validate_snapshot(ctx, snapshot, session, args.token)
+    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+
+    review_result = None
+    if args.review_only:
+        review_result = review_invariants(ctx, snapshot, metadata)
+        if not review_result["ok"]:
+            failed = [
+                name for name, passed in review_result["checks"].items() if not passed
+            ]
+            raise GuardError(
+                "/cr 불변 조건을 충족하지 못해 스냅샷을 삭제하지 않습니다: "
+                + ", ".join(failed)
+            )
 
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
     )
-    if dirty and not args.allow_dirty:
+    if dirty and not (args.allow_dirty or args.review_only):
         raise GuardError(
             "작업 트리가 깨끗하지 않아 스냅샷을 삭제하지 않습니다. "
             "모든 의도된 변경이 커밋되었는지 확인하십시오."
@@ -458,6 +514,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "snapshot": str(snapshot),
             "lock_released": True,
             "worktree_clean": not bool(dirty),
+            "review_invariants": review_result,
         }
     )
 
@@ -516,7 +573,20 @@ def build_parser() -> argparse.ArgumentParser:
     finish.add_argument("--token", required=True)
     finish.add_argument("--snapshot", required=True)
     finish.add_argument("--allow-dirty", action="store_true")
+    finish.add_argument(
+        "--review-only",
+        action="store_true",
+        help="Require HEAD, branch, and staged diff to match the snapshot",
+    )
     finish.add_argument("--keep-snapshot", action="store_true")
+
+    verify_review = sub.add_parser(
+        "verify-review",
+        help="Verify /cr HEAD, branch, and staged diff invariants",
+    )
+    verify_review.add_argument("--session", required=True)
+    verify_review.add_argument("--token", required=True)
+    verify_review.add_argument("--snapshot", required=True)
 
     abort = sub.add_parser("abort", help="Keep snapshot but release owned lock")
     abort.add_argument("--session", required=True)
@@ -534,6 +604,7 @@ def main() -> None:
         "probe": cmd_probe,
         "begin": cmd_begin,
         "fingerprint": cmd_fingerprint,
+        "verify-review": cmd_verify_review,
         "finish": cmd_finish,
         "abort": cmd_abort,
         "status": cmd_status,

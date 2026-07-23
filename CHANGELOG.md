@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 — 2026-07-23
+
+- Guard `verify-review`와 `finish --review-only`로 `/cr`의 HEAD·branch·staged diff 불변 조건을 프로그램 수준에서 강제
+- 조건부 reviewer 최소 활성 집합을 계산하는 보수적 trigger 도구와 golden fixture 평가 추가
+- finding stable ID, fingerprint, severity, status, evidence, blocking 공통 schema 추가
+- reviewer 최대 병렬 수, 필수 관점, fallback과 `UNKNOWN` 차단 정책 추가
+- GitHub Actions에서 metadata·test·syntax·checksum·installer를 자동 검증
+- `release.py`로 manifest·checksum 검증과 재현 가능한 ZIP/TAR.GZ 생성 지원
+
 ## 1.3.0 — 2026-07-23
 
 - `/cr`에서 Atomic Commit 전용 Git reviewer와 staging plan Gate를 제거해 순수 review-only 경계 보장

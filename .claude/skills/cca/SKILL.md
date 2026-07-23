@@ -36,6 +36,7 @@ allowed-tools:
   - Bash(git diff-tree *)
   - Bash(cmp *)
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
 ---
 
 # `/cca` — CommitForge All
@@ -65,6 +66,7 @@ $ARGUMENTS
 9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md`
 10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
 11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
+12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
 
 변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -175,6 +177,8 @@ git log -20 --pretty=format:'%h%x09%s'
 - `cca-requirements-product-reviewer`
 
 비활성 조건도 `N/A`와 근거를 coverage에 남긴다.
+
+변경 경로를 `reviewer_triggers.py`에 전달한 결과를 최소 활성 집합으로 사용하고, 코드 의미에서 확인된 추가 trigger를 합친다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단, finding 공통 schema와 중복 제거 규칙을 적용한다.
 
 각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다.
 

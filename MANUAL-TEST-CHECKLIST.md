@@ -76,6 +76,7 @@ git show --stat HEAD
 - 조건부 reviewer의 활성/N/A 근거
 - Atomic Commit 계획과 메시지 초안 없음
 - staged diff와 HEAD가 실행 전과 동일
+- Guard `verify-review`와 `finish --review-only` 통과
 - commit과 push 없음
 
 ## 5. `/cr` 자동 수정 확인
@@ -241,3 +242,26 @@ history가 있는 테스트 저장소에서 실행합니다.
 - 비관련 reviewer는 근거가 있는 N/A
 - Requirements/Product는 명시적 기준이 없을 때 추측하지 않음
 - 수정 후 trigger를 다시 판정하고 활성 reviewer를 재실행
+
+## 15. Reviewer 실패와 Finding Schema
+
+테스트 환경에서 선택 reviewer 하나를 사용할 수 없게 한 뒤 `/cr --no-fix`를 실행합니다.
+
+확인:
+
+- main agent fallback 또는 `UNKNOWN`
+- 필수/활성 관점이 UNKNOWN이면 성공 처리하지 않음
+- finding에 stable ID, reviewer, fingerprint, severity, status, 위치, evidence, blocking 포함
+- 중복 root cause가 하나의 owner finding으로 통합
+
+## 16. Release 재현성
+
+```bash
+python3 release.py --check
+python3 -m unittest tests.test_release -v
+```
+
+확인:
+
+- metadata가 현재 source와 일치
+- 서로 다른 임시 디렉터리에서 생성한 ZIP/TAR.GZ가 byte-identical

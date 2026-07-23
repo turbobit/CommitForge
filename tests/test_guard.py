@@ -101,6 +101,109 @@ class GuardIntegrationTest(unittest.TestCase):
         _, status = self.guard("status")
         self.assertIsNone(status["claude_atomic_lock"])
 
+    def test_review_only_preserves_head_branch_and_index(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nstaged\n", encoding="utf-8")
+        run(["git", "add", "tracked.txt"], self.tmp)
+
+        _, started = self.guard("begin", "--session", "review-pass")
+        (self.tmp / "tracked.txt").write_text(
+            "base\nstaged\nreview-fix\n",
+            encoding="utf-8",
+        )
+
+        _, verified = self.guard(
+            "verify-review",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["checks"]["staged_diff_unchanged"])
+
+        _, finished = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--review-only",
+        )
+        self.assertTrue(finished["review_invariants"]["ok"])
+        self.assertFalse(finished["worktree_clean"])
+
+        _, changed = self.guard("begin", "--session", "review-block")
+        run(["git", "add", "tracked.txt"], self.tmp)
+        proc, payload = self.guard(
+            "verify-review",
+            "--session", changed["session"],
+            "--token", changed["token"],
+            "--snapshot", changed["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+        self.assertIn("staged_diff_unchanged", payload["error"])
+
+        finish_proc, finish_payload = self.guard(
+            "finish",
+            "--session", changed["session"],
+            "--token", changed["token"],
+            "--snapshot", changed["snapshot"],
+            "--review-only",
+            check=False,
+        )
+        self.assertNotEqual(finish_proc.returncode, 0)
+        self.assertFalse(finish_payload["ok"])
+
+        _, aborted = self.guard(
+            "abort",
+            "--session", changed["session"],
+            "--token", changed["token"],
+            "--snapshot", changed["snapshot"],
+        )
+        self.assertTrue(aborted["lock_released"])
+
+        run(["git", "commit", "-m", "test: staged baseline"], self.tmp)
+        _, head_changed = self.guard("begin", "--session", "review-head")
+        (self.tmp / "tracked.txt").write_text(
+            "base\nstaged\nreview-fix\ncommitted\n",
+            encoding="utf-8",
+        )
+        run(["git", "add", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: forbidden review commit"], self.tmp)
+        head_proc, head_payload = self.guard(
+            "verify-review",
+            "--session", head_changed["session"],
+            "--token", head_changed["token"],
+            "--snapshot", head_changed["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(head_proc.returncode, 0)
+        self.assertIn("head_unchanged", head_payload["error"])
+        self.guard(
+            "abort",
+            "--session", head_changed["session"],
+            "--token", head_changed["token"],
+            "--snapshot", head_changed["snapshot"],
+        )
+
+        _, branch_changed = self.guard("begin", "--session", "review-branch")
+        run(["git", "switch", "-c", "unexpected-review-branch"], self.tmp)
+        branch_proc, branch_payload = self.guard(
+            "verify-review",
+            "--session", branch_changed["session"],
+            "--token", branch_changed["token"],
+            "--snapshot", branch_changed["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(branch_proc.returncode, 0)
+        self.assertIn("branch_unchanged", branch_payload["error"])
+        self.guard(
+            "abort",
+            "--session", branch_changed["session"],
+            "--token", branch_changed["token"],
+            "--snapshot", branch_changed["snapshot"],
+        )
+
     def test_linked_worktrees_use_independent_locks(self) -> None:
         linked = self.tmp.parent / f"{self.tmp.name}-linked"
         run(["git", "worktree", "add", "-b", "linked-test", str(linked)], self.tmp)

@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.3.0",
-  "generated_at": "2026-07-23T17:08:38+09:00",
-  "file_count": 52,
-  "total_bytes": 210833,
+  "version": "1.4.0",
+  "reproducible": true,
+  "file_count": 59,
+  "total_bytes": 242491,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -87,8 +87,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 1210,
-      "sha256": "8c3a8557e48eff7d6d16f3789e23512ec3f321e383c67b7a3e11c9e5a520729a"
+      "size": 1374,
+      "sha256": "3c883d68f4e8de7dd6fde545d6343d7dc8966baf3f3a7aa587f89318455cd3f5"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -102,8 +102,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/conditional-reviewers.md",
-      "size": 2225,
-      "sha256": "e5e0c6cf1fba84239ca07b0f28d7142d885419c07b60f20cfb3bb493418eced5"
+      "size": 2447,
+      "sha256": "20860850a9bd1696c54dfccf14ec21d38e4832a8531eac5f978d610ce5a55d62"
     },
     {
       "path": ".claude/skills/_git-atomic-core/deep-review-protocol.md",
@@ -137,28 +137,38 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 2953,
-      "sha256": "139f54799293f48c69378ba6220714de524611832a585cba9083e44ed2abb81e"
+      "size": 3079,
+      "sha256": "aec6b6468a449566178b9640624f4c2d32d9526845d41c2f271075efbf27f5d7"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/review-execution.md",
+      "size": 2824,
+      "sha256": "50776a26ff578dee0f0f879ab828c856f74c96e484cfe1f00006aeb7f911d84a"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
-      "size": 6087,
-      "sha256": "9e16d6d00d148344dd63d187f9a6f8755e8cc48a7fab5fd1470b3e5b8d2b2ced"
+      "size": 6181,
+      "sha256": "7650a288977d5cfa2ac45210ed5dc6984834b642fe76e225e31df8b27b85b874"
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 4123,
-      "sha256": "15b91e081c4c60fbd4fbc6660658a499bcc4fe618cf9fb071811ac841ea674a9"
+      "size": 4371,
+      "sha256": "b2a7f0dce861430936e59469fe4aee1c49b4aa0349134b4f61a89952133dd5d7"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 19319,
-      "sha256": "3f13b47f7666ec6965dfde6ee5cff7986fff66b36ea7ba999962229328adb3db"
+      "size": 21935,
+      "sha256": "724170a728d03c5a0a4fee600a6464185770c7bdf85fd901e4f8ca1f6b7b8de2"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
       "size": 576,
       "sha256": "05cf055f32591fa8de69003b5510b8993a53724d13c93e524437a6e3adcaa2cb"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
+      "size": 2548,
+      "sha256": "d15a5b40f9cbf2ddd4237f503eae9cdeef873e369317e40a1d1938992306f7ae"
     },
     {
       "path": ".claude/skills/_git-atomic-core/staging-strategy.md",
@@ -177,8 +187,8 @@
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 16988,
-      "sha256": "28eb603f2177225662c54a45780465ab9c5629c60a89a00fa7d36d26931d36bd"
+      "size": 17453,
+      "sha256": "5717107bd0e6c612e6494d1bd204e7864882b49454d1b68e452fd03ab3b8cba8"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
@@ -187,13 +197,18 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 8599,
-      "sha256": "6c638feb7ba4ad16a6a9703ece8d1427160817bb7de27da5c047ed3db004b0ff"
+      "size": 9478,
+      "sha256": "b0b3bc0951d8e1d69697fc4039da9e95a917a5705d034e654ca3280e70351386"
+    },
+    {
+      "path": ".github/workflows/verify.yml",
+      "size": 1379,
+      "sha256": "7a15a47ccbb46519fdb89cb23e48e3aa3f2c224b5660950f3324db6244a7f0b6"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 2805,
-      "sha256": "5b19f57662a5966f390d11963ae6b134b3d7d51fdd231d4b8be53683a5a00216"
+      "size": 3437,
+      "sha256": "57af0eae1145acadc351e39f3dc2fb82f6ce931aa9174b8fa029f78a29fa1369"
     },
     {
       "path": "INSTALL.md",
@@ -202,23 +217,28 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 5907,
-      "sha256": "1fa0667dfe52b646c92324d7f005c97ee4be9193da95201dfa305c234d6d126f"
+      "size": 6632,
+      "sha256": "d6cde2693e2c6c37e515ad0f3c7a4bfdeb98fcbf9390079e6e0b0de240f292a8"
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 2552,
-      "sha256": "b2c9e8c9ddca1bb80a016f025fec4ed383885a837c20c34b813d280bcb2b5dba"
+      "size": 2968,
+      "sha256": "79a9dec21e34bc90fa13681e86068d9b661010f02d878afecb251d968faf09d1"
     },
     {
       "path": "README.md",
-      "size": 16593,
-      "sha256": "652f99a6e543ce2cb3075cc5c6803e5da1ff975d9bc36a57f5478c74d57d66f8"
+      "size": 17743,
+      "sha256": "fe51c245b9029127fd5100a30ad7869a39bb2a99f7582faff31cbf11bf36abf6"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "64d23f858ef51b0f996e4966d4e27c0371b437e2d2787890b1f7ad22d4ec5663"
+      "sha256": "78b591400c56b7b67b8cb3b2b8a8e65e9093897f02ce0878e6b5405c68620fa7"
+    },
+    {
+      "path": "evals/conditional-reviewer-triggers.json",
+      "size": 1343,
+      "sha256": "6a17a805e17838b0c5b9761e82330d00abacdc1ec7cffd1fd21f464d1408d275"
     },
     {
       "path": "install.ps1",
@@ -236,14 +256,29 @@
       "sha256": "20e386fe8ceff4f13d02491fd82939d7d836d5595088621886c6974eb9b9cf1a"
     },
     {
+      "path": "release.py",
+      "size": 6158,
+      "sha256": "0e0bfcf3f39f048d5d72494ff752f98e2cd6988cda775692dbafbe4240d5d911"
+    },
+    {
       "path": "tests/test_guard.py",
-      "size": 5596,
-      "sha256": "e73b351cbb7db6fc159f8a910aed47e5c46a971519477b9a578c082338255ade"
+      "size": 9534,
+      "sha256": "065f818996e73821264e27d89869c7225ad571b1fd9f36a6875c321990a58940"
     },
     {
       "path": "tests/test_package.py",
       "size": 6261,
       "sha256": "9e3ec193cc30c4972c9ffc3c6f4ee92b1664219841fc17cb73fdb5c5c4c58f08"
+    },
+    {
+      "path": "tests/test_release.py",
+      "size": 2438,
+      "sha256": "505d7815e41effedfe46bdb74b2cb3b26b08008ddc074a3a0549520a42a9c538"
+    },
+    {
+      "path": "tests/test_review_evals.py",
+      "size": 1549,
+      "sha256": "4af6c90fe180bcea1db94f2b4c9fcd5211f07b9d06b1789ad5bc2725089c6017"
     },
     {
       "path": "uninstall.ps1",
@@ -262,8 +297,8 @@
     },
     {
       "path": "verify.py",
-      "size": 8654,
-      "sha256": "3c4e0227b0e05ccd616b5b5728873428464d984b7b9ea133219cd3b7089902e0"
+      "size": 10398,
+      "sha256": "fc8f04032ad180559e10408cbc741231aac9498e7f9f5bc672d24d48b1dba38d"
     }
   ]
 }

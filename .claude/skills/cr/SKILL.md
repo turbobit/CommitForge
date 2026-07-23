@@ -28,6 +28,7 @@ allowed-tools:
   - Bash(git worktree list *)
   - Bash(cmp *)
   - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
 ---
 
 # `/cr` — CommitForge Review
@@ -58,6 +59,7 @@ $ARGUMENTS
 5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
 6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
 7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
+8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -125,6 +127,14 @@ Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실�
 
 `conditional-reviewers.md`의 trigger를 판정해 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product reviewer를 필요한 경우에만 추가한다. 비활성 조건도 `N/A`와 근거를 남긴다.
 
+변경 경로를 다음 도구에 전달해 조건부 reviewer의 최소 활성 집합을 얻는다.
+
+```bash
+python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" <changed-path...>
+```
+
+이 결과는 하한선이다. 실제 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단과 finding schema를 적용한다.
+
 - `cca-data-migration-reviewer`
 - `cca-dependency-supply-chain-reviewer`
 - `cca-reliability-recovery-reviewer`
@@ -171,7 +181,16 @@ Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실�
 
 ## 6. 종료 불변식과 Guard 정리
 
-종료 직전에 다음을 시작 상태와 비교한다.
+종료 직전에 다음을 실행해 Guard가 시작 snapshot과 직접 비교하게 한다.
+
+```bash
+bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" verify-review \
+  --session "<session>" \
+  --token "<token>" \
+  --snapshot "<snapshot>"
+```
+
+검증 항목:
 
 - `HEAD`가 동일함
 - staged diff의 binary patch와 name/status가 동일함
@@ -185,10 +204,10 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>" \
-  --allow-dirty
+  --review-only
 ```
 
-소스 수정이 없고 clean이면 `--allow-dirty`를 생략한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
+`finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
 
 불변식 위반, 검증 실패, unresolved blocker이면 `abort`로 lock만 해제하고 snapshot을 보존한다.
 

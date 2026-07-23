@@ -13,6 +13,7 @@
 - `deep-review-protocol.md`: line-by-line, removed behavior, cross-file, wrapper/proxy, UX·observability 검토
 - `language-api-pitfalls.md`: 언어·프레임워크별 타입·lifecycle·API 함정
 - `conditional-reviewers.md`: 데이터·공급망·복구·privacy·요구사항 reviewer trigger
+- `review-execution.md`: 실행 budget, fallback, finding schema와 중복 제거
 - `validation-strategy.md`: 테스트/빌드
 - `project-profiles.md`: 언어·프레임워크
 - `reporting.md`: 결과 형식
@@ -20,3 +21,4 @@
 - `examples.md`: 사례
 - `scripts/guard.py`: worktree별 lock, snapshot, fingerprint, cleanup
 - `scripts/guard.sh`: macOS/Linux/WSL/Git Bash용 Python 3 launcher
+- `scripts/reviewer_triggers.py`: 조건부 reviewer 최소 trigger 집합 계산

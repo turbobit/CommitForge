@@ -1,0 +1,47 @@
+[
+  {
+    "name": "schema migration",
+    "paths": ["db/migrations/20260723_add_index.sql"],
+    "context": "",
+    "expected_active": ["cca-data-migration-reviewer"]
+  },
+  {
+    "name": "dependency lockfile",
+    "paths": ["package.json", "pnpm-lock.yaml"],
+    "context": "",
+    "expected_active": ["cca-dependency-supply-chain-reviewer"]
+  },
+  {
+    "name": "queue retry recovery",
+    "paths": ["src/jobs/email_retry_worker.ts"],
+    "context": "DLQ replay and graceful shutdown",
+    "expected_active": ["cca-reliability-recovery-reviewer"]
+  },
+  {
+    "name": "analytics consent",
+    "paths": ["lib/analytics/consent_manager.dart"],
+    "context": "",
+    "expected_active": ["cca-privacy-governance-reviewer"]
+  },
+  {
+    "name": "acceptance criteria",
+    "paths": ["docs/requirements/authentication.md"],
+    "context": "acceptance criteria for session renewal",
+    "expected_active": ["cca-requirements-product-reviewer"]
+  },
+  {
+    "name": "combined migration and CI",
+    "paths": ["schema/users.sql", ".github/workflows/migrate.yml"],
+    "context": "",
+    "expected_active": [
+      "cca-data-migration-reviewer",
+      "cca-dependency-supply-chain-reviewer"
+    ]
+  },
+  {
+    "name": "ordinary documentation",
+    "paths": ["README.md"],
+    "context": "clarify installation wording",
+    "expected_active": []
+  }
+]

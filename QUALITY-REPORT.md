@@ -16,6 +16,11 @@
 - `/cca` 기본 11개와 조건부 전문 reviewer 5종 trigger 연결 검증
 - 설치·제거 agent registry와 실제 파일 목록 일치 검증
 - 모든 reviewer의 shell 실행 권한 부재 검증
+- `/cr` HEAD·branch·staged diff 불변의 Guard 강제 검증
+- 조건부 reviewer trigger golden fixture 검증
+- finding 공통 schema와 reviewer fallback·UNKNOWN 정책 검증
+- deterministic release metadata와 ZIP/TAR.GZ 재현성 검증
+- GitHub Actions 검증 workflow 포함
 
 ### Guard 통합 테스트
 
@@ -26,6 +31,8 @@
 5. 성공 시 snapshot 삭제 + lock 해제
 6. merge 등 진행 중 Git operation에서 시작 차단
 7. 서로 다른 linked worktree의 독립 lock/snapshot
+8. `/cr` working tree 수정 허용 + HEAD·branch·index 불변 확인
+9. `/cr` index 변경 시 verify와 finish 모두 차단
 
 ### 확장 모드 검증
 

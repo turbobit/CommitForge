@@ -1,0 +1,52 @@
+name: Verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Verify release metadata
+        run: python3 release.py --check
+
+      - name: Verify package
+        run: python3 verify.py
+
+      - name: Run tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Compile Python sources
+        run: |
+          python3 -m py_compile \
+            install.py uninstall.py verify.py release.py \
+            .claude/skills/_git-atomic-core/scripts/guard.py \
+            .claude/skills/_git-atomic-core/scripts/reviewer_triggers.py
+
+      - name: Verify checksums
+        run: sha256sum -c checksums.sha256
+
+      - name: Smoke test installer
+        run: |
+          target="$(mktemp -d)"
+          ./install.sh project "$target"
+          test -f "$target/.claude/skills/cr/SKILL.md"
+          test -f "$target/.claude/agents/cca-data-migration-reviewer.md"
+          ./install.sh project "$target"
+          test -d "$target/.claude/.commitforge-backups"
+          ./uninstall.sh project "$target"
+          test ! -e "$target/.claude/skills/cr"
+          test -d "$target/.claude/.commitforge-uninstall-backups"

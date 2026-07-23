@@ -48,6 +48,8 @@ type(scope): 한글 제목
 
 Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
 
+`/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged binary diff를 직접 비교합니다. 프롬프트 판단과 별개로 index나 commit이 바뀌었다면 성공과 snapshot 삭제를 차단합니다.
+
 ## 설치
 
 ### 프로젝트에 설치
@@ -232,6 +234,15 @@ Guard + 원본 Diff 보존
 | Requirements/Product | 비교 가능한 ticket, ADR, acceptance criteria, API 명세가 제공됨 |
 
 활성화하지 않은 관점도 생략 사실과 근거를 `N/A`로 남깁니다. 명시적인 요구나 privacy 정책이 없으면 제품 의도나 법률 준수를 추측하지 않습니다.
+
+### Reviewer 실행 신뢰성
+
+- 최대 4개 reviewer를 동시에 실행하고 나머지는 batch 처리
+- Line·Correctness·Security와 활성 조건부 reviewer는 필수
+- agent 실패·timeout 시 main agent가 같은 관점으로 fallback
+- 완료하지 못한 관점은 `UNKNOWN`이며 `/cr` 성공과 `/cca` commit을 차단
+- finding은 stable ID, diff fingerprint, severity, status, evidence, failure scenario, validation으로 정규화
+- 같은 root cause는 직접 owner reviewer 하나로 통합
 
 ### 확장 모드
 
@@ -426,6 +437,28 @@ Windows PowerShell:
 ```
 
 알려진 skill/agent만 제거하고 `.claude/.commitforge-uninstall-backups/<timestamp>/`에 사본을 남깁니다.
+
+## 개발·릴리스 검증
+
+현재 metadata 확인:
+
+```bash
+python3 release.py --check
+```
+
+manifest와 checksum 갱신:
+
+```bash
+python3 release.py
+```
+
+재현 가능한 ZIP/TAR.GZ 생성:
+
+```bash
+python3 release.py --check --archives-dir dist
+```
+
+GitHub Actions는 push와 pull request마다 release metadata, 전체 테스트, Python syntax, SHA-256, 설치·재설치·제거를 검증합니다.
 
 ## 한계
 

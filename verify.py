@@ -21,8 +21,10 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/deep-review-protocol.md",
     ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
     ".claude/skills/_git-atomic-core/conditional-reviewers.md",
+    ".claude/skills/_git-atomic-core/review-execution.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
+    ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
     ".claude/agents/cca-git-reviewer.md",
     ".claude/agents/cca-correctness-reviewer.md",
     ".claude/agents/cca-security-reviewer.md",
@@ -39,6 +41,9 @@ REQUIRED = [
     ".claude/agents/cca-reliability-recovery-reviewer.md",
     ".claude/agents/cca-privacy-governance-reviewer.md",
     ".claude/agents/cca-requirements-product-reviewer.md",
+    ".github/workflows/verify.yml",
+    "evals/conditional-reviewer-triggers.json",
+    "release.py",
 ]
 
 
@@ -105,6 +110,8 @@ def main() -> None:
             errors.append("MANIFEST.json: name이 CommitForge가 아님")
         if manifest.get("version") != version:
             errors.append("MANIFEST.json: VERSION과 version 불일치")
+        if manifest.get("reproducible") is not True:
+            errors.append("MANIFEST.json: reproducible 표시 누락")
 
     cca_path = ROOT / ".claude/skills/cca/SKILL.md"
     modes_path = ROOT / ".claude/skills/_git-atomic-core/extended-modes.md"
@@ -154,6 +161,8 @@ def main() -> None:
             errors.append("cr/SKILL.md: Atomic Commit 전용 git reviewer 연결")
         if "Atomic Commit 계획이나 메시지 후보를 만들지 않는다" not in cr_text:
             errors.append("cr/SKILL.md: review-only 출력 경계 누락")
+        if "--review-only" not in cr_text or "verify-review" not in cr_text:
+            errors.append("cr/SKILL.md: deterministic review invariant 연결 누락")
 
     conditional_path = ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
     conditional_reviewers = (
@@ -173,6 +182,24 @@ def main() -> None:
             if cr_path.exists() and reviewer not in cr_text:
                 errors.append(f"cr/SKILL.md: {reviewer} 조건부 연결 누락")
 
+    execution_path = ROOT / ".claude/skills/_git-atomic-core/review-execution.md"
+    if execution_path.exists():
+        execution_text = execution_path.read_text(encoding="utf-8")
+        for field in (
+            '"id"',
+            '"reviewer"',
+            '"fingerprint"',
+            '"severity"',
+            '"status"',
+            '"evidence"',
+            '"blocking"',
+        ):
+            if field not in execution_text:
+                errors.append(f"review-execution.md: finding schema {field} 누락")
+        for policy in ("최대 4개", "UNKNOWN", "fallback"):
+            if policy not in execution_text:
+                errors.append(f"review-execution.md: 실행 정책 {policy} 누락")
+
     actual_agents = tuple(
         path.name for path in sorted((ROOT / ".claude/agents").glob("cca-*.md"))
     )
@@ -191,6 +218,19 @@ def main() -> None:
         )
         if proc.returncode != 0:
             errors.append(f"guard.py --help 실패: {proc.stderr}")
+        if "verify-review" not in proc.stdout:
+            errors.append("guard.py: verify-review command 누락")
+
+    release = ROOT / "release.py"
+    if release.exists() and manifest_path.exists():
+        proc = subprocess.run(
+            [sys.executable, str(release), "--check"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if proc.returncode != 0:
+            errors.append(f"release.py --check 실패: {proc.stderr or proc.stdout}")
 
     if errors:
         print(json.dumps({"ok": False, "errors": errors}, ensure_ascii=False, indent=2))

@@ -196,6 +196,7 @@
 - 예상치 못한 외부 변경 없음
 - 미검토 hunk 0
 - 적용 가능한 기본·조건부 reviewer 상태가 모두 PASS/FINDING/N/A
+- 필수 또는 활성 reviewer의 `UNKNOWN` 0
 - HEAD와 staged diff가 시작 상태와 동일
 - Atomic Commit 계획·메시지 초안·staging·commit 없음
 
@@ -214,5 +215,6 @@
 - 예상치 못한 외부 변경 없음
 - 미검토 hunk 0
 - 적용 가능한 기본·조건부 reviewer 상태가 모두 PASS/FINDING/N/A
+- 필수 또는 활성 reviewer의 `UNKNOWN` 0
 
 조건을 충족하지 못하면 커밋을 시작하지 않는다.
