@@ -1,9 +1,9 @@
 {
-  "name": "Claude Code Atomic Git Skills",
-  "version": "1.0.0",
-  "generated_at": "2026-07-23T00:00:00+09:00",
-  "file_count": 35,
-  "total_bytes": 127250,
+  "name": "CommitForge",
+  "version": "1.1.0",
+  "generated_at": "2026-07-23T16:19:04+09:00",
+  "file_count": 37,
+  "total_bytes": 148819,
   "files": [
     {
       "path": ".claude/agents/cca-correctness-reviewer.md",
@@ -32,8 +32,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 789,
-      "sha256": "5be3d48f25b5326c14f5e398f70b6941de790b0f15f75f9cdd483d09f355a9de"
+      "size": 897,
+      "sha256": "8c2ac74aabd4ed51e9cca0f1e6b3c10ddf42e6af01dd7e27e76ab165da33a958"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -51,6 +51,11 @@
       "sha256": "9e7ea4cf4263a4af3a46972f610b6ac88176e6c4848a8af9a6e47195320f2378"
     },
     {
+      "path": ".claude/skills/_git-atomic-core/extended-modes.md",
+      "size": 10149,
+      "sha256": "0efed2741bb965f500afd3df2cabe0305252cf61dfdc50ade0715444aebab415"
+    },
+    {
       "path": ".claude/skills/_git-atomic-core/project-profiles.md",
       "size": 2970,
       "sha256": "0f06d107eead0e7afe1ea7d1c4934b209f18ad3e7c6568fe50beb04c094f0d91"
@@ -62,8 +67,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 1561,
-      "sha256": "477a85131626b6d346e41b84d0567fac5bbe4561230241cf6157682093911920"
+      "size": 2065,
+      "sha256": "b42ebe59957f059c1001dab8868a1db5ce85b988d8771b68c4519345422393b3"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -97,48 +102,48 @@
     },
     {
       "path": ".claude/skills/cc/SKILL.md",
-      "size": 10028,
-      "sha256": "62ea8f7de812f702735790eadb15facc26afcb5155865b3ce0db1e0370bc8f62"
+      "size": 10210,
+      "sha256": "597c636089b079bd2e8954daa36a0f0f88e08d2e5c3d9b3eda198ff49dbb7b9f"
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 12216,
-      "sha256": "2e517346fa3dcaa140725fdc42388c5b54fbb9afa0e8c009661cc76d521f50b9"
+      "size": 14454,
+      "sha256": "88331ccdd41006ef5c7638745b7a30dfd490cf5aeeb0331f5590d97329ee5129"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
-      "size": 5587,
-      "sha256": "d114958e578c53894bfcb06fe289cf51fabfca3619d6b9032acce83240d7a8f2"
+      "size": 5769,
+      "sha256": "a4201e5c366350d15813bff4328d701210a0c82c506ebfa88a2565e677cb76ed"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 714,
-      "sha256": "54ee632083cd8cbffebe3e5a771e9ca3d8b930eef0e37b3a1b8e9c8c6aff7fab"
+      "size": 1278,
+      "sha256": "5ff226731707aaeaac3b36687990d1dc0d3907e259d75d26ec3c1f5f9d23d68c"
     },
     {
       "path": "INSTALL.md",
-      "size": 884,
-      "sha256": "afb00fb90afae5dd25643fcc0029f64b71242fa5770b3328c423fc226b558a4a"
+      "size": 939,
+      "sha256": "2658d4c0dfeebc4b9398bf55ddb81ad8db8c9bc89bcbc1a7402a58db0fb23308"
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 2366,
-      "sha256": "b15856c60c1039a0376f15d7e3038e7079922e7f6b4af539eab579dd5920dcea"
+      "size": 3951,
+      "sha256": "4534d7d2f57e75d9edfdc650c6790be59e37125e2dbc21a1b7243066a3778260"
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 1329,
-      "sha256": "1fd1671ce9fb03e13218f4a3c9c23a457d8c258f4b82e074411d327a82eb7b20"
+      "size": 1662,
+      "sha256": "30f10415835e8748938c2f77463739f8aa38953b4dc21cadb09ee4712b366a6f"
     },
     {
       "path": "README.md",
-      "size": 10678,
-      "sha256": "caeeb1f37a5bf9f596373a9d919abddda3d61363d3f41a8ed5f12c6ee4d2f72c"
+      "size": 13009,
+      "sha256": "475389b90bf1da60ecea709b5bf11d999507f75d59d22d88347e41f5e21c82a1"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "59854984853104df5c353e2f681a15fc7924742f9a2e468c29af248dce45ce03"
+      "sha256": "1575e1af4a95f12f70b4ee6a6adce8160953d93ea17dc2611b90883ccc3ad3b8"
     },
     {
       "path": "install.ps1",
@@ -147,8 +152,8 @@
     },
     {
       "path": "install.py",
-      "size": 2984,
-      "sha256": "e0989527908233415ff46ad0bc253ce25b7e919f672768cfabde537be1f4d57f"
+      "size": 3116,
+      "sha256": "6ddd338b9552ff053c341108e26022b8831fd2fda1b8ea15f722b66aa3821ab3"
     },
     {
       "path": "install.sh",
@@ -161,14 +166,19 @@
       "sha256": "e73b351cbb7db6fc159f8a910aed47e5c46a971519477b9a578c082338255ade"
     },
     {
+      "path": "tests/test_package.py",
+      "size": 1857,
+      "sha256": "d9eb0e32f60ed2d0273349402432bbb0431ce9c73d5ea442e473bfbad9789098"
+    },
+    {
       "path": "uninstall.ps1",
       "size": 829,
       "sha256": "b159c2afabb460d430b576ec8ffd171c4eb75f5dcf3501bb5a6025f0e554d27a"
     },
     {
       "path": "uninstall.py",
-      "size": 2215,
-      "sha256": "4073f8334dd32e53df92754f54ce5029e4e907490ba5e17dcd4578246e6bd6fc"
+      "size": 2222,
+      "sha256": "13679bb68df11bc22f3f3bf820ecfa6dff86619615e7556bc597b43bf93aa364"
     },
     {
       "path": "uninstall.sh",
@@ -177,8 +187,8 @@
     },
     {
       "path": "verify.py",
-      "size": 2420,
-      "sha256": "1c746ef21a26b8df802a9c22ec9bdea39ef5fbda47ff20766731533aa4b4e48e"
+      "size": 3762,
+      "sha256": "ddeec32338df0f4e1f9fe99ec7d865af30c6e4a381bdf6e2ff86afbf855bbe9e"
     }
   ]
 }
