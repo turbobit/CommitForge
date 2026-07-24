@@ -1,6 +1,6 @@
-# Today·Weekly 기간 리뷰
+# Today·3days·Weekly 기간 리뷰
 
-`/cca today|weekly`와 `/cr today|weekly`에서 이 규칙을 사용한다.
+`/cca today|3days|weekly`와 `/cr today|3days|weekly`에서 이 규칙을 사용한다.
 
 ## 1. 경계와 대상
 
@@ -8,10 +8,12 @@
 
 ```bash
 python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" today
+python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" 3days
 python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" weekly
 ```
 
 - `today`: 호스트 로컬 달력의 오늘 00:00부터 현재까지다. 최근 24시간이 아니다.
+- `3days`: 호스트 로컬 달력의 오늘과 직전 2개 날짜를 포함해, 이틀 전 00:00부터 현재까지다. 정확한 72시간 rolling window가 아니다.
 - `weekly`: 기본 월요일 00:00부터 현재까지다. 최근 7일이 아니다.
 - `--week-start sunday`이면 일요일 00:00을 사용한다.
 - `--timezone <IANA|±HH:MM>`이면 해당 시간대를 사용한다. 해석할 수 없으면 임의 대체하지 않는다.
@@ -83,7 +85,11 @@ finding에는 원인을 다음 중 하나로 귀속한다.
 - finding 귀속과 현재 blocker
 - 변경 파일·추가·삭제 통계와 검증 결과
 
-## 7. Weekly 보고
+## 7. 3days 보고
+
+Today 보고 형식을 사용하되 3개 달력일을 날짜별로 구분하고, 날짜 경계를 넘은 후속 수정·revert·교차 commit 회귀를 연결한다.
+
+## 8. Weekly 보고
 
 Today 보고에 다음을 더한다.
 

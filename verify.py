@@ -132,7 +132,7 @@ def main() -> None:
     if cca_path.exists() and modes_path.exists():
         cca_text = cca_path.read_text(encoding="utf-8")
         modes_text = modes_path.read_text(encoding="utf-8")
-        for mode in ("today", "weekly", "release", "emergency", "learn"):
+        for mode in ("today", "3days", "weekly", "release", "emergency", "learn"):
             if f"`{mode}`" not in cca_text:
                 errors.append(f"cca/SKILL.md: {mode} 모드 분기 누락")
             if f"## " not in modes_text or f"`{mode}`" not in modes_text:
@@ -145,9 +145,10 @@ def main() -> None:
             if skill_path.exists() and "period-review-modes.md" not in skill_path.read_text(
                 encoding="utf-8"
             ):
-                errors.append(f"{skill_path}: today·weekly 공통 규칙 연결 누락")
+                errors.append(f"{skill_path}: today·3days·weekly 공통 규칙 연결 누락")
         for contract in (
             "최근 24시간이 아니다",
+            "정확한 72시간 rolling window가 아니다",
             "최근 7일이 아니다",
             "period-interaction",
             "Atomic Commit 계획·메시지·staging·commit·push는 항상 금지",
@@ -244,7 +245,13 @@ def main() -> None:
         ):
             if field not in execution_text:
                 errors.append(f"review-execution.md: finding schema {field} 누락")
-        for policy in ("최대 4개", "UNKNOWN", "fallback"):
+        for policy in (
+            "기본 동시 실행 목표는 6개",
+            "최대 8개",
+            "3~4개로 축소",
+            "UNKNOWN",
+            "fallback",
+        ):
             if policy not in execution_text:
                 errors.append(f"review-execution.md: 실행 정책 {policy} 누락")
 

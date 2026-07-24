@@ -29,11 +29,13 @@
 /cc
 /cr
 /cr today
+/cr 3days
 /cr weekly
 /cr --base main
 /cr pr
 /cca
 /cca today
+/cca 3days
 /cca weekly
 /cca release
 /cca emergency

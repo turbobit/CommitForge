@@ -1,7 +1,7 @@
 ---
 name: cr
-description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 today/weekly/branch/range/PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정·재리뷰·검증한다. Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
-argument-hint: "[today|weekly|pr] [추가 맥락] [--fix] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 today/3days/weekly/branch/range/PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정·재리뷰·검증한다. Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
+argument-hint: "[today|3days|weekly|pr] [추가 맥락] [--fix] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -84,7 +84,7 @@ $ARGUMENTS
 10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
 11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
 12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
-13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`weekly`에서만 읽는다.
+13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -94,13 +94,13 @@ $ARGUMENTS
 ## 0. 인자와 수정 정책
 
 - 일반 문장은 구현 의도와 리뷰 맥락으로 사용한다.
-- 첫 번째 위치 인자가 `today` 또는 `weekly`이면 `period-review-modes.md`의 기간 범위와 review-only 정책을 적용한다.
+- 첫 번째 위치 인자가 `today`, `3days`, `weekly` 중 하나면 `period-review-modes.md`의 기간 범위와 review-only 정책을 적용한다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.
 - `--base <ref>`: `merge-base(<ref>, HEAD)..HEAD`와 현재 working change를 함께 리뷰한다.
 - `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 `--fix`를 허용하지 않는다.
 - 첫 인자가 `pr`이면 `gh pr view --json baseRefName,headRefName,number,url`로 현재 PR의 base를 읽어 `--base`처럼 처리한다. PR을 찾지 못하면 변경하지 말고 base를 요청한다.
 - `--format human|json|sarif`과 `--output`은 `reporting-formats.md`를 따른다.
-- `--all-authors`, `--week-start`, `--timezone`은 `today`·`weekly`에서만 적용한다.
+- `--all-authors`, `--timezone`은 `today`·`3days`·`weekly`에서 적용하고, `--week-start`는 `weekly`에서만 적용한다.
 - 기본은 모든 소스 수정을 금지하는 읽기 전용 리뷰다.
 - `--fix`를 명시한 경우에만 현재 working hunk가 만든 확정적·국소적 CRITICAL/MAJOR 문제를 수정할 수 있다.
 - `--fix`가 없으면 blocker를 보고하고 소스는 그대로 둔다.
@@ -138,7 +138,7 @@ git ls-files --others --exclude-standard
 git log -20 --pretty=format:'%h%x09%s'
 ```
 
-`today`, `weekly`이면 `period_range.py`가 반환한 범위로 커밋 원장과 net effect를 수집한다. `--base`, `--range`, `pr`이면 `git merge-base`, `git diff <range>`, `git log <range>`로 해당 commit range를 별도 수집한다. 모든 committed 범위는 working tree hunk와 섞지 않고 원장에 표시한다.
+`today`, `3days`, `weekly`이면 `period_range.py`가 반환한 범위로 커밋 원장과 net effect를 수집한다. `--base`, `--range`, `pr`이면 `git merge-base`, `git diff <range>`, `git log <range>`로 해당 commit range를 별도 수집한다. 모든 committed 범위는 working tree hunk와 섞지 않고 원장에 표시한다.
 
 변경 파일뿐 아니라 관련 호출부, 타입·인터페이스, 테스트, 설정, migration, generated source, 프로젝트 규칙을 읽는다. 모든 hunk를 `deep-review-protocol.md`의 변경 원장에 배정하고 삭제 라인과 wrapper/proxy/adapter를 별도 추적한다.
 
@@ -268,7 +268,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 - snapshot 삭제/보존과 lock 해제
 - Atomic Commit 계획, staging, commit, push를 하지 않았음
 - `--fix` 요청 여부와 실제 수정 파일
-- `today`·`weekly`이면 정확한 기간 경계, 작성자 조건, commit 원장, net effect와 finding 귀속
+- `today`·`3days`·`weekly`이면 정확한 기간 경계, 작성자 조건, commit 원장, net effect와 finding 귀속
 
 JSON/SARIF를 생성했다면 `report_validator.py` 검증 결과와 출력 경로를 포함한다.
 

@@ -11,7 +11,7 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 | `/cr` | 기본 read-only 심층 리뷰, `--fix` 시 확정적 working 문제 수정·재리뷰 | 없음 | `--fix`만 |
 | `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
-`/cr`은 `today`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
+`/cr`은 `today`, `3days`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
 
 ### 빠른 선택
 
@@ -280,7 +280,8 @@ Guard + 원본 Diff 보존
 
 ### Reviewer 실행 신뢰성
 
-- 최대 4개 reviewer를 동시에 실행하고 나머지는 batch 처리
+- 기본 6개 reviewer를 병렬 실행하고 고위험·대형 diff는 환경 상한 안에서 최대 8개까지 확대
+- rate-limit·agent 시작 실패·반복 timeout 시 다음 batch를 3~4개로 자동 축소
 - Line·Correctness·Security와 활성 조건부 reviewer는 필수
 - agent 실패·timeout 시 main agent가 같은 관점으로 fallback
 - 완료하지 못한 관점은 `UNKNOWN`이며 `/cr` 성공과 `/cca` commit을 차단
@@ -315,14 +316,15 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 ### 확장 모드
 
-#### 오늘·이번 주 심층 리뷰
+#### 오늘·최근 3개 달력일·이번 주 심층 리뷰
 
 ```text
 /cr today
+/cr 3days
 /cr weekly --all-authors
 ```
 
-`/cr`은 오늘 또는 이번 주의 기존 commit과 현재 working tree를 함께 심층 리뷰합니다. 기간 commit은 읽기 전용이며 Atomic Commit 계획·staging·commit을 만들지 않습니다. working tree가 깨끗해도 기간 commit이 있으면 검토합니다.
+`/cr`은 오늘, 최근 3개 달력일 또는 이번 주의 기존 commit과 현재 working tree를 함께 심층 리뷰합니다. 기간 commit은 읽기 전용이며 Atomic Commit 계획·staging·commit을 만들지 않습니다. working tree가 깨끗해도 기간 commit이 있으면 검토합니다.
 
 #### 오늘 작업 전체 분석·커밋
 
@@ -333,6 +335,15 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 호스트 로컬 달력의 오늘 00:00부터 현재까지 commit과 미커밋 변경을 함께 분석합니다. 커밋별 원장, 되돌림·후속 수정, 최종 net effect와 교차 commit 회귀를 검토합니다. 기존 commit은 재작성하지 않으며 현재 미커밋 변경만 `/cca` 파이프라인으로 commit합니다.
 
+#### 최근 3개 달력일 분석·커밋
+
+```text
+/cca 3days
+/cca 3days --timezone Asia/Seoul --all-authors
+```
+
+선택 시간대에서 오늘과 직전 2개 날짜를 포함해 이틀 전 00:00부터 현재까지 분석합니다. 정확한 최근 72시간이 아닙니다. 기존 기간 commit은 재작성하지 않고 현재 미커밋 변경만 `/cca` 파이프라인으로 commit합니다.
+
 #### 이번 주 작업 전체 분석·커밋
 
 ```text
@@ -342,7 +353,7 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 기본 월요일 00:00부터 현재까지를 날짜·domain·작성자별로 집계합니다. 반복 수정, revert, flaky test, 미완료 기능과 테스트·문서·migration·관측성 공백을 분석하고 현재 미커밋 변경만 commit합니다.
 
-`today`는 최근 24시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start <monday|sunday>`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
+`today`는 최근 24시간, `3days`는 최근 72시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start <monday|sunday>`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
 
 #### 릴리스 준비
 
@@ -395,22 +406,24 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 `--output`으로 저장소 내부 경로를 지정하면 보고서 파일은 commit 대상에서 제외되고 미커밋 상태로 남습니다. `/cr`은 Guard 불변식 검증과 종료 후, `/cca`는 commit 실행 종료 후 보고서를 생성합니다.
 
-### Today·Weekly 기간 옵션
+### Today·3days·Weekly 기간 옵션
 
 | 옵션 | 적용 | 의미 |
 |---|---|---|
-| `--all-authors` | `/cr today`, `/cr weekly`, `/cca today`, `/cca weekly` | 기본 Git 사용자 이메일 제한을 제거하고 모든 작성자의 기간 commit 포함 |
+| `--all-authors` | `/cr today`, `/cr 3days`, `/cr weekly`, `/cca today`, `/cca 3days`, `/cca weekly` | 기본 Git 사용자 이메일 제한을 제거하고 모든 작성자의 기간 commit 포함 |
 | `--week-start <monday\|sunday>` | `/cr weekly`, `/cca weekly` | 주간 시작 요일 선택; 기본값은 `monday` |
-| `--timezone <IANA\|±HH:MM>` | `/cr today`, `/cr weekly`, `/cca today`, `/cca weekly` | 기간 경계 계산 시간대 지정; 기본값은 호스트 로컬 시간대 |
+| `--timezone <IANA\|±HH:MM>` | `/cr today`, `/cr 3days`, `/cr weekly`, `/cca today`, `/cca 3days`, `/cca weekly` | 기간 경계 계산 시간대 지정; 기본값은 호스트 로컬 시간대 |
 
 ```text
 /cr today --timezone Asia/Seoul
+/cr 3days --all-authors --timezone Asia/Seoul
 /cr weekly --all-authors --week-start sunday
 /cca today --timezone +09:00
+/cca 3days --timezone +09:00
 /cca weekly --all-authors --week-start monday
 ```
 
-`today`는 선택한 시간대의 오늘 00:00부터 현재까지이며 최근 24시간이 아닙니다. `weekly`는 선택한 시작 요일의 00:00부터 현재까지이며 최근 7일이 아닙니다.
+`today`는 선택한 시간대의 오늘 00:00부터 현재까지이며 최근 24시간이 아닙니다. `3days`는 이틀 전 00:00부터 현재까지인 3개 달력일이며 최근 72시간이 아닙니다. `weekly`는 선택한 시작 요일의 00:00부터 현재까지이며 최근 7일이 아닙니다.
 
 ### `/cca` 확장 모드 옵션
 

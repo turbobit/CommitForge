@@ -29,7 +29,7 @@ class PackageMetadataTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("extended-modes.md", cca)
-        for mode in ("today", "weekly", "release", "emergency", "learn"):
+        for mode in ("today", "3days", "weekly", "release", "emergency", "learn"):
             self.assertIn(f"`{mode}`", cca)
             self.assertIn(f"`{mode}`", modes)
         self.assertIn("호스트 로컬 달력", period)
@@ -50,8 +50,10 @@ class PackageMetadataTest(unittest.TestCase):
             )
             self.assertIn("period-review-modes.md", skill)
             self.assertIn("today", skill)
+            self.assertIn("3days", skill)
             self.assertIn("weekly", skill)
         self.assertIn("최근 24시간이 아니다", period)
+        self.assertIn("정확한 72시간 rolling window가 아니다", period)
         self.assertIn("최근 7일이 아니다", period)
         self.assertIn("period-interaction", period)
         self.assertIn(
@@ -67,6 +69,19 @@ class PackageMetadataTest(unittest.TestCase):
             "기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속",
             cca,
         )
+
+    def test_reviewer_concurrency_is_adaptive(self) -> None:
+        execution = (
+            ROOT / ".claude/skills/_git-atomic-core/review-execution.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "기본 동시 실행 목표는 6개",
+            "최대 8개",
+            "3~4개로 축소",
+            "환경 상한",
+        ):
+            self.assertIn(contract, execution)
+        self.assertNotIn("최대 4개 agent", execution)
 
     def test_all_commands_load_learned_profile(self) -> None:
         for command in ("ccr", "cc", "cr", "cca"):

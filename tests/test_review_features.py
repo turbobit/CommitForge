@@ -144,6 +144,14 @@ class ReviewFeatureTest(unittest.TestCase):
             "--now",
             "2026-07-24T13:45:00+09:00",
         )
+        three_days = self.run_python(
+            script,
+            "3days",
+            "--timezone",
+            "+09:00",
+            "--now",
+            "2026-07-24T13:45:00+09:00",
+        )
         sunday = self.run_python(
             script,
             "weekly",
@@ -164,6 +172,11 @@ class ReviewFeatureTest(unittest.TestCase):
             "2026-07-20T00:00:00+09:00",
             json.loads(weekly.stdout)["start"],
         )
+        self.assertEqual(
+            "2026-07-22T00:00:00+09:00",
+            json.loads(three_days.stdout)["start"],
+        )
+        self.assertEqual("3days", json.loads(three_days.stdout)["mode"])
         self.assertEqual(
             "2026-07-19T00:00:00+09:00",
             json.loads(sunday.stdout)["start"],

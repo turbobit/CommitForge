@@ -3,7 +3,7 @@
 ## 목차
 
 1. 공통 해석 규칙
-2. `today`·`weekly`
+2. `today`·`3days`·`weekly`
 3. `release`
 4. `emergency`
 5. `learn`
@@ -11,7 +11,7 @@
 
 ## 1. 공통 해석 규칙
 
-`/cca`의 첫 번째 위치 인자가 `today`, `weekly`, `release`, `emergency`, `learn` 중 하나면 확장 모드로 해석한다. 그 외에는 기본 `/cca` 흐름을 사용한다.
+`/cca`의 첫 번째 위치 인자가 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 중 하나면 확장 모드로 해석한다. 그 외에는 기본 `/cca` 흐름을 사용한다.
 
 - 확장 모드 이름 뒤의 일반 문장은 작업 맥락으로 사용한다.
 - 알 수 없는 모드처럼 보이는 단어는 자동 실행하지 말고 일반 맥락으로 취급한다.
@@ -19,13 +19,15 @@
 - 어떤 모드도 push, tag, GitHub Release 생성 또는 배포를 수행하지 않는다.
 - `.commitforge/profile.md`가 있으면 저장소의 명시적 규칙과 충돌하지 않는 범위에서 메시지·분리·검증 선호에 적용한다.
 
-## 2. `today`·`weekly`
+## 2. `today`·`3days`·`weekly`
 
 두 모드는 `_git-atomic-core/period-review-modes.md`를 따른다.
 
 ```text
 /cca today
 /cca today --all-authors
+/cca 3days
+/cca 3days --timezone Asia/Seoul --all-authors
 /cca weekly
 /cca weekly --week-start sunday --all-authors
 ```

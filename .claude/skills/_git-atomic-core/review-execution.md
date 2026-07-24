@@ -6,8 +6,11 @@
 2. `/cr` 기본 10개 또는 `/cca` 기본 11개 reviewer를 준비한다.
 3. `reviewer_triggers.py` 결과를 조건부 reviewer의 **최소 활성 집합**으로 사용한다.
 4. 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. 스크립트가 비활성이라고 판정해도 의미 근거가 있으면 생략하지 않는다.
-5. 최대 4개 agent를 동시에 실행하고 나머지는 batch로 이어서 실행한다.
-6. 수정 후 이전 결과를 폐기하고 fingerprint·trigger·활성 reviewer를 다시 계산한다.
+5. 기본 동시 실행 목표는 6개 agent다. 현재 Claude Code의 유효 concurrency 상한이 더 낮으면 그 값을 따른다.
+6. 고위험 또는 대형 diff이고 독립 reviewer가 충분하면 최대 8개까지 병렬 실행한다. 환경 상한을 초과하지 않는다.
+7. 429, 일시적 제한, agent 시작 실패 또는 반복 timeout이 발생하면 다음 batch를 3~4개로 축소하고 실패 관점은 한 번만 재시도한다.
+8. 남은 reviewer는 축소된 batch로 이어서 실행하며 필수 관점을 생략하지 않는다.
+9. 수정 후 이전 결과를 폐기하고 fingerprint·trigger·활성 reviewer를 다시 계산한다.
 
 ## 2. 필수성과 실패 정책
 

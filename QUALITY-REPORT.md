@@ -6,8 +6,8 @@
 - `/cr` frontmatter의 `--fix`와 `/cca --no-fix` 독립 정책 검증
 - 기본 `/cr` 편집 도구 호출을 Skill 범위 PreToolUse Hook으로 실행 전 차단
 - Live eval의 HEAD·index·working diff·status 불변 검증
-- `/cr`·`/cca` today/weekly 공통 기간 규칙과 명령 연결 검증
-- today·weekly 월요일·weekly 일요일 고정 시각 경계 회귀 검증
+- `/cr`·`/cca` today/3days/weekly 공통 기간 규칙과 명령 연결 검증
+- today·3days·weekly 월요일·weekly 일요일 고정 시각 경계 회귀 검증
 - 기간 commit 불변, `/cr` Atomic 계획 금지, `/cca` working-only commit 경계 검증
 - Python 파일 syntax compile
 - Skill/Agent YAML frontmatter parser 검증
@@ -53,9 +53,9 @@
 
 ### 확장 모드 검증
 
-- `/cca today`, `weekly`, `release`, `emergency`, `learn` 분기 존재
-- `/cr today`, `weekly` 기간 리뷰 분기 존재
-- today는 최근 24시간, weekly는 최근 7일로 해석하지 않는 달력 경계 확인
+- `/cca today`, `3days`, `weekly`, `release`, `emergency`, `learn` 분기 존재
+- `/cr today`, `3days`, `weekly` 기간 리뷰 분기 존재
+- today는 최근 24시간, 3days는 최근 72시간, weekly는 최근 7일로 해석하지 않는 달력 경계 확인
 - commit 원장·net effect·revert·교차 commit finding 귀속 규칙 확인
 - 확장 모드 공통 규칙 파일 설치 대상 포함
 - `learn` 프로필을 `/ccr`, `/cc`, `/cr`, `/cca`가 참조

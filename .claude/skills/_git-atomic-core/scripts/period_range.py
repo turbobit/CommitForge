@@ -68,7 +68,9 @@ def calculate(
 
     now = parse_now(now_value, timezone)
     start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    if mode == "weekly":
+    if mode == "3days":
+        start -= dt.timedelta(days=2)
+    elif mode == "weekly":
         if week_start == "monday":
             days_since_start = now.weekday()
         else:
@@ -92,7 +94,7 @@ def calculate(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("mode", choices=("today", "weekly"))
+    parser.add_argument("mode", choices=("today", "3days", "weekly"))
     parser.add_argument("--timezone")
     parser.add_argument("--week-start", choices=("monday", "sunday"), default="monday")
     parser.add_argument("--now", help=argparse.SUPPRESS)

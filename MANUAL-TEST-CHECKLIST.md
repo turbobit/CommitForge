@@ -134,30 +134,33 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - `guard.py status`에서 snapshot 확인
 - 다른 세션 snapshot 미삭제
 
-## 9. `/cr today|weekly`
+## 9. `/cr today|3days|weekly`
 
 오늘과 이번 주에 해당하는 여러 commit, 되돌림 commit, 새 미커밋 변경을 준비합니다.
 
 ```text
 /cr today
+/cr 3days --timezone Asia/Seoul
 /cr weekly --all-authors
 ```
 
 확인:
 
-- today는 로컬 00:00, weekly는 기본 월요일 00:00 경계
+- today는 로컬 00:00, 3days는 이틀 전 00:00, weekly는 기본 월요일 00:00 경계
+- 3days를 rolling 72시간으로 해석하지 않음
 - timezone·UTC offset·정확한 시작/종료 시각
 - commit별 원장과 branch net effect 분리
 - revert·후속 correction·교차 commit finding 귀속
 - working tree가 깨끗해도 기간 commit 리뷰
 - HEAD·index 불변, Atomic 계획·commit·push 없음
 
-## 10. `/cca today|weekly`
+## 10. `/cca today|3days|weekly`
 
 테스트 브랜치에서 오늘 날짜의 기존 commit과 새 미커밋 변경을 준비합니다.
 
 ```text
 /cca today 테스트 작업
+/cca 3days --timezone Asia/Seoul 테스트 작업
 /cca weekly --week-start sunday 테스트 작업
 ```
 
