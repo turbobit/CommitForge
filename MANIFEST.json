@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.9.1",
+  "version": "1.9.2",
   "reproducible": true,
   "file_count": 78,
-  "total_bytes": 363903,
+  "total_bytes": 365483,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -267,8 +267,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 8572,
-      "sha256": "e07e7f6e8e2c4a85f5633107108514b2c9c64b5793f07d4634285cd155c1615e"
+      "size": 9148,
+      "sha256": "78f6ac7afe0e30defffed81e0ae31da3e766aec117afb48cf58177688d6e29bf"
     },
     {
       "path": "INSTALL.md",
@@ -282,18 +282,18 @@
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 5522,
-      "sha256": "c443d18ad97978fff421b557ea7641bd53eec3a1eaf3e44537609dcb3668b21f"
+      "size": 5633,
+      "sha256": "4ed716f3ec9b2e44e870aebb0f623ba8754240c20f07019ab9bb250f47d1e67d"
     },
     {
       "path": "README.md",
-      "size": 33033,
-      "sha256": "090f3ac5c8c91836c24968f257ecc0dcf4f51183c2ae93d1087994e8a3258323"
+      "size": 33152,
+      "sha256": "73dee9712023e83bf6b7b12bf8462b824c016828ded69d4261aad56d54ccdacb"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "0ab4fa190ca1b1d1f630ac87cf34672bfbaf1395d0148c7568d38e58335b8d68"
+      "sha256": "bb59919018ee76482c23f1ce44219ce4c9c6393c65ef0ddae40d32d79d413bb5"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
@@ -372,8 +372,8 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 7396,
-      "sha256": "bd09aaffb358593d3cd2090174d44d3a53efaea3d80b04461e16664870ab2347"
+      "size": 8170,
+      "sha256": "04a1fe55506650618fea5f4c4d1395a3e33c221a07f66fea728f0778399815fd"
     },
     {
       "path": "uninstall.ps1",

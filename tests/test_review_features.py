@@ -201,11 +201,28 @@ class ReviewFeatureTest(unittest.TestCase):
             readme,
         )
         self.assertIn(
-            "/cr release --prepare --tag`는 같은 준비·tag 실행 결과",
+            "/cr release --prepare --tag`는 version·CHANGELOG·commit·tag 결과",
             readme,
         )
         self.assertIn("│   ├── cr/SKILL.md", readme)
         self.assertIn("│           ├── cr_edit_gate.py", readme)
+
+    def test_readme_prioritizes_command_choice_and_safety_boundaries(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        ordered_sections = (
+            "## 한눈에 보기",
+            "## 30초 빠른 시작",
+            "## 문서 바로가기",
+            "## 설치",
+            "## 명령 사용법",
+            "## 옵션 참조",
+            "## Atomic Commit 기준",
+        )
+        positions = [readme.index(section) for section in ordered_sections]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("> [!IMPORTANT]", readme)
+        self.assertIn("| 모드 | `/cr` — 읽기 전용 분석 | `/cca` — 실행 |", readme)
+        self.assertIn("## 권한과 실행 통제", readme)
 
 
 if __name__ == "__main__":

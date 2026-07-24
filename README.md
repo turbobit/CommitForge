@@ -2,84 +2,88 @@
 
 > Atomic Git Assistant for Claude Code
 
-CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Commit 계획과 안전한 커밋 실행을 제공하는 Skills 패키지입니다.
+CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증 → Atomic Commit**을 일관된 규칙으로 실행하는 Skills 패키지입니다. 커밋 제목과 본문은 기본적으로 한국어를 사용합니다.
 
-| 명령 | 역할 | Git 상태 변경 | 소스 수정 |
+## 한눈에 보기
+
+| 명령 | 핵심 역할 | 소스 수정 | Git 변경 |
 |---|---|---:|---:|
-| `/ccr` | Atomic Commit 계획, 분리 기준, 순서, 한글 메시지 초안 | 없음 | 없음 |
-| `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
-| `/cr` | 기본 read-only 심층 리뷰, 일반 모드의 `--fix`에서만 확정적 working 문제 수정 | 없음 | 일반 모드의 `--fix`만 |
-| `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit, 명시적 release tag | 필요 시 있음 |
+| `/ccr` | Atomic Commit 계획·순서·메시지 초안 | 안 함 | 안 함 |
+| `/cc` | 현재 변경을 의미 단위별로 순차 commit | 안 함 | staging·commit |
+| `/cr` | line-by-line 심층 코드 리뷰 | 기본 안 함, 일반 모드의 `--fix`만 허용 | 안 함 |
+| `/cca` | 리뷰·국소 수정·검증·Atomic Commit 전체 실행 | 필요 시 | staging·commit |
 
-`/cr`과 `/cca`는 모두 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다. `/cr release|emergency|learn`은 `--fix`를 붙여도 항상 읽기 전용이고, `/cca`만 명시적인 실행 옵션으로 릴리스 준비·hotfix·프로필 저장을 수행합니다.
-
-> **Release tag 실행 경계**
->
-> - `/cca release --prepare --tag`만 최종 clean HEAD에 **로컬 annotated tag를 실제 생성**합니다.
-> - `/cr release --prepare --tag`는 같은 준비·tag 실행 결과를 **읽기 전용으로 미리 보고**할 뿐, version 파일·CHANGELOG·commit·tag를 변경하지 않습니다.
-> - `/cr release`만 실행해도 권장 version/tag는 보고합니다. `--prepare --tag`를 붙이면 실제 실행 시 바뀔 파일과 생성될 tag까지 시뮬레이션합니다.
-> - 두 명령 모두 remote tag push, GitHub Release, package publish, deploy는 수행하지 않습니다.
-
-### 빠른 선택
+### 무엇을 실행해야 하나요?
 
 | 원하는 결과 | 명령 |
 |---|---|
-| 변경을 커밋하지 않고 Atomic Commit 구성을 먼저 확인 | `/ccr` |
-| 이미 만든 변경을 수정하지 않고 Atomic Commit으로 생성 | `/cc` |
-| 코드를 바꾸지 않고 현재·기간·PR 변경을 심층 리뷰 | `/cr` |
-| 리뷰에서 확인한 현재 working 문제만 고치고 커밋하지 않음 | `/cr --fix` |
-| 릴리스 버전·tag·위험만 미리 분석 | `/cr release` |
-| 장애 원인·rollback·검증 계획만 분석 | `/cr emergency` |
-| 프로젝트 commit 문화 프로필을 미리 확인 | `/cr learn` |
-| 리뷰·안전한 수정·검증·Atomic Commit을 한 번에 실행 | `/cca` |
-| 버전·CHANGELOG를 준비하고 로컬 tag까지 생성 | `/cca release --prepare --tag` |
-| 긴급 수정·회귀 검증·Atomic Commit 실행 | `/cca emergency` |
-| 프로젝트 프로필 파일 생성 | `/cca learn` |
-| `/cca`에서 소스 수정 없이 blocker만 확인 | `/cca --no-fix` |
+| 계획만 먼저 확인 | `/ccr` |
+| 변경된 소스를 건드리지 않고 commit | `/cc` |
+| 현재 변경·branch·PR을 읽기 전용으로 심층 리뷰 | `/cr` |
+| 리뷰에서 확인한 현재 문제만 고치고 commit하지 않음 | `/cr --fix` |
+| 리뷰부터 수정·검증·commit까지 한 번에 실행 | `/cca` |
+| `/cca`에서 자동 수정 없이 blocker만 확인 | `/cca --no-fix` |
+| 기간 작업 분석 | `/cr today`, `/cr 3days`, `/cr weekly` |
+| 기간 분석 후 현재 미커밋 변경까지 commit | `/cca today`, `/cca 3days`, `/cca weekly` |
+| release·장애·학습 결과만 미리 확인 | `/cr release`, `/cr emergency`, `/cr learn` |
+| release 준비·hotfix·프로필 저장을 실제 실행 | `/cca release`, `/cca emergency`, `/cca learn` |
+
+> [!IMPORTANT]
+> **Release tag 실행 경계**
+>
+> - `/cca release --prepare --tag`만 최종 clean HEAD에 **로컬 annotated tag를 실제 생성**합니다.
+> - `/cr release --prepare --tag`는 version·CHANGELOG·commit·tag 결과를 **읽기 전용으로 시뮬레이션**할 뿐 아무것도 변경하지 않습니다.
+> - `/cr release`만으로도 권장 version/tag를 확인할 수 있습니다.
+> - 두 명령 모두 remote tag push, GitHub Release, package publish, deploy는 수행하지 않습니다.
 
 `/cr --fix`와 `/cca`의 자동 수정은 현재 working tree가 만든 확정적·국소적 문제로 제한됩니다. 기존 commit을 amend하거나 history를 재작성하지 않습니다.
 
-커밋 메시지는 기본적으로 다음 형태를 사용합니다.
+<p align="center">
+  <img width="546" height="378" alt="CommitForge 실행 결과 예시" src="https://github.com/user-attachments/assets/d0c2c82b-27d5-4c5e-ba3e-6ceb1d32d7ab">
+</p>
 
-```text
-type(scope): 한글 제목
+## 30초 빠른 시작
 
-- 변경 배경과 목적
-- 핵심 동작 및 구현 변화
-- 영향 범위와 호환성
-- 실제 수행한 검증
-```
-<img width="546" height="378" alt="image" src="https://github.com/user-attachments/assets/d0c2c82b-27d5-4c5e-ba3e-6ceb1d32d7ab" />
+현재 저장소에 설치:
 
-## 왜 `.claude/skills`인가
-
-현재 Claude Code에서는 Custom Commands가 Skills로 통합됐습니다. `.claude/commands/cc.md`도 계속 동작하지만, 권장 형식인 `.claude/skills/cc/SKILL.md`를 사용하면 지원 파일, invocation 통제, tool 사전 승인, subagent 구성을 함께 배포할 수 있습니다.
-
-디렉터리 이름이 slash command가 됩니다.
-
-```text
-.claude/skills/cc/SKILL.md   → /cc
-.claude/skills/ccr/SKILL.md  → /ccr
-.claude/skills/cr/SKILL.md   → /cr
-.claude/skills/cca/SKILL.md  → /cca
+```bash
+./install.sh project
 ```
 
-네 명령은 모두 `disable-model-invocation: true`이므로 사용자가 직접 입력할 때만 실행됩니다.
+Claude Code를 열고 목적에 맞는 명령을 실행합니다.
 
-## 요구사항
+```text
+/cr    # 읽기 전용 심층 리뷰
+/ccr   # Atomic Commit 계획
+/cc    # 계획·staging·commit
+/cca   # 리뷰·수정·검증·commit 전체 실행
+```
+
+Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. 전체 설치 방식은 [설치](#설치)를 참고하십시오.
+
+## 문서 바로가기
+
+- [설치](#설치)
+- [명령 사용법](#명령-사용법)
+- [심층 리뷰와 reviewer](#심층-리뷰-범위)
+- [확장 모드: 기간·release·emergency·learn](#확장-모드)
+- [옵션 참조](#옵션-참조)
+- [Atomic Commit 기준](#atomic-commit-기준)
+- [동시 세션·Diff 보존·복구](#동시-세션-안전성)
+- [안전 경계와 권한](#안전상-하지-않는-작업)
+- [검증·제거·개발](#검증)
+
+## 설치
+
+### 요구사항
 
 - Git
 - Python 3.9 이상
 - 최신 Claude Code 권장
-- `/cr`·`/cca`의 custom subagent를 새로 설치한 현재 세션에서 찾지 못하면 Claude Code를 한 번 재시작
 
-Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
+Python은 lock, Diff snapshot, untracked 보존, fingerprint와 안전한 cleanup을 담당합니다. Python이 없거나 Guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않습니다.
 
-기본 `/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged/unstaged binary diff, status, untracked content를 직접 비교합니다. 프롬프트 판단과 별개로 저장소 상태가 바뀌었다면 성공과 snapshot 삭제를 차단합니다. 일반 리뷰에서 `--fix`를 명시한 실행도 HEAD·branch·staging 불변 조건을 유지하며, `release`·`emergency`·`learn`은 `--fix`와 관계없이 작업 트리까지 읽기 전용입니다.
-
-## 설치
-
-### 프로젝트에 설치
+### 프로젝트 설치
 
 현재 저장소에만 `/cc`, `/ccr`, `/cr`, `/cca`를 제공합니다.
 
@@ -167,7 +171,11 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 
 전역 범위는 `~/.claude/skills`와 `~/.claude/agents`에 같은 구조로 복사합니다.
 
-## 사용
+### 설치 후 확인
+
+대상 저장소에서 Claude Code를 다시 열고 `/`를 입력해 `ccr`, `cc`, `cr`, `cca`가 표시되는지 확인합니다. 새 `.claude/agents` 디렉터리를 현재 세션에서 처음 만들었다면 Claude Code를 한 번 재시작하십시오.
+
+## 명령 사용법
 
 ### 계획만 검토
 
@@ -329,6 +337,15 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 ### 확장 모드
 
+| 모드 | `/cr` — 읽기 전용 분석 | `/cca` — 실행 |
+|---|---|---|
+| `today` | 오늘 commit과 현재 변경 리뷰 | 오늘 이력 분석 + 현재 변경 commit |
+| `3days` | 최근 3개 달력일 리뷰 | 3개 달력일 분석 + 현재 변경 commit |
+| `weekly` | 이번 주 리뷰 | 주간 분석 + 현재 변경 commit |
+| `release` | version/tag·릴리스 위험 또는 준비 작업 시뮬레이션 | 명시적 `--prepare`·`--tag` 실행 |
+| `emergency` | 장애 원인·rollback·검증 계획 | 최소 hotfix·회귀 검증·commit |
+| `learn` | 프로젝트 스타일 프로필 미리보기 | JSON·Markdown 프로필 저장 |
+
 #### 오늘·최근 3개 달력일·이번 주 심층 리뷰
 
 ```text
@@ -411,7 +428,7 @@ tag는 문자열을 추측하지 않고 전용 계산기가 SemVer와 기존 tag
 
 bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하며, commit 메시지의 검증 명령은 CI·manifest·script 정의로 교차 검증합니다. 프로필은 자동 stage/commit하지 않고 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
 
-## 인자 규약
+## 옵션 참조
 
 이 옵션들은 별도 shell parser가 아니라 Skill이 해석하는 명시적 프롬프트 규약입니다.
 
@@ -495,6 +512,17 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 `--no-verify`여도 staged diff 직접 검토, whitespace, secret, 저장소 안전 검사는 생략하지 않습니다.
 
 ## Atomic Commit 기준
+
+기본 메시지 형식:
+
+```text
+type(scope): 한글 제목
+
+- 변경 배경과 목적
+- 핵심 동작 및 구현 변화
+- 영향 범위와 호환성
+- 실제 수행한 검증
+```
 
 이 패키지는 다음을 함께 유지합니다.
 
@@ -580,7 +608,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 
 ## 안전상 하지 않는 작업
 
-- push
+- remote commit/tag push
 - amend
 - rebase/squash/history rewrite
 - force push
@@ -592,9 +620,9 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - dependency 자동 설치/업그레이드
 - 외부 서비스/인프라 변경
 
-commit hook과 서명 설정을 기본적으로 존중합니다.
+`/cca release --prepare --tag`의 검증된 로컬 annotated tag 생성만 예외입니다. commit hook과 서명 설정은 기본적으로 존중합니다.
 
-## Permission
+## 권한과 실행 통제
 
 Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 일반 리뷰에서 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. `release`·`emergency`·`learn`은 `--fix`가 있어도 차단됩니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
 
