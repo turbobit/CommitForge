@@ -23,6 +23,7 @@ type(scope): 한글 제목
 - 영향 범위와 호환성
 - 실제 수행한 검증
 ```
+<img width="546" height="378" alt="image" src="https://github.com/user-attachments/assets/d0c2c82b-27d5-4c5e-ba3e-6ceb1d32d7ab" />
 
 ## 왜 `.claude/skills`인가
 
