@@ -9,7 +9,7 @@
 - `commit-message-guide.md`: 한글 메시지
 - `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
 - `review-gates.md`: `/cr`·`/cca` 품질 gate
-- `extended-modes.md`: `/cca today|3days|weekly|release|emergency|learn` 분기와 프로젝트 프로필
+- `extended-modes.md`: `/cr`·`/cca`의 today|3days|weekly|release|emergency|learn 분기와 프로젝트 프로필
 - `period-review-modes.md`: `/cr`·`/cca`의 강화된 today·3days·weekly 범위·원장·net-effect 리뷰
 - `deep-review-protocol.md`: line-by-line, removed behavior, cross-file, wrapper/proxy, UX·observability 검토
 - `language-api-pitfalls.md`: 언어·프레임워크별 타입·lifecycle·API 함정

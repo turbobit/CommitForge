@@ -1,7 +1,7 @@
 ---
 name: cr
-description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 today/3days/weekly/branch/range/PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정·재리뷰·검증한다. Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
-argument-hint: "[today|3days|weekly|pr] [추가 맥락] [--fix] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 기간·release·emergency·learn·branch·range·PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 일반 리뷰에서 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정한다. release·emergency·learn은 항상 읽기 전용이고 Atomic Commit 계획, staging, commit, tag, push는 하지 않는다.
+argument-hint: "[today|3days|weekly|release|emergency|learn|pr] [추가 맥락] [--fix] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--from <ref>] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -19,6 +19,8 @@ allowed-tools:
   - Bash(git show *)
   - Bash(git branch *)
   - Bash(git config *)
+  - Bash(git describe *)
+  - Bash(git tag --list *)
   - Bash(git rev-parse *)
   - Bash(git ls-files *)
   - Bash(git check-attr *)
@@ -33,6 +35,7 @@ allowed-tools:
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" *)'
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|NotebookEdit"
@@ -57,6 +60,7 @@ $ARGUMENTS
 
 - 없으면 `SOURCE_EDIT_ALLOWED=false`다. `Edit`·`Write`로 source, test, config, docs 또는 untracked 파일을 생성·수정·삭제하지 않는다.
 - 있으면 `SOURCE_EDIT_ALLOWED=true`지만 현재 working hunk가 만든 확정적·국소 문제만 수정할 수 있다.
+- 첫 번째 위치 인자가 `release`, `emergency`, `learn`이면 `SOURCE_EDIT_ALLOWED=false`로 고정한다. 이 모드의 `--fix`는 오류로 보고하며 편집 권한을 열지 않는다.
 - 자연어의 “고쳐”, `fix`, `수정`은 `--fix`를 대신하지 않는다.
 - report output은 Guard 불변식 검증과 `finish`가 성공한 뒤 마지막에 생성한다.
 
@@ -85,16 +89,21 @@ $ARGUMENTS
 11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
 12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
 13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+14. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md` — `release`·`emergency`·`learn`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
-저장소 루트에 `.commitforge/profile.md`가 있으면 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
+저장소 루트에 `.commitforge/profile.json`과 `.commitforge/profile.md`가 있으면 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
 `.commitforge/review.yml`이 있으면 `review-policy.md`에 따라 적용한다.
 
 ## 0. 인자와 수정 정책
 
 - 일반 문장은 구현 의도와 리뷰 맥락으로 사용한다.
 - 첫 번째 위치 인자가 `today`, `3days`, `weekly` 중 하나면 `period-review-modes.md`의 기간 범위와 review-only 정책을 적용한다.
+- 첫 번째 위치 인자가 `release`, `emergency`, `learn`이면 `extended-modes.md`의 해당 read-only 흐름을 적용한다. Atomic Commit 계획이나 메시지 초안을 만들지 않는다.
+- `release`: `--from`, `--target`, `--bump`, `--channel`, `--package`, `--tag-prefix`를 검증해 릴리스 위험·다음 version/tag·릴리스 노트만 제안한다. `--prepare`, `--tag`, `--fix`는 실행하지 않는다.
+- `emergency`: incident·severity·base·scope 증거를 바탕으로 원인 후보, rollback/containment, 최소 수정·검증 계획만 제안한다. `--diagnose` 유무와 관계없이 소스를 고치지 않는다.
+- `learn`: `--since`, `--branches`, `--exclude-bots`, `--package`, `--commits` 범위에서 profile 후보와 근거·확신도만 보여주며 프로필 파일을 쓰지 않는다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.
 - `--base <ref>`: `merge-base(<ref>, HEAD)..HEAD`와 현재 working change를 함께 리뷰한다.
 - `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 `--fix`를 허용하지 않는다.
@@ -138,7 +147,7 @@ git ls-files --others --exclude-standard
 git log -20 --pretty=format:'%h%x09%s'
 ```
 
-`today`, `3days`, `weekly`이면 `period_range.py`가 반환한 범위로 커밋 원장과 net effect를 수집한다. `--base`, `--range`, `pr`이면 `git merge-base`, `git diff <range>`, `git log <range>`로 해당 commit range를 별도 수집한다. 모든 committed 범위는 working tree hunk와 섞지 않고 원장에 표시한다.
+`today`, `3days`, `weekly`이면 `period_range.py`가 반환한 범위로 커밋 원장과 net effect를 수집한다. `release`, `emergency`, `learn`이면 `extended-modes.md`의 범위·증거를 수집한다. `--base`, `--range`, `pr`이면 `git merge-base`, `git diff <range>`, `git log <range>`로 해당 commit range를 별도 수집한다. 모든 committed 범위는 working tree hunk와 섞지 않고 원장에 표시한다.
 
 변경 파일뿐 아니라 관련 호출부, 타입·인터페이스, 테스트, 설정, migration, generated source, 프로젝트 규칙을 읽는다. 모든 hunk를 `deep-review-protocol.md`의 변경 원장에 배정하고 삭제 라인과 wrapper/proxy/adapter를 별도 추적한다.
 
@@ -231,7 +240,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" verify-review \
   --source-read-only
 ```
 
-기본 `/cr`은 반드시 `--source-read-only`를 사용한다. 사용자가 `--fix`를 명시한 경우에만 이 flag를 생략한다.
+기본 `/cr`은 반드시 `--source-read-only`를 사용한다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 이 flag를 생략한다. `release`·`emergency`·`learn`은 `--fix`가 있어도 반드시 `--source-read-only`를 사용한다.
 
 검증 항목:
 
@@ -251,7 +260,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
   --source-read-only
 ```
 
-기본 `/cr`은 `finish`에도 반드시 `--source-read-only`를 사용하고, `--fix`일 때만 생략한다. `finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
+기본 `/cr`은 `finish`에도 반드시 `--source-read-only`를 사용하고, 일반 리뷰의 `--fix`일 때만 생략한다. `release`·`emergency`·`learn`은 항상 `--source-read-only`를 유지한다. `finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
 
 불변식 위반, 검증 실패, unresolved blocker이면 `abort`로 lock만 해제하고 snapshot을 보존한다.
 
@@ -269,6 +278,9 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 - Atomic Commit 계획, staging, commit, push를 하지 않았음
 - `--fix` 요청 여부와 실제 수정 파일
 - `today`·`3days`·`weekly`이면 정확한 기간 경계, 작성자 조건, commit 원장, net effect와 finding 귀속
+- `release`이면 기준 ref, package, 권장 version/tag, 자동 증가 근거, 릴리스 노트와 차단 요소
+- `emergency`이면 incident/severity, 증거·원인 후보, rollback/containment, 검증·관찰 계획
+- `learn`이면 분석 refs·표본·제외 조건, profile 후보, 근거·확신도·반례
 
 JSON/SARIF를 생성했다면 `report_validator.py` 검증 결과와 출력 경로를 포함한다.
 

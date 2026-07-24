@@ -188,7 +188,14 @@ class ReviewFeatureTest(unittest.TestCase):
         self.assertNotIn("`--week-start monday|sunday`", readme)
         self.assertIn("`--week-start <monday\\|sunday>`", readme)
         self.assertIn("`--timezone <IANA\\|±HH:MM>`", readme)
-        self.assertIn("`--from <ref>` | `/cca release`", readme)
+        self.assertIn(
+            "`--from <ref>` | `/cr release`, `/cca release`",
+            readme,
+        )
+        self.assertIn(
+            "`--tag` | `/cca release --prepare`",
+            readme,
+        )
         self.assertIn("│   ├── cr/SKILL.md", readme)
         self.assertIn("│           ├── cr_edit_gate.py", readme)
 

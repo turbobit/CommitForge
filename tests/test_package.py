@@ -29,8 +29,11 @@ class PackageMetadataTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
 
         self.assertIn("extended-modes.md", cca)
+        cr = (ROOT / ".claude/skills/cr/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("extended-modes.md", cr)
         for mode in ("today", "3days", "weekly", "release", "emergency", "learn"):
             self.assertIn(f"`{mode}`", cca)
+            self.assertIn(f"`{mode}`", cr)
             self.assertIn(f"`{mode}`", modes)
         self.assertIn("호스트 로컬 달력", period)
         self.assertIn("git merge-base --is-ancestor", modes)
@@ -89,6 +92,25 @@ class PackageMetadataTest(unittest.TestCase):
                 ROOT / f".claude/skills/{command}/SKILL.md"
             ).read_text(encoding="utf-8")
             self.assertIn(".commitforge/profile.md", skill)
+            self.assertIn(".commitforge/profile.json", skill)
+
+    def test_release_emergency_and_learn_execution_boundaries(self) -> None:
+        cr = (ROOT / ".claude/skills/cr/SKILL.md").read_text(encoding="utf-8")
+        cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
+        modes = (
+            ROOT / ".claude/skills/_git-atomic-core/extended-modes.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("`release`, `emergency`, `learn`이면 `SOURCE_EDIT_ALLOWED=false`", cr)
+        self.assertIn("Atomic Commit 계획이나 메시지 초안을 만들지 않는다", cr)
+        self.assertIn("`--dry-run`인 경우", cca)
+        self.assertIn("`emergency --diagnose`", cca)
+        self.assertIn("`--preview`면 history 분석 결과만", cca)
+        self.assertIn("release_version.py", cca)
+        self.assertIn("release_version.py", cr)
+        self.assertIn("로컬 annotated tag", modes)
+        self.assertIn("remote push, GitHub Release, publish, deploy", modes)
+        self.assertIn("`.commitforge/profile.json`", modes)
 
     def test_cr_stops_before_staging_and_commit(self) -> None:
         cr_path = ROOT / ".claude/skills/cr/SKILL.md"

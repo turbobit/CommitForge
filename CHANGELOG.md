@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.9.0 — 2026-07-24
+
+- `/cr release`, `/cr emergency`, `/cr learn` 읽기 전용 분석 모드 추가
+- 세 `/cr` 확장 모드에서 `--fix`가 있어도 Edit·Write Hook이 차단되도록 실행 경계 강화
+- `/cca release`에 `--target`, `--bump`, `--channel`, `--package`, `--tag-prefix`, `--from`, `--dry-run`, `--prepare`, `--tag` 계약 추가
+- 기존 tag를 기준으로 stable/rc/beta/alpha와 monorepo package tag 번호를 결정론적으로 자동 증가하는 계산기 추가
+- `/cca release --prepare --tag`에서만 검증된 최종 HEAD에 로컬 annotated tag를 생성하고 push·publish·deploy는 분리
+- emergency 모드에 incident·severity·diagnose·rollback-first·base·scope 기반 진단, 완화, 최소 hotfix, 관찰·복구 절차 추가
+- learn 모드에 preview·since·branches·exclude-bots·package 범위와 근거·반례·확신도를 가진 JSON/Markdown 프로필 추가
+- README, 설치 안내, 수동 시험 체크리스트와 품질 보고서에 실행형 `/cca`와 읽기 전용 `/cr`의 차이를 보강
+
 ## 1.8.0 — 2026-07-24
 
 - `/cr 3days`, `/cca 3days` 최근 3개 달력일 리뷰·커밋 모드 추가

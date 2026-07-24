@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deny /cr file-editing tools unless the invocation contains exact --fix."""
+"""Deny /cr editing unless exact --fix is valid for the selected mode."""
 
 from __future__ import annotations
 
@@ -62,6 +62,19 @@ def exact_fix_requested(arguments: str | None) -> bool:
         return False
 
 
+def strict_read_only_mode(arguments: str | None) -> str | None:
+    if arguments is None:
+        return None
+    try:
+        tokens = shlex.split(arguments)
+    except ValueError:
+        return None
+    return next(
+        (token for token in tokens if token in {"release", "emergency", "learn"}),
+        None,
+    )
+
+
 def main() -> int:
     try:
         event = json.load(sys.stdin)
@@ -73,9 +86,17 @@ def main() -> int:
         return 2
 
     transcript = event.get("transcript_path")
-    if not isinstance(transcript, str) or not exact_fix_requested(
-        latest_cr_args(Path(transcript))
-    ):
+    arguments = (
+        latest_cr_args(Path(transcript)) if isinstance(transcript, str) else None
+    )
+    mode = strict_read_only_mode(arguments)
+    if mode:
+        print(
+            f"CommitForge: /cr {mode} 모드는 --fix와 관계없이 항상 read-only입니다.",
+            file=sys.stderr,
+        )
+        return 2
+    if not exact_fix_requested(arguments):
         print(
             "CommitForge: 기본 /cr은 read-only입니다. 파일을 수정하려면 "
             "명령 호출에 독립된 --fix 옵션을 명시하세요.",

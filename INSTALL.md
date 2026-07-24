@@ -31,15 +31,18 @@
 /cr today
 /cr 3days
 /cr weekly
+/cr release
+/cr emergency
+/cr learn
 /cr --base main
 /cr pr
 /cca
 /cca today
 /cca 3days
 /cca weekly
-/cca release
-/cca emergency
-/cca learn
+/cca release --dry-run
+/cca emergency --diagnose
+/cca learn --preview
 ```
 
 새 `.claude/agents` 디렉터리를 실행 중 세션에서 처음 만들었다면 한 번 재시작하십시오.

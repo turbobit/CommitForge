@@ -1,7 +1,7 @@
 ---
 name: cca
 description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/3days/weekly/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
-argument-hint: "[today|3days|weekly|release|emergency|learn] [추가 맥락] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[today|3days|weekly|release|emergency|learn] [추가 맥락] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -40,6 +40,7 @@ allowed-tools:
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" *)'
 ---
 
 # `/cca` — CommitForge All
@@ -80,7 +81,7 @@ $ARGUMENTS
 
 안전 규칙과 품질 gate가 다른 지침보다 우선한다.
 
-저장소 루트에 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
+저장소 루트에 `.commitforge/profile.json`과 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 적용한다.
 `.commitforge/review.yml`이 있으면 review policy를 적용한다.
 
 ## 0. 인자 해석
@@ -97,6 +98,10 @@ $ARGUMENTS
 - `--keep-snapshot`: 성공 후 snapshot을 보존한다.
 - `--format human|json|sarif`, `--output <경로>`: 검증된 추가 보고 형식을 생성한다.
 - `--all-authors`, `--timezone`: `today`·`3days`·`weekly` 기간 계산과 작성자 범위에 적용한다. `--week-start`는 `weekly`에서만 적용한다.
+- `release`: `--target`, `--bump`, `--channel`, `--package`, `--tag-prefix`, `--from`으로 계산 범위를 정한다. `--prepare`만 version/CHANGELOG 수정과 commit을 허용하고 `--tag`는 검증된 로컬 annotated tag까지 생성한다.
+- `--dry-run`: `release`에서 수정·stage·commit·tag를 금지한다.
+- `emergency`: `--incident`, `--severity`, `--base`, `--scope`, `--rollback-first`를 적용한다. `--diagnose`는 수정·stage·commit을 금지한다.
+- `learn`: `--since`, `--branches`, `--exclude-bots`, `--package`, `--commits`를 적용한다. `--preview`는 프로필 파일을 쓰지 않는다.
 - 알 수 없는 옵션은 자연어 맥락으로 취급한다.
 - 새 dependency 설치, 외부 서비스 변경, 데이터 파괴 작업은 인자로 명시돼도 별도 안전 판단 없이 수행하지 않는다.
 
@@ -105,11 +110,11 @@ $ARGUMENTS
 - `today`: 오늘의 기존 commit을 기본·조건부 reviewer로 읽기 전용 심층 분석하고 현재 미커밋 변경만 아래 기본 파이프라인으로 commit한다. 기존 commit은 재작성하지 않는다.
 - `3days`: 오늘을 포함한 최근 3개 달력일의 기존 commit을 날짜 경계와 net effect 기준으로 심층 분석하고 현재 미커밋 변경만 commit한다.
 - `weekly`: 이번 주의 기존 commit을 날짜·domain·net effect와 기본·조건부 reviewer로 심층 분석하고 현재 미커밋 변경만 commit한다.
-- `release`: 최근 tag 또는 `--from <ref>` 이후와 현재 변경을 검토한다. 현재 변경만 commit하고 버전 제안·릴리스 노트 초안을 반환한다.
-- `emergency`: 아래 파이프라인을 최소 hotfix 범위로 제한하고 보안·정확성·데이터 무결성·직접 회귀 검증을 우선한다.
-- `learn`: 기본 리뷰/commit 파이프라인을 실행하지 않는다. history를 분석해 `.commitforge/profile.md`만 생성·갱신하고 stage/commit하지 않는다.
+- `release`: `--prepare`가 없으면 읽기·검증·version/tag 제안만 하고 source-read-only로 종료한다. `--prepare`에서만 canonical version source와 CHANGELOG를 수정·Atomic Commit하며, `--tag`가 함께 있으면 최종 HEAD에 로컬 annotated tag를 만든다.
+- `emergency`: `--diagnose`면 읽기 전용이다. 그 외에는 아래 파이프라인을 최소 hotfix 범위로 제한하고 보안·정확성·데이터 무결성·복구·직접 회귀 검증을 우선한다.
+- `learn`: 기본 리뷰/commit 파이프라인을 실행하지 않는다. `--preview`면 history 분석 결과만 보고하고, 그 외에는 `.commitforge/profile.json`과 `.commitforge/profile.md`만 생성·갱신하며 stage/commit하지 않는다.
 
-`today`, `3days`, `weekly`, `release`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
+`today`, `3days`, `weekly`, `release --prepare`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. 단, `release`에서 `--prepare`가 없거나 `--dry-run`인 경우와 `emergency --diagnose`는 source-read-only Guard 검증 후 commit 단계 없이 종료한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
 
 `allowed-tools`에 없는 프로젝트별 테스트·lint·build 명령은 사용할 수 없는 것이 아니다. Claude Code 권한 설정에 따라 사용자 승인을 요청한 뒤 실행한다. 승인을 받지 못하거나 실행할 수 없으면 해당 검증을 생략했다고 명시하며, 필수 검증이 없는 `emergency` 작업을 성공으로 처리하지 않는다.
 
@@ -166,7 +171,7 @@ policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 c
 - 위험 파일과 binary/submodule/LFS
 - scope 밖 의존성
 
-변경이 없으면 기본 모드와 `release`는 guard `finish`로 정리한다. 기본 모드는 종료하고 `release`는 사전 분석한 범위 보고를 완료한다. `today`·`3days`·`weekly`는 기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속한 뒤 Atomic 계획·commit 없이 `finish`하고 기간 보고를 반환한다. 기간 commit도 없을 때만 즉시 “검토 대상 없음”으로 종료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
+변경이 없으면 기본 모드는 guard `finish`로 정리하고 종료한다. `release`는 `--prepare`가 있으면 version/CHANGELOG 준비가 새 변경을 만들 수 있으므로 종료하지 않으며, 그 외에는 source-read-only로 정리하고 사전 분석 보고를 완료한다. `today`·`3days`·`weekly`는 기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속한 뒤 Atomic 계획·commit 없이 `finish`하고 기간 보고를 반환한다. 기간 commit도 없을 때만 즉시 “검토 대상 없음”으로 종료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
 
 ## 3. 병렬 전문 리뷰
 

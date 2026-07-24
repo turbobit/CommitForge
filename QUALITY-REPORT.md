@@ -7,6 +7,9 @@
 - 기본 `/cr` 편집 도구 호출을 Skill 범위 PreToolUse Hook으로 실행 전 차단
 - Live eval의 HEAD·index·working diff·status 불변 검증
 - `/cr`·`/cca` today/3days/weekly 공통 기간 규칙과 명령 연결 검증
+- `/cr release`·`emergency`·`learn`의 강제 read-only 계약과 `--fix` 편집 Hook 차단 검증
+- `/cca release`의 SemVer·stable/rc/beta/alpha·package tag 자동 증가 계산기 회귀 검증
+- `/cca release --prepare/--tag`, emergency diagnose/실행, learn preview/프로필 저장 경계 검증
 - today·3days·weekly 월요일·weekly 일요일 고정 시각 경계 회귀 검증
 - 기간 commit 불변, `/cr` Atomic 계획 금지, `/cca` working-only commit 경계 검증
 - Python 파일 syntax compile
@@ -54,11 +57,11 @@
 ### 확장 모드 검증
 
 - `/cca today`, `3days`, `weekly`, `release`, `emergency`, `learn` 분기 존재
-- `/cr today`, `3days`, `weekly` 기간 리뷰 분기 존재
+- `/cr today`, `3days`, `weekly`, `release`, `emergency`, `learn` read-only 분기 존재
 - today는 최근 24시간, 3days는 최근 72시간, weekly는 최근 7일로 해석하지 않는 달력 경계 확인
 - commit 원장·net effect·revert·교차 commit finding 귀속 규칙 확인
 - 확장 모드 공통 규칙 파일 설치 대상 포함
-- `learn` 프로필을 `/ccr`, `/cc`, `/cr`, `/cca`가 참조
+- `learn`의 JSON·Markdown 프로필을 `/ccr`, `/cc`, `/cr`, `/cca`가 참조
 - README·MANIFEST·VERSION의 CommitForge 브랜딩과 버전 일치
 
 ### 심층 리뷰 검증

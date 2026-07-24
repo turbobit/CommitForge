@@ -18,6 +18,16 @@
 
 커밋 skill은 push하지 않는다. 원격 저장소 변경은 별도 사용자 요청이 필요하다.
 
+tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --prepare --tag`이며 다음을 모두 만족해야 한다.
+
+- 결정론적 version/tag 계산 결과 사용
+- tag 미존재 재확인
+- release commit과 최종 검증 성공
+- clean working tree
+- 최종 HEAD를 가리키는 로컬 annotated tag
+
+이 예외도 tag push, GitHub Release, publish, deploy를 허용하지 않는다. `/cr`은 어떤 모드에서도 tag를 만들지 않는다.
+
 ## 2. Diff 스냅샷
 
 `/cc`, `/cr`, `/cca`는 작업 시작 전에 guard를 실행한다.
@@ -35,7 +45,7 @@
 
 스냅샷 metadata에는 보존 파일별 크기와 SHA-256이 기록된다. `finish`는 삭제 직전에 이 inventory를 다시 감사하며 누락·크기 변화·해시 불일치가 있으면 성공 처리와 삭제를 차단한다. 필요하면 `audit-snapshot`으로 중간 상태를 별도 확인한다.
 
-`/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다. 기본 `/cr`은 두 명령에 `--source-read-only`도 사용해 working binary diff, porcelain status, untracked 내용까지 일치시킨다. 사용자가 `--fix`를 명시한 경우에만 source read-only 검사를 생략한다.
+`/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다. 기본 `/cr`은 두 명령에 `--source-read-only`도 사용해 working binary diff, porcelain status, untracked 내용까지 일치시킨다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 source read-only 검사를 생략한다. `release`·`emergency`·`learn`은 `--fix`와 관계없이 source read-only다.
 
 실패·중단·부분 완료 시:
 

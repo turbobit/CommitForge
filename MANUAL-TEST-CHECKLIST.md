@@ -173,48 +173,58 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 기존 기간 commit과 신규 commit을 구분해 보고
 - working tree가 처음부터 clean이면 보고만 하고 commit 없음
 
-## 11. `/cca release`
+## 11. `/cr release`와 `/cca release`
 
 테스트 tag 이후 작은 변경을 준비합니다.
 
 ```text
-/cca release --from <test-tag>
+/cr release --from <test-tag>
+/cca release --from <test-tag> --dry-run
+/cca release --target 1.9.0 --prepare
 ```
 
 확인:
 
 - 지정 ref부터 HEAD까지의 범위 표시
-- 현재 미커밋 변경만 commit
-- major/minor/patch 제안과 근거
+- 첫 두 호출은 HEAD·index·working tree 불변
+- major/minor/patch와 다음 tag 제안 및 자동 증가 근거
 - 릴리스 노트 초안과 차단 요소
-- tag, push, publish, deploy 없음
+- `--prepare`에서만 version/CHANGELOG 갱신과 Atomic Commit
+- `--tag` 없이는 tag를 만들지 않고 항상 push/publish/deploy 없음
 
-## 12. `/cca emergency`
+## 12. `/cr emergency`와 `/cca emergency`
 
 작은 hotfix와 직접 회귀 테스트를 준비합니다.
 
 ```text
+/cr emergency --incident TEST-1 --severity sev3
+/cca emergency --diagnose --base <known-good-ref>
 /cca emergency --scope <hotfix-path> 장애 재현 설명
 ```
 
 확인:
 
+- 첫 두 호출은 source·HEAD·index 불변
 - 장애 원인과 직접 관련된 최소 범위만 수정
+- rollback/containment·관찰·복구 계획
 - 무관한 formatting/refactor/dependency 변경 없음
 - 직접 회귀 테스트 또는 명확한 수동 검증
 - 배포 전후 확인 항목과 남은 위험 보고
 
-## 13. `/cca learn`
+## 13. `/cr learn`과 `/cca learn`
 
 history가 있는 테스트 저장소에서 실행합니다.
 
 ```text
+/cr learn --commits 20
+/cca learn --preview --commits 20
 /cca learn --commits 20
 ```
 
 확인:
 
-- `.commitforge/profile.md`만 생성 또는 갱신
+- 첫 두 호출은 파일과 Git 상태 불변
+- 실제 `/cca learn`만 `.commitforge/profile.json`과 `.commitforge/profile.md` 생성 또는 갱신
 - source/index/기존 commit 변경 없음
 - 프로필 자동 stage/commit 없음
 - 분석 범위·표본 수·확신도 표시
@@ -341,3 +351,63 @@ python3 evals/run_evals.py --live --scenario "python mutable default regression"
 - 격리된 임시 저장소에서 기본 read-only `/cr` 실행
 - 기대한 정확성 개념을 finding에서 탐지
 - HEAD와 staged diff가 실행 전후 동일
+
+## 22. Release 분석·준비·tag 경계
+
+tag가 있는 임시 저장소에서:
+
+```text
+/cr release --from v1.8.0
+/cca release --channel rc --target 2.0.0 --dry-run
+```
+
+확인:
+
+- 두 실행 모두 HEAD·index·working tree 불변
+- 기존 같은 channel tag 다음 prerelease 번호 자동 증가
+- version/tag 계산 근거와 tag 충돌 검사
+- 릴리스 노트·migration·배포 위험 보고
+- commit, tag, push 없음
+
+실행형 시험은 별도 test branch에서 수행합니다.
+
+```text
+/cca release --target 1.9.0 --prepare
+```
+
+확인:
+
+- canonical version source와 CHANGELOG만 의도대로 갱신
+- 검증된 Atomic Commit 생성
+- `--tag`가 없으면 tag 없음
+- push, GitHub Release, publish, deploy 없음
+
+## 23. Emergency 진단·실행 경계
+
+```text
+/cr emergency --incident TEST-1 --severity sev3
+/cr emergency --fix
+/cca emergency --diagnose --base HEAD~1
+```
+
+확인:
+
+- 증거·원인 후보·rollback/containment·검증 계획
+- 세 실행 모두 source·HEAD·index 불변
+- `/cr emergency --fix` 편집 Hook 차단
+
+실행형 `/cca emergency`는 재현 가능한 작은 결함에서 최소 수정·직접 회귀 테스트·Atomic Commit만 생성하는지 확인합니다.
+
+## 24. Learn preview·프로필 저장 경계
+
+```text
+/cr learn --exclude-bots
+/cca learn --preview --branches main
+```
+
+확인:
+
+- profile 후보·근거 commit·반례·확신도 보고
+- 파일 생성과 Git 상태 변경 없음
+
+실제 `/cca learn` 실행 후 `.commitforge/profile.json`과 `.commitforge/profile.md`만 변경되고 자동 stage/commit되지 않는지 확인합니다.

@@ -2,6 +2,12 @@
 
 프로젝트 자동 감지 결과는 보조 신호다. 저장소 자체 규칙이 항상 우선한다.
 
+## 학습 프로필
+
+`.commitforge/profile.json`은 근거·확신도·반례를 가진 machine-readable 원본이고 `.commitforge/profile.md`는 사람이 읽는 요약이다. 둘이 충돌하면 JSON의 근거를 확인하고 낮은 확신도 규칙은 자동 적용하지 않는다.
+
+우선순위는 사용자 현재 요청, 저장소 명시 규칙, 학습 프로필, CommitForge 기본값 순이다. 프로필은 안전 gate, 사실 기반 commit 메시지, Atomic 독립성, 필수 검증을 약화할 수 없다.
+
 ## Flutter/Dart
 
 - `pubspec.yaml`과 `pubspec.lock`의 동일 의존성 변경은 함께 둔다.

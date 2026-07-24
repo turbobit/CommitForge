@@ -76,6 +76,18 @@ class CrEditGateTest(unittest.TestCase):
         self.assertEqual(self.invoke("--fixed").returncode, 2)
         self.assertEqual(self.invoke(None).returncode, 2)
 
+    def test_extended_analysis_modes_stay_read_only_with_fix(self) -> None:
+        for arguments in (
+            "release --fix",
+            "--fix emergency --incident INC-142",
+            "learn --fix --since v1.0.0",
+            "--format json --fix release",
+        ):
+            with self.subTest(arguments=arguments):
+                result = self.invoke(arguments)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("항상 read-only", result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

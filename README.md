@@ -8,10 +8,10 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 |---|---|---:|---:|
 | `/ccr` | Atomic Commit 계획, 분리 기준, 순서, 한글 메시지 초안 | 없음 | 없음 |
 | `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
-| `/cr` | 기본 read-only 심층 리뷰, `--fix` 시 확정적 working 문제 수정·재리뷰 | 없음 | `--fix`만 |
-| `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
+| `/cr` | 기본 read-only 심층 리뷰, 일반 모드의 `--fix`에서만 확정적 working 문제 수정 | 없음 | 일반 모드의 `--fix`만 |
+| `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit, 명시적 release tag | 필요 시 있음 |
 
-`/cr`은 `today`, `3days`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
+`/cr`과 `/cca`는 모두 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다. `/cr release|emergency|learn`은 `--fix`를 붙여도 항상 읽기 전용이고, `/cca`만 명시적인 실행 옵션으로 릴리스 준비·hotfix·프로필 저장을 수행합니다.
 
 ### 빠른 선택
 
@@ -21,7 +21,13 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 | 이미 만든 변경을 수정하지 않고 Atomic Commit으로 생성 | `/cc` |
 | 코드를 바꾸지 않고 현재·기간·PR 변경을 심층 리뷰 | `/cr` |
 | 리뷰에서 확인한 현재 working 문제만 고치고 커밋하지 않음 | `/cr --fix` |
+| 릴리스 버전·tag·위험만 미리 분석 | `/cr release` |
+| 장애 원인·rollback·검증 계획만 분석 | `/cr emergency` |
+| 프로젝트 commit 문화 프로필을 미리 확인 | `/cr learn` |
 | 리뷰·안전한 수정·검증·Atomic Commit을 한 번에 실행 | `/cca` |
+| 버전·CHANGELOG를 준비하고 로컬 tag까지 생성 | `/cca release --prepare --tag` |
+| 긴급 수정·회귀 검증·Atomic Commit 실행 | `/cca emergency` |
+| 프로젝트 프로필 파일 생성 | `/cca learn` |
 | `/cca`에서 소스 수정 없이 blocker만 확인 | `/cca --no-fix` |
 
 `/cr --fix`와 `/cca`의 자동 수정은 현재 working tree가 만든 확정적·국소적 문제로 제한됩니다. 기존 commit을 amend하거나 history를 재작성하지 않습니다.
@@ -62,7 +68,7 @@ type(scope): 한글 제목
 
 Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
 
-기본 `/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged/unstaged binary diff, status, untracked content를 직접 비교합니다. 프롬프트 판단과 별개로 저장소 상태가 바뀌었다면 성공과 snapshot 삭제를 차단합니다. `--fix`를 명시한 실행에서도 HEAD·branch·staging 불변 조건은 유지합니다.
+기본 `/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged/unstaged binary diff, status, untracked content를 직접 비교합니다. 프롬프트 판단과 별개로 저장소 상태가 바뀌었다면 성공과 snapshot 삭제를 차단합니다. 일반 리뷰에서 `--fix`를 명시한 실행도 HEAD·branch·staging 불변 조건을 유지하며, `release`·`emergency`·`learn`은 `--fix`와 관계없이 작업 트리까지 읽기 전용입니다.
 
 ## 설치
 
@@ -214,7 +220,7 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 - `--range <A..B>`: 명시한 commit 범위를 검토하며 `B`가 HEAD가 아니면 자동 수정 금지
 - `pr`: GitHub CLI로 현재 PR의 base/head를 확인해 PR 범위를 검토
 
-어떤 모드에서도 `/cr`은 Atomic Commit 계획·메시지·staging·commit을 만들지 않습니다.
+`/cr release`, `/cr emergency`, `/cr learn`은 `--fix`를 붙여도 편집 Hook이 권한을 열지 않는 강제 read-only 모드입니다. 어떤 모드에서도 `/cr`은 Atomic Commit 계획·메시지·staging·commit·tag를 만들지 않습니다.
 
 ### 전체 파이프라인
 
@@ -355,32 +361,47 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 `today`는 최근 24시간, `3days`는 최근 72시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start <monday|sunday>`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
 
-#### 릴리스 준비
+#### 릴리스 분석과 준비
 
 ```text
-/cca release
-/cca release --from v1.1.0
+/cr release --from v1.8.0
+/cr release --channel rc --target 2.0.0-rc.1
+/cca release --dry-run
+/cca release --target 1.9.0 --prepare
+/cca release --channel rc --target 2.0.0-rc.1 --prepare --tag
+/cca release --package mobile --from mobile-v1.8.0 --bump minor
 ```
 
-최근 도달 가능한 tag 또는 `HEAD`의 조상으로 검증된 `--from` 기준 이후의 변경과 현재 작업을 검토합니다. 현재 변경을 commit한 뒤 권장 Semantic Version, 릴리스 노트 초안, migration·배포 주의사항을 보고합니다. tag, push, GitHub Release, publish, deploy는 수행하지 않습니다.
+`/cr release`는 최근 도달 가능한 tag 또는 검증된 `--from` 이후의 변경을 읽기 전용으로 분석해 다음 version/tag, 릴리스 노트, migration·배포 위험을 제안합니다. `/cca release`도 기본은 분석만 하며, `--prepare`를 명시해야 저장소의 기존 canonical version source와 CHANGELOG를 갱신하고 검증된 Atomic Commit을 만듭니다.
 
-#### 긴급 수정
+tag는 문자열을 추측하지 않고 전용 계산기가 SemVer와 기존 tag를 기준으로 결정합니다. `stable`, `rc`, `beta`, `alpha`, monorepo package prefix를 지원하며 같은 prerelease channel은 `rc.1 → rc.2`처럼 자동 증가합니다. `--tag`는 `--prepare`와 함께만 허용되고 최종 clean HEAD에 로컬 annotated tag를 만듭니다. tag push, GitHub Release, package publish, deploy는 수행하지 않습니다.
+
+#### 긴급 진단과 수정
 
 ```text
-/cca emergency 결제 승인 중복 처리
-/cca emergency --scope src/payments test/payments
+/cr emergency --incident INC-142 --severity sev1
+/cca emergency --diagnose
+/cca emergency --rollback-first --incident INC-142
+/cca emergency --base v1.8.0 --scope src/payments test/payments
 ```
 
-운영 장애나 hotfix를 가장 작은 안전 범위로 제한합니다. working tree가 깨끗해도 구체적인 장애 요청과 재현 가능한 근거가 있으면 최소 수정과 직접 회귀 테스트를 구현할 수 있습니다. 정확성·보안·데이터 무결성을 우선하며 무관한 리팩터링이나 의존성 변경을 포함하지 않습니다.
+`/cr emergency`와 `/cca emergency --diagnose`는 증거·시간선·영향·원인 후보·rollback/containment·검증·관찰 계획만 보고합니다. 실행형 `/cca emergency`는 working tree가 깨끗해도 구체적인 장애가 재현되고 수정이 국소적일 때 최소 hotfix와 직접 회귀 테스트를 구현해 Atomic Commit합니다.
 
-#### 프로젝트 스타일 학습
+`--rollback-first`는 feature flag, 설정, 호환 가능한 복구 경로를 코드 수정보다 먼저 검토한다는 뜻입니다. 파괴적 reset, 자동 revert, 배포를 의미하지 않습니다. 정확성·보안·데이터 무결성·동시성·복구 가능성을 우선하며, 검증 실패를 긴급함으로 우회하지 않습니다.
+
+#### 프로젝트 스타일 미리보기와 학습
 
 ```text
-/cca learn
-/cca learn --commits 200
+/cr learn --since v1.5.0 --exclude-bots
+/cr learn --branches main,develop --package mobile
+/cca learn --preview
+/cca learn --since v1.5.0 --branches main,develop --exclude-bots
+/cca learn --package mobile --commits 200
 ```
 
-최근 non-merge commit을 분석해 `.commitforge/profile.md`에 제목·본문·scope·분리·검증 선호를 기록합니다. 이 모드는 소스나 Git index를 변경하거나 commit하지 않습니다. 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로필을 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
+`/cr learn`과 `/cca learn --preview`는 최근 non-merge commit을 branch·기간·package·type별로 표본화해 제목·본문·scope·분리·검증 선호, 근거 commit, 반례, 확신도를 보여주지만 파일을 만들지 않습니다. 실제 `/cca learn`만 machine-readable `.commitforge/profile.json`과 사람이 읽는 `.commitforge/profile.md`를 갱신합니다.
+
+bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하며, commit 메시지의 검증 명령은 CI·manifest·script 정의로 교차 검증합니다. 프로필은 자동 stage/commit하지 않고 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
 
 ## 인자 규약
 
@@ -392,7 +413,7 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
 | `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
-| `--fix` | `/cr` | 현재 working hunk의 확정적·국소 문제 수정 허용 |
+| `--fix` | `/cr` 일반 리뷰 | 현재 working hunk의 확정적·국소 문제 수정 허용; `release`·`emergency`·`learn`에서는 거부 |
 | `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
 | `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |
 | `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
@@ -425,12 +446,41 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 `today`는 선택한 시간대의 오늘 00:00부터 현재까지이며 최근 24시간이 아닙니다. `3days`는 이틀 전 00:00부터 현재까지인 3개 달력일이며 최근 72시간이 아닙니다. `weekly`는 선택한 시작 요일의 00:00부터 현재까지이며 최근 7일이 아닙니다.
 
-### `/cca` 확장 모드 옵션
+### Release 옵션
 
 | 옵션 | 적용 | 의미 |
 |---|---|---|
-| `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정; 생략하면 HEAD에서 도달 가능한 최근 tag 사용 |
-| `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
+| `--from <ref>` | `/cr release`, `/cca release` | 릴리스 분석 시작 ref; 생략하면 namespace와 일치하는 최근 도달 가능 tag |
+| `--target <semver>` | `/cr release`, `/cca release` | 정확한 목표 SemVer |
+| `--bump <auto\|major\|minor\|patch>` | `/cr release`, `/cca release` | 버전 증가 방식; 기본 `auto` |
+| `--channel <stable\|rc\|beta\|alpha>` | `/cr release`, `/cca release` | 안정/사전 릴리스 channel과 순번 자동 증가 |
+| `--package <name>` | `/cr release`, `/cca release` | monorepo package 범위와 기본 `<name>-v` tag namespace |
+| `--tag-prefix <prefix>` | `/cr release`, `/cca release` | 명시적 tag 접두사 |
+| `--dry-run` | `/cca release` | 수정·commit·tag 없이 예상 결과만 보고 |
+| `--prepare` | `/cca release` | version source·CHANGELOG 갱신, 검증, Atomic Commit |
+| `--tag` | `/cca release --prepare` | 최종 HEAD에 로컬 annotated tag 생성; push하지 않음 |
+
+### Emergency 옵션
+
+| 옵션 | 적용 | 의미 |
+|---|---|---|
+| `--incident <id>` | `/cr emergency`, `/cca emergency` | incident 식별자 기록 |
+| `--severity <sev1\|sev2\|sev3\|sev4>` | `/cr emergency`, `/cca emergency` | 사용자가 확인한 심각도 |
+| `--diagnose` | `/cca emergency` | 수정·stage·commit 없는 진단 |
+| `--rollback-first` | `/cr emergency`, `/cca emergency` | 안전한 rollback/containment 경로 우선 평가 |
+| `--base <ref>` | `/cr emergency`, `/cca emergency` | 정상 동작 비교 기준 후보 |
+| `--scope <경로...>` | `/cr emergency`, `/cca emergency` | hotfix 중심 범위 |
+
+### Learn 옵션
+
+| 옵션 | 적용 | 의미 |
+|---|---|---|
+| `--preview` | `/cca learn` | 프로필 파일을 쓰지 않고 후보만 보고 |
+| `--since <ref>` | `/cr learn`, `/cca learn` | 지정 ref 이후 history 분석 |
+| `--branches <a,b,...>` | `/cr learn`, `/cca learn` | checkout 없이 여러 branch 분석 |
+| `--exclude-bots` | `/cr learn`, `/cca learn` | 확인 가능한 bot 작성자 제외 및 제외 수 보고 |
+| `--package <name>` | `/cr learn`, `/cca learn` | monorepo package 관련 표본 중심 분석 |
+| `--commits 20-500` | `/cr learn`, `/cca learn` | 분석할 non-merge commit 수 |
 
 `--no-verify`여도 staged diff 직접 검토, whitespace, secret, 저장소 안전 검사는 생략하지 않습니다.
 
@@ -536,7 +586,7 @@ commit hook과 서명 설정을 기본적으로 존중합니다.
 
 ## Permission
 
-Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
+Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 일반 리뷰에서 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. `release`·`emergency`·`learn`은 `--fix`가 있어도 차단됩니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
 
 저장소에 포함된 Skill은 workspace trust를 승인하기 전에 내용을 검토하십시오.
 
@@ -645,7 +695,8 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │           ├── reviewer_triggers.py
 │           ├── report_validator.py
 │           ├── baseline.py
-│           └── period_range.py
+│           ├── period_range.py
+│           └── release_version.py
 └── agents/
     ├── cca-git-reviewer.md
     ├── cca-correctness-reviewer.md
