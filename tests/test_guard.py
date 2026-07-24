@@ -280,6 +280,67 @@ class GuardIntegrationTest(unittest.TestCase):
         )
         self.assertTrue(finished["review_invariants"]["ok"])
 
+    def test_expected_branch_allows_only_main_or_master_branch_creation(self) -> None:
+        start_branch = run(["git", "branch", "--show-current"], self.tmp).stdout.strip()
+        self.assertIn(start_branch, {"main", "master"})
+        _, started = self.guard("begin", "--session", "pr-auto-branch")
+        run(["git", "switch", "-c", "feat/pr-preview"], self.tmp)
+
+        _, verified = self.guard(
+            "verify-review",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--source-read-only",
+            "--expected-branch", "feat/pr-preview",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["checks"]["branch_unchanged_or_expected"])
+
+        proc, payload = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--review-only",
+            "--source-read-only",
+            "--expected-branch", "fix/wrong-branch",
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("branch_unchanged_or_expected", payload["error"])
+
+        _, finished = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--review-only",
+            "--source-read-only",
+            "--expected-branch", "feat/pr-preview",
+        )
+        self.assertTrue(finished["review_invariants"]["ok"])
+
+        _, invalid_start = self.guard("begin", "--session", "pr-wrong-start")
+        run(["git", "switch", "-c", "feat/nested-branch"], self.tmp)
+        invalid_proc, invalid_payload = self.guard(
+            "verify-review",
+            "--session", invalid_start["session"],
+            "--token", invalid_start["token"],
+            "--snapshot", invalid_start["snapshot"],
+            "--source-read-only",
+            "--expected-branch", "feat/nested-branch",
+            check=False,
+        )
+        self.assertNotEqual(invalid_proc.returncode, 0)
+        self.assertIn("branch_unchanged_or_expected", invalid_payload["error"])
+        self.guard(
+            "abort",
+            "--session", invalid_start["session"],
+            "--token", invalid_start["token"],
+            "--snapshot", invalid_start["snapshot"],
+        )
+
     def test_linked_worktrees_use_independent_locks(self) -> None:
         linked = self.tmp.parent / f"{self.tmp.name}-linked"
         run(["git", "worktree", "add", "-b", "linked-test", str(linked)], self.tmp)

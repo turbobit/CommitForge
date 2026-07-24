@@ -1,6 +1,6 @@
 # Shared Git Atomic Core
 
-이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cr`, `/cca`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
+이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cr`, `/cca`, `/cpr`, `/cp`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
 
 `SKILL.md`가 없으므로 독립 slash command로 등록되지 않습니다.
 
@@ -19,6 +19,7 @@
 - `reporting-formats.md`: human·JSON·SARIF 보고서 계약과 검증
 - `baseline-and-suppressions.md`: 기한·소유자가 있는 제한적 finding 기준선
 - `large-diff-review.md`: 대형 변경의 도메인 분할과 cross-file 집계
+- `pull-request-workflow.md`: `/cpr` read-only 미리보기와 `/cp` branch push·PR 생성 계약
 - `validation-strategy.md`: 테스트/빌드
 - `project-profiles.md`: 언어·프레임워크
 - `reporting.md`: 결과 형식
@@ -30,3 +31,4 @@
 - `scripts/report_validator.py`: JSON·SARIF 결과 계약 검증
 - `scripts/baseline.py`: review baseline 구조·만료 검증
 - `scripts/period_range.py`: today·3days·weekly 로컬 달력 경계 계산
+- `scripts/pr_context.py`: base/head merge-base, commit range, diff 통계와 자동 분기 필요성 계산

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0 — 2026-07-24
+
+- `/cpr` read-only Pull Request 미리보기 명령 추가
+- `/cp` 심층 검토·검증 후 일반 branch push와 GitHub Pull Request 생성 명령 추가
+- 동일 head의 열린 PR 중복 생성, non-fast-forward, stale tracking ref, dirty tree와 blocking finding 차단
+- 현재가 `main`/`master`이면 변경 의미에 맞는 충돌 없는 branch 이름을 `/cpr`에서 제안하고 `/cp`에서 실제 생성
+- 자동 분기 시 예상 branch 변경만 허용하고 HEAD commit·source·index 불변을 Guard로 검증
+- PR 옵션·안전 경계·설치·수동 검증·파일 구조 문서 보강
+
 ## 1.9.2 — 2026-07-24
 
 - README 첫 화면을 명령 선택·release 안전 경계·30초 시작 중심으로 재배치

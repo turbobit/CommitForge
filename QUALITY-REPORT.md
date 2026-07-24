@@ -3,6 +3,9 @@
 ## 완료한 자동 검증
 
 - `/cr` 기본 read-only와 명시적 `--fix` opt-in 수정 계약 검증
+- `/cpr` 완전 read-only PR 미리보기와 `/cp` 일반 push·PR 생성 경계 검증
+- `main`/`master`에서 제안 branch와 실제 자동 branch 생성을 분리하고 Guard의 예상 branch 불변식 검증
+- PR context의 merge-base·commit range·dirty·ahead commit 회귀 검증
 - `/cr` frontmatter의 `--fix`와 `/cca --no-fix` 독립 정책 검증
 - 기본 `/cr` 편집 도구 호출을 Skill 범위 PreToolUse Hook으로 실행 전 차단
 - Live eval의 HEAD·index·working diff·status 불변 검증
@@ -21,7 +24,7 @@
 - skeleton/TODO placeholder 검색
 - 설치 → 재설치 backup → 제거 backup 통합 시험
 - 공백이 포함된 경로에서 guard launcher 및 설치 시험
-- guard 통합 테스트 3개
+- guard 통합 테스트 6개
 - CommitForge 브랜딩·버전·확장 모드 정적 검증
 - 심층 리뷰 reference와 전문 reviewer 6종 연결 검증
 - `/cr`의 기본 10개 리뷰와 Atomic 계획·staging·commit 금지 검증
@@ -45,7 +48,7 @@
 
 ### Guard 통합 테스트
 
-1. 같은 worktree에서 두 번째 `/cc`·`/cr`·`/cca` lock 차단
+1. 같은 worktree에서 두 번째 `/cc`·`/cr`·`/cca`·`/cpr`·`/cp` lock 차단
 2. staged/unstaged Diff와 untracked archive snapshot 생성
 3. repository fingerprint 변경 감지
 4. 실패 시 snapshot 보존 + 소유 lock 해제
@@ -55,6 +58,7 @@
 8. `/cr` working tree 수정 허용 + HEAD·branch·index 불변 확인
 9. `/cr` index 변경 시 verify와 finish 모두 차단
 10. snapshot 파일 변조 시 `audit-snapshot`과 `finish` 차단
+11. `main`/`master` 시작 시 지정한 새 branch 하나만 허용하고 HEAD·source·index 불변 확인
 
 ### 확장 모드 검증
 

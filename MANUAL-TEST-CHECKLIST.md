@@ -15,6 +15,8 @@ Claude Code에서 `/`를 입력해 다음이 보이는지 확인합니다.
 - `cc`
 - `cr`
 - `cca`
+- `cpr`
+- `cp`
 
 custom reviewer가 보이지 않으면 Claude Code를 재시작합니다.
 
@@ -413,3 +415,56 @@ tag가 있는 임시 저장소에서:
 - 파일 생성과 Git 상태 변경 없음
 
 실제 `/cca learn` 실행 후 `.commitforge/profile.json`과 `.commitforge/profile.md`만 변경되고 자동 stage/commit되지 않는지 확인합니다.
+
+## 25. `/cpr` Pull Request 미리보기
+
+base보다 1개 이상 앞선 clean test branch에서:
+
+```text
+/cpr --base main
+/cpr --base main --draft
+```
+
+확인:
+
+- committed range의 모든 hunk와 net effect 리뷰
+- readiness가 `READY`, `CONDITIONAL`, `BLOCKED` 중 하나
+- PR 제목·본문·검증·위험 완성 초안
+- 기존 동일-head PR이 있으면 URL 보고
+- source·index·HEAD·branch·remote·PR 모두 불변
+- dirty working tree는 blocker
+
+`main` 또는 `master`가 remote tracking base보다 앞선 임시 저장소에서도 실행합니다.
+
+확인:
+
+- 의미에 맞는 `type/ascii-kebab-slug` branch 이름 제안
+- branch를 실제 생성하거나 전환하지 않음
+- ahead commit이 0개면 차단
+
+## 26. `/cp` Pull Request 생성
+
+쓰기 가능한 별도 GitHub test repository의 clean branch에서:
+
+```text
+/cp --base main --draft
+```
+
+확인:
+
+- review gate 통과 전 push 없음
+- force 없는 현재 branch push
+- draft PR 하나 생성 후 number·URL·base·head·title 재검증
+- 같은 명령을 다시 실행하면 중복 PR 대신 기존 URL 보고
+- source·index·HEAD commit 불변
+- merge·close·auto-merge·label·reviewer·deploy 없음
+
+`main`/`master`가 remote보다 앞선 별도 test repository에서도 실행합니다.
+
+확인:
+
+- review 이후에만 충돌 없는 branch 생성
+- 새 branch의 commit SHA가 시작 HEAD와 동일
+- 새 branch를 push해 PR 생성
+- 실패 시 branch 자동 삭제·원래 branch 자동 복귀 없음
+- `--branch <name>`의 잘못된 ref 형식과 기존 local/remote 이름 충돌 차단

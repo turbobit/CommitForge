@@ -18,6 +18,9 @@ REQUIRED = [
     ".claude/skills/ccr/SKILL.md",
     ".claude/skills/cca/SKILL.md",
     ".claude/skills/cr/SKILL.md",
+    ".claude/skills/cp/SKILL.md",
+    ".claude/skills/cpr/SKILL.md",
+    ".claude/skills/_git-atomic-core/pull-request-workflow.md",
     ".claude/skills/_git-atomic-core/extended-modes.md",
     ".claude/skills/_git-atomic-core/deep-review-protocol.md",
     ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
@@ -34,6 +37,7 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/scripts/report_validator.py",
     ".claude/skills/_git-atomic-core/scripts/baseline.py",
     ".claude/skills/_git-atomic-core/scripts/period_range.py",
+    ".claude/skills/_git-atomic-core/scripts/pr_context.py",
     ".claude/agents/cca-git-reviewer.md",
     ".claude/agents/cca-correctness-reviewer.md",
     ".claude/agents/cca-security-reviewer.md",
@@ -77,7 +81,7 @@ def main() -> None:
         if not path.is_file():
             errors.append(f"필수 파일 누락: {rel}")
 
-    for command in ("cc", "ccr", "cr", "cca"):
+    for command in ("cc", "ccr", "cr", "cca", "cp", "cpr"):
         path = ROOT / f".claude/skills/{command}/SKILL.md"
         if not path.exists():
             continue
@@ -213,6 +217,41 @@ def main() -> None:
                     f"cr/SKILL.md: --fix 편집 도구 사전 승인 누락 {required.strip()}"
                 )
 
+    cp_path = ROOT / ".claude/skills/cp/SKILL.md"
+    cpr_path = ROOT / ".claude/skills/cpr/SKILL.md"
+    pr_workflow = ROOT / ".claude/skills/_git-atomic-core/pull-request-workflow.md"
+    if cp_path.exists() and cpr_path.exists() and pr_workflow.exists():
+        cp_text = cp_path.read_text(encoding="utf-8")
+        cpr_text = cpr_path.read_text(encoding="utf-8")
+        cp_fm = frontmatter(cp_text)
+        cpr_fm = frontmatter(cpr_text)
+        workflow_text = pr_workflow.read_text(encoding="utf-8")
+        for skill_path, skill_text in ((cp_path, cp_text), (cpr_path, cpr_text)):
+            if "pull-request-workflow.md" not in skill_text:
+                errors.append(f"{skill_path}: PR 공통 계약 연결 누락")
+        for forbidden in ("Bash(git add ", "Bash(git commit ", "\n  - Edit\n"):
+            if forbidden in cp_fm:
+                errors.append(f"cp/SKILL.md: 로컬 불변 도구 허용 {forbidden.strip()}")
+        for required in ("Bash(git push *)", "Bash(gh pr create *)"):
+            if required not in cp_fm:
+                errors.append(f"cp/SKILL.md: PR 생성 도구 누락 {required}")
+        for forbidden in (
+            "\n  - Write\n",
+            "\n  - Edit\n",
+            "Bash(git push ",
+            "Bash(gh pr create ",
+        ):
+            if forbidden in cpr_fm:
+                errors.append(f"cpr/SKILL.md: read-only 금지 도구 허용 {forbidden.strip()}")
+        for contract in (
+            "이미 열린 PR",
+            "tracking ref",
+            "force",
+            "source/index/HEAD",
+        ):
+            if contract not in workflow_text:
+                errors.append(f"pull-request-workflow.md: 안전 계약 누락 {contract}")
+
     conditional_path = ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
     conditional_reviewers = (
         "cca-data-migration-reviewer",
@@ -277,6 +316,13 @@ def main() -> None:
             errors.append("guard.py: verify-review command 누락")
         if "audit-snapshot" not in proc.stdout:
             errors.append("guard.py: audit-snapshot command 누락")
+        if "--expected-branch" not in subprocess.run(
+            [sys.executable, str(guard), "verify-review", "--help"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        ).stdout:
+            errors.append("guard.py: main/master 자동 분기 불변식 옵션 누락")
 
     for skill_path in (cr_path, cca_path):
         if not skill_path.exists():

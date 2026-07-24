@@ -2,7 +2,7 @@
 
 > Atomic Git Assistant for Claude Code
 
-CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증 → Atomic Commit**을 일관된 규칙으로 실행하는 Skills 패키지입니다. 커밋 제목과 본문은 기본적으로 한국어를 사용합니다.
+CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증 → Atomic Commit → Pull Request**를 일관된 규칙으로 실행하는 Skills 패키지입니다. 커밋과 PR 제목·본문은 기본적으로 한국어를 사용합니다.
 
 ## 한눈에 보기
 
@@ -12,6 +12,8 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | `/cc` | 현재 변경을 의미 단위별로 순차 commit | 안 함 | staging·commit |
 | `/cr` | line-by-line 심층 코드 리뷰 | 기본 안 함, 일반 모드의 `--fix`만 허용 | 안 함 |
 | `/cca` | 리뷰·국소 수정·검증·Atomic Commit 전체 실행 | 필요 시 | staging·commit |
+| `/cpr` | committed branch의 PR 리뷰·제목·본문 미리보기 | 안 함 | 안 함 |
+| `/cp` | PR gate 통과 후 branch push·GitHub PR 생성 | 안 함 | branch 생성 가능·일반 push·PR 생성 |
 
 ### 무엇을 실행해야 하나요?
 
@@ -27,6 +29,8 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | 기간 분석 후 현재 미커밋 변경까지 commit | `/cca today`, `/cca 3days`, `/cca weekly` |
 | release·장애·학습 결과만 미리 확인 | `/cr release`, `/cr emergency`, `/cr learn` |
 | release 준비·hotfix·프로필 저장을 실제 실행 | `/cca release`, `/cca emergency`, `/cca learn` |
+| PR 생성 전 결과와 blocker만 확인 | `/cpr --base main` |
+| 검증된 현재 branch로 GitHub PR 생성 | `/cp --base main` |
 
 > [!IMPORTANT]
 > **Release tag 실행 경계**
@@ -57,6 +61,8 @@ Claude Code를 열고 목적에 맞는 명령을 실행합니다.
 /ccr   # Atomic Commit 계획
 /cc    # 계획·staging·commit
 /cca   # 리뷰·수정·검증·commit 전체 실행
+/cpr   # Pull Request 읽기 전용 미리보기
+/cp    # branch push와 Pull Request 실제 생성
 ```
 
 Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. 전체 설치 방식은 [설치](#설치)를 참고하십시오.
@@ -67,6 +73,7 @@ Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. �
 - [명령 사용법](#명령-사용법)
 - [심층 리뷰와 reviewer](#심층-리뷰-범위)
 - [확장 모드: 기간·release·emergency·learn](#확장-모드)
+- [Pull Request 미리보기와 생성](#pull-request-미리보기와-생성)
 - [옵션 참조](#옵션-참조)
 - [Atomic Commit 기준](#atomic-commit-기준)
 - [동시 세션·Diff 보존·복구](#동시-세션-안전성)
@@ -80,12 +87,13 @@ Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. �
 - Git
 - Python 3.9 이상
 - 최신 Claude Code 권장
+- `/cpr`, `/cp` 사용 시 GitHub CLI(`gh`)와 GitHub 인증
 
-Python은 lock, Diff snapshot, untracked 보존, fingerprint와 안전한 cleanup을 담당합니다. Python이 없거나 Guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않습니다.
+Python은 lock, Diff snapshot, untracked 보존, fingerprint와 안전한 cleanup을 담당합니다. Python이 없거나 Guard가 실패하면 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 시작하지 않습니다.
 
 ### 프로젝트 설치
 
-현재 저장소에만 `/cc`, `/ccr`, `/cr`, `/cca`를 제공합니다.
+현재 저장소에만 `/cc`, `/ccr`, `/cr`, `/cca`, `/cpr`, `/cp`를 제공합니다.
 
 macOS / Linux / WSL / Git Bash:
 
@@ -147,6 +155,8 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 │   ├── ccr/
 │   ├── cr/
 │   ├── cca/
+│   ├── cpr/
+│   ├── cp/
 │   └── _git-atomic-core/
 └── agents/
     ├── cca-git-reviewer.md
@@ -173,7 +183,7 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 
 ### 설치 후 확인
 
-대상 저장소에서 Claude Code를 다시 열고 `/`를 입력해 `ccr`, `cc`, `cr`, `cca`가 표시되는지 확인합니다. 새 `.claude/agents` 디렉터리를 현재 세션에서 처음 만들었다면 Claude Code를 한 번 재시작하십시오.
+대상 저장소에서 Claude Code를 다시 열고 `/`를 입력해 `ccr`, `cc`, `cr`, `cca`, `cpr`, `cp`가 표시되는지 확인합니다. 새 `.claude/agents` 디렉터리를 현재 세션에서 처음 만들었다면 Claude Code를 한 번 재시작하십시오.
 
 ## 명령 사용법
 
@@ -428,6 +438,32 @@ tag는 문자열을 추측하지 않고 전용 계산기가 SemVer와 기존 tag
 
 bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하며, commit 메시지의 검증 명령은 CI·manifest·script 정의로 교차 검증합니다. 프로필은 자동 stage/commit하지 않고 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
 
+### Pull Request 미리보기와 생성
+
+```text
+/cpr --base main
+/cpr --base main --draft
+/cp --base main
+/cp --base main --draft
+```
+
+| 명령 | 결과 | 원격 변경 |
+|---|---|---|
+| `/cpr` | committed diff 심층 리뷰, readiness, blocker, PR 제목·본문 완성 초안 | 없음 |
+| `/cp` | 같은 gate 통과 후 현재 branch를 일반 push하고 GitHub PR 생성 | branch push와 새 PR 하나 |
+
+두 명령은 clean working tree와 commit이 존재하는 branch만 대상으로 합니다. 소스 수정, staging, commit, amend, rebase, force push, PR merge·close·auto-merge는 하지 않습니다. 같은 head의 열린 PR이 이미 있으면 새 PR을 중복 생성하지 않고 기존 URL을 보고합니다.
+
+현재가 base인 `main` 또는 `master`이면 다음처럼 동작합니다.
+
+- `/cpr`: committed diff의 주목적에 맞는 `feat/...`, `fix/...` 등의 충돌 없는 branch 이름만 제안하며 branch를 만들지 않습니다.
+- `/cp`: remote tracking base보다 앞선 commit을 리뷰한 뒤 같은 규칙으로 branch를 실제 생성하고 그 branch를 push해 PR을 만듭니다.
+- 미커밋 변경만 있거나 ahead commit이 없으면 두 명령 모두 차단됩니다. 먼저 `/cca` 또는 `/cc`로 commit한 뒤 다시 실행하십시오.
+- `--branch <name>`으로 head 이름을 명시할 수 있습니다. 형식·충돌·diff 의미를 검증하며 기존 local/remote branch를 덮어쓰지 않습니다.
+- 자동 branch 생성 뒤 push나 PR 생성이 실패하면 branch를 자동 삭제하거나 `main`/`master`로 복귀하지 않고 현재 상태와 재시도 방법을 보고합니다.
+
+`/cp`는 GitHub CLI 인증과 저장소 쓰기 권한이 필요합니다. remote branch가 이미 있으면 최신 local tracking ref와 실제 remote SHA가 일치하고 fast-forward 가능한 경우에만 일반 push합니다. 자동 fetch는 하지 않습니다.
+
 ## 옵션 참조
 
 이 옵션들은 별도 shell parser가 아니라 Skill이 해석하는 명시적 프롬프트 규약입니다.
@@ -511,6 +547,19 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 
 `--no-verify`여도 staged diff 직접 검토, whitespace, secret, 저장소 안전 검사는 생략하지 않습니다.
 
+### Pull Request 옵션
+
+| 옵션 | 적용 | 의미 |
+|---|---|---|
+| `--base <branch>` | `/cpr`, `/cp` | PR 대상 branch; 생략하면 GitHub 기본 branch |
+| `--remote <name>` | `/cpr`, `/cp` | 조회·push remote; 기본값 `origin` |
+| `--branch <name>` | `/cpr`, `/cp` | `main`/`master` 자동 분기의 head 이름 제안 또는 실제 생성 |
+| `--draft` | `/cpr`, `/cp` | draft PR 미리보기 또는 실제 draft 생성 |
+| `--title <text>` | `/cpr`, `/cp` | diff와 일치 여부를 검증할 명시적 PR 제목 |
+| `--no-verify` | `/cpr`, `/cp` | 프로젝트 test/lint/build 생략; diff·secret·Git 안전 검사는 유지 |
+| `--strict` | `/cpr`, `/cp` | 확인된 MINOR finding도 차단 |
+| `--keep-snapshot` | `/cpr`, `/cp` | 성공 후 Guard snapshot 보존 |
+
 ## Atomic Commit 기준
 
 기본 메시지 형식:
@@ -548,7 +597,7 @@ type(scope): 한글 제목
 
 ### 같은 worktree
 
-`/cc`, `/cr`, `/cca`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
+`/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
 
 다만 이 lock은 다른 IDE, terminal, Git GUI를 강제로 막지 못합니다. 실행 중 다른 세션이 파일이나 index를 바꾸면 fingerprint 불일치로 재분석 또는 중단합니다.
 
@@ -565,7 +614,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 ## 작업 전 Diff 보존
 
-`/cc`, `/cr`, `/cca` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다.
+`/cc`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다.
 
 ```text
 <git-dir>/claude-atomic-snapshots/<timestamp-session-random>/
@@ -608,7 +657,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 
 ## 안전상 하지 않는 작업
 
-- remote commit/tag push
+- remote commit/tag push (`/cp`의 검증된 현재 branch 일반 push만 예외)
 - amend
 - rebase/squash/history rewrite
 - force push
@@ -620,7 +669,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - dependency 자동 설치/업그레이드
 - 외부 서비스/인프라 변경
 
-`/cca release --prepare --tag`의 검증된 로컬 annotated tag 생성만 예외입니다. commit hook과 서명 설정은 기본적으로 존중합니다.
+`/cp`의 force 없는 검증된 branch push와 새 PR 생성, `/cca release --prepare --tag`의 검증된 로컬 annotated tag 생성만 예외입니다. `/cp`도 tag push, merge, auto-merge, deploy는 하지 않습니다. commit hook과 서명 설정은 기본적으로 존중합니다.
 
 ## 권한과 실행 통제
 
@@ -708,6 +757,8 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │   ├── ccr/SKILL.md
 │   ├── cr/SKILL.md
 │   ├── cca/SKILL.md
+│   ├── cpr/SKILL.md
+│   ├── cp/SKILL.md
 │   └── _git-atomic-core/
 │       ├── atomic-commit-rules.md
 │       ├── staging-strategy.md
@@ -724,6 +775,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │       ├── reporting-formats.md
 │       ├── baseline-and-suppressions.md
 │       ├── large-diff-review.md
+│       ├── pull-request-workflow.md
 │       ├── reporting.md
 │       ├── recovery.md
 │       ├── examples.md
@@ -734,6 +786,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │           ├── report_validator.py
 │           ├── baseline.py
 │           ├── period_range.py
+│           ├── pr_context.py
 │           └── release_version.py
 └── agents/
     ├── cca-git-reviewer.md

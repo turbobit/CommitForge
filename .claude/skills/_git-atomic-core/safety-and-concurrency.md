@@ -16,7 +16,7 @@
 - 사용자 요청 없는 `git commit --amend`
 - 사용자 요청 없는 rebase, squash, history rewrite
 
-커밋 skill은 push하지 않는다. 원격 저장소 변경은 별도 사용자 요청이 필요하다.
+커밋 skill은 push하지 않는다. 유일한 예외인 `/cp`는 사용자가 직접 호출했을 때 검증된 현재 branch를 force 없이 push하고 새 Pull Request 하나만 생성한다.
 
 tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --prepare --tag`이며 다음을 모두 만족해야 한다.
 
@@ -30,7 +30,7 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 
 ## 2. Diff 스냅샷
 
-`/cc`, `/cr`, `/cca`는 작업 시작 전에 guard를 실행한다.
+`/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 작업 시작 전에 guard를 실행한다.
 
 스냅샷은 현재 worktree의 실제 Git directory 아래에 생성된다.
 
@@ -47,6 +47,8 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 
 `/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다. 기본 `/cr`은 두 명령에 `--source-read-only`도 사용해 working binary diff, porcelain status, untracked 내용까지 일치시킨다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 source read-only 검사를 생략한다. `release`·`emergency`·`learn`은 `--fix`와 관계없이 source read-only다.
 
+`/cpr`은 같은 source read-only 불변식을 그대로 적용한다. `/cp`가 `main` 또는 `master`에서 새 branch를 만드는 경우에만 `--expected-branch`로 그 이름 하나를 허용하며 HEAD commit, staged/working diff와 untracked 내용은 모두 시작 상태와 같아야 한다.
+
 실패·중단·부분 완료 시:
 
 - `abort`로 잠금만 해제
@@ -58,7 +60,7 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 
 guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만든다.
 
-- 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`를 실행하면 두 번째 실행은 중단
+- 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`를 실행하면 두 번째 실행은 중단
 - 다른 Git 클라이언트까지 강제로 막는 잠금은 아님
 - `index.lock` 등 Git 자체 잠금이 있으면 중단
 - merge/rebase/cherry-pick/revert/bisect 진행 중이면 중단
@@ -82,7 +84,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 - 편집 세션과 커밋 세션을 동시에 실행하지 않음
 - `/ccr`은 read-only이지만 분석 중 변경되면 계획이 낡을 수 있음
-- `/cc`·`/cr`·`/cca` 시작 후 다른 세션의 Git/파일 변경을 중지
+- `/cc`·`/cr`·`/cca`·`/cpr`·`/cp` 시작 후 다른 세션의 Git/파일 변경을 중지
 - 예상하지 못한 fingerprint 변화 시 중단
 
 ## 5. 진행 중 Git 작업

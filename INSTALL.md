@@ -1,5 +1,7 @@
 # CommitForge 설치
 
+Git과 Python 3.9 이상이 필요합니다. `/cpr`, `/cp`에는 GitHub CLI(`gh`)와 해당 저장소 인증도 필요합니다.
+
 ## 프로젝트 설치
 
 ```bash
@@ -22,7 +24,7 @@
 
 ## 확인
 
-대상 프로젝트에서 Claude Code를 실행하고 `/`를 입력해 `cc`, `ccr`, `cr`, `cca`를 확인합니다.
+대상 프로젝트에서 Claude Code를 실행하고 `/`를 입력해 `cc`, `ccr`, `cr`, `cca`, `cpr`, `cp`를 확인합니다.
 
 ```text
 /ccr
@@ -43,6 +45,8 @@
 /cca release --dry-run
 /cca emergency --diagnose
 /cca learn --preview
+/cpr --base main
+/cp --base main --draft
 ```
 
 새 `.claude/agents` 디렉터리를 실행 중 세션에서 처음 만들었다면 한 번 재시작하십시오.
@@ -70,3 +74,5 @@
 `/cr`은 기본 읽기 전용입니다. 검토 결과를 확인한 뒤 현재 미커밋 변경의 안전한 국소 수정을 원할 때만 `/cr --fix`를 사용합니다.
 
 프로젝트별 리뷰 설정은 `examples/review.yml`을 `.commitforge/review.yml`로 복사해 조정할 수 있습니다. JSON·SARIF 결과가 필요하면 `/cr --format json|sarif --output <경로>`를 사용합니다.
+
+PR 생성 전에는 `/cpr --base main`으로 제목·본문·readiness를 확인하고, 실제 branch push와 GitHub PR 생성은 `/cp --base main`을 실행합니다. 현재가 `main`/`master`이면 `/cpr`은 branch 이름만 제안하고 `/cp`가 검증 후 실제 branch를 만듭니다.

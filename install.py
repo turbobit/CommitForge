@@ -12,7 +12,7 @@ import sys
 
 PACKAGE_ROOT = Path(__file__).resolve().parent
 SOURCE_CLAUDE = PACKAGE_ROOT / ".claude"
-SKILLS = ("cc", "ccr", "cr", "cca", "_git-atomic-core")
+SKILLS = ("cc", "ccr", "cr", "cca", "cp", "cpr", "_git-atomic-core")
 AGENTS = (
     "cca-git-reviewer.md",
     "cca-correctness-reviewer.md",
@@ -98,7 +98,8 @@ def main() -> None:
     if backup_root.exists() or args.dry_run:
         print(f"기존 파일 백업: {backup_root}")
     print("CommitForge 설치 완료")
-    print("사용 명령: /ccr, /cc, /cr, /cca")
+    print("사용 명령: /ccr, /cc, /cr, /cca, /cpr, /cp")
+    print("Pull Request: /cpr 미리보기, /cp 실제 생성")
     print("기간 리뷰: /cr today, /cr 3days, /cr weekly")
     print(
         "확장 모드: /cca today, /cca 3days, /cca weekly, /cca release, "

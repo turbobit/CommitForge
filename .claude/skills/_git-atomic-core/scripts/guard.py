@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
-from typing import Any
+from typing import Any, Optional
 
 
 SCHEMA_VERSION = 1
@@ -449,6 +449,7 @@ def review_invariants(
     metadata: dict[str, Any],
     *,
     source_read_only: bool = False,
+    expected_branch: Optional[str] = None,
 ) -> dict[str, Any]:
     start_head = metadata.get("head", "")
     start_branch = metadata.get("branch", "")
@@ -459,9 +460,24 @@ def review_invariants(
         ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"],
         cwd=ctx["root"],
     )
+    branch_valid = current_branch_value == start_branch
+    if expected_branch:
+        valid_expected = subprocess.run(
+            ["git", "check-ref-format", "--branch", expected_branch],
+            cwd=ctx["root"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode == 0
+        branch_valid = (
+            valid_expected
+            and start_branch in {"main", "master"}
+            and current_branch_value == expected_branch
+            and current_branch_value != start_branch
+        )
     checks = {
         "head_unchanged": current_head_value == start_head,
-        "branch_unchanged": current_branch_value == start_branch,
+        "branch_unchanged_or_expected": branch_valid,
         "staged_diff_unchanged": current_staged == start_staged,
     }
     if source_read_only:
@@ -506,6 +522,7 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
         snapshot,
         metadata,
         source_read_only=args.source_read_only,
+        expected_branch=args.expected_branch,
     )
     if not result["ok"]:
         failed = [name for name, passed in result["checks"].items() if not passed]
@@ -589,6 +606,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
             snapshot,
             metadata,
             source_read_only=args.source_read_only,
+            expected_branch=args.expected_branch,
         )
         if not review_result["ok"]:
             failed = [
@@ -688,6 +706,10 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also require working diff, status, and untracked content to match",
     )
+    finish.add_argument(
+        "--expected-branch",
+        help="Allow only this branch change when the snapshot began on main/master",
+    )
     finish.add_argument("--keep-snapshot", action="store_true")
 
     verify_review = sub.add_parser(
@@ -698,6 +720,10 @@ def build_parser() -> argparse.ArgumentParser:
     verify_review.add_argument("--token", required=True)
     verify_review.add_argument("--snapshot", required=True)
     verify_review.add_argument("--source-read-only", action="store_true")
+    verify_review.add_argument(
+        "--expected-branch",
+        help="Allow only this branch change when the snapshot began on main/master",
+    )
 
     audit = sub.add_parser(
         "audit-snapshot",

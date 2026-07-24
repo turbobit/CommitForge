@@ -87,7 +87,7 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertNotIn("최대 4개 agent", execution)
 
     def test_all_commands_load_learned_profile(self) -> None:
-        for command in ("ccr", "cc", "cr", "cca"):
+        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
             skill = (
                 ROOT / f".claude/skills/{command}/SKILL.md"
             ).read_text(encoding="utf-8")
@@ -153,6 +153,49 @@ class PackageMetadataTest(unittest.TestCase):
                 sorted(runpy.run_path(str(ROOT / registry_file))["AGENTS"])
             )
             self.assertEqual(actual, registered)
+
+    def test_installer_skill_registries_match_package(self) -> None:
+        actual = tuple(
+            path.name
+            for path in sorted((ROOT / ".claude/skills").iterdir())
+            if path.is_dir()
+        )
+        for registry_file in ("install.py", "uninstall.py"):
+            registered = tuple(
+                sorted(runpy.run_path(str(ROOT / registry_file))["SKILLS"])
+            )
+            self.assertEqual(actual, registered)
+
+    def test_pull_request_commands_enforce_execution_boundary(self) -> None:
+        cp = (ROOT / ".claude/skills/cp/SKILL.md").read_text(encoding="utf-8")
+        cpr = (ROOT / ".claude/skills/cpr/SKILL.md").read_text(encoding="utf-8")
+        workflow = (
+            ROOT / ".claude/skills/_git-atomic-core/pull-request-workflow.md"
+        ).read_text(encoding="utf-8")
+        cp_frontmatter = cp.split("\n---\n", 1)[0]
+        cpr_frontmatter = cpr.split("\n---\n", 1)[0]
+
+        for skill in (cp, cpr):
+            self.assertIn("pull-request-workflow.md", skill)
+            self.assertIn("disable-model-invocation: true", skill)
+        for forbidden in ("Bash(git add ", "Bash(git commit ", "\n  - Edit\n"):
+            self.assertNotIn(forbidden, cp_frontmatter)
+        self.assertIn("Bash(git push *)", cp_frontmatter)
+        self.assertIn("Bash(gh pr create *)", cp_frontmatter)
+        for forbidden in (
+            "\n  - Write\n",
+            "\n  - Edit\n",
+            "Bash(git push ",
+            "Bash(gh pr create ",
+        ):
+            self.assertNotIn(forbidden, cpr_frontmatter)
+        for contract in (
+            "이미 열린 PR",
+            "tracking ref",
+            "force",
+            "source/index/HEAD",
+        ):
+            self.assertIn(contract, workflow)
 
     def test_review_agents_are_read_only(self) -> None:
         for path in (ROOT / ".claude/agents").glob("cca-*.md"):
