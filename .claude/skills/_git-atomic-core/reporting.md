@@ -104,7 +104,8 @@
 
 ### 확장 모드 추가 항목
 
-- `today`: 사용한 시간대·자정 경계·작성자 조건, 기존 오늘 commit, 새 commit, 오늘 전체 통계
+- `today`: 정확한 시간대·자정 경계·작성자 조건, commit 원장, net effect, 새 commit, 오늘 전체 통계
+- `weekly`: 주 시작·기간·작성자 조건, 날짜·domain별 집계, net effect, 반복 수정·미완료 위험, 새 commit
 - `release`: 기준 ref, 분석 범위, 권장 Semantic Version과 근거, 릴리스 노트 초안, 차단 요소
 - `emergency`: 장애 증상·근본 원인·최소 완화 범위·긴급 검증·배포 전후 확인·후속 작업
 - `learn`: 분석 ref·표본 commit 수·프로필 경로·확신도·프로필 외 파일을 변경하지 않았음

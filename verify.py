@@ -23,6 +23,7 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
     ".claude/skills/_git-atomic-core/conditional-reviewers.md",
     ".claude/skills/_git-atomic-core/review-execution.md",
+    ".claude/skills/_git-atomic-core/period-review-modes.md",
     ".claude/skills/_git-atomic-core/review-policy.md",
     ".claude/skills/_git-atomic-core/reporting-formats.md",
     ".claude/skills/_git-atomic-core/baseline-and-suppressions.md",
@@ -32,6 +33,7 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
     ".claude/skills/_git-atomic-core/scripts/report_validator.py",
     ".claude/skills/_git-atomic-core/scripts/baseline.py",
+    ".claude/skills/_git-atomic-core/scripts/period_range.py",
     ".claude/agents/cca-git-reviewer.md",
     ".claude/agents/cca-correctness-reviewer.md",
     ".claude/agents/cca-security-reviewer.md",
@@ -130,11 +132,28 @@ def main() -> None:
     if cca_path.exists() and modes_path.exists():
         cca_text = cca_path.read_text(encoding="utf-8")
         modes_text = modes_path.read_text(encoding="utf-8")
-        for mode in ("today", "release", "emergency", "learn"):
+        for mode in ("today", "weekly", "release", "emergency", "learn"):
             if f"`{mode}`" not in cca_text:
                 errors.append(f"cca/SKILL.md: {mode} 모드 분기 누락")
             if f"## " not in modes_text or f"`{mode}`" not in modes_text:
                 errors.append(f"extended-modes.md: {mode} 모드 설명 누락")
+
+    period_modes = ROOT / ".claude/skills/_git-atomic-core/period-review-modes.md"
+    if period_modes.exists():
+        period_text = period_modes.read_text(encoding="utf-8")
+        for skill_path in (ROOT / ".claude/skills/cr/SKILL.md", cca_path):
+            if skill_path.exists() and "period-review-modes.md" not in skill_path.read_text(
+                encoding="utf-8"
+            ):
+                errors.append(f"{skill_path}: today·weekly 공통 규칙 연결 누락")
+        for contract in (
+            "최근 24시간이 아니다",
+            "최근 7일이 아니다",
+            "period-interaction",
+            "Atomic Commit 계획·메시지·staging·commit·push는 항상 금지",
+        ):
+            if contract not in period_text:
+                errors.append(f"period-review-modes.md: 계약 누락 {contract}")
 
     if cca_path.exists():
         cca_text = cca_path.read_text(encoding="utf-8")

@@ -134,23 +134,43 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - `guard.py status`에서 snapshot 확인
 - 다른 세션 snapshot 미삭제
 
-## 9. `/cca today`
+## 9. `/cr today|weekly`
+
+오늘과 이번 주에 해당하는 여러 commit, 되돌림 commit, 새 미커밋 변경을 준비합니다.
+
+```text
+/cr today --no-fix
+/cr weekly --all-authors --no-fix
+```
+
+확인:
+
+- today는 로컬 00:00, weekly는 기본 월요일 00:00 경계
+- timezone·UTC offset·정확한 시작/종료 시각
+- commit별 원장과 branch net effect 분리
+- revert·후속 correction·교차 commit finding 귀속
+- working tree가 깨끗해도 기간 commit 리뷰
+- HEAD·index 불변, Atomic 계획·commit·push 없음
+
+## 10. `/cca today|weekly`
 
 테스트 브랜치에서 오늘 날짜의 기존 commit과 새 미커밋 변경을 준비합니다.
 
 ```text
 /cca today 테스트 작업
+/cca weekly --week-start sunday 테스트 작업
 ```
 
 확인:
 
-- 로컬 자정 이후 현재 작성자의 기존 commit 표시
+- 정확한 달력 경계와 현재 작성자의 기존 commit 표시
+- weekly 날짜·domain별 집계와 반복 수정·미완료 위험
 - 기존 commit은 amend/rebase/재생성하지 않음
 - 미커밋 변경만 신규 Atomic Commit으로 생성
-- 기존 오늘 commit과 신규 commit을 구분해 보고
+- 기존 기간 commit과 신규 commit을 구분해 보고
 - working tree가 처음부터 clean이면 보고만 하고 commit 없음
 
-## 10. `/cca release`
+## 11. `/cca release`
 
 테스트 tag 이후 작은 변경을 준비합니다.
 
@@ -166,7 +186,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 릴리스 노트 초안과 차단 요소
 - tag, push, publish, deploy 없음
 
-## 11. `/cca emergency`
+## 12. `/cca emergency`
 
 작은 hotfix와 직접 회귀 테스트를 준비합니다.
 
@@ -181,7 +201,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 - 직접 회귀 테스트 또는 명확한 수동 검증
 - 배포 전후 확인 항목과 남은 위험 보고
 
-## 12. `/cca learn`
+## 13. `/cca learn`
 
 history가 있는 테스트 저장소에서 실행합니다.
 
@@ -197,7 +217,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - 분석 범위·표본 수·확신도 표시
 - 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로필의 관련 선호를 참고
 
-## 13. 심층 리뷰 Coverage Gate
+## 14. 심층 리뷰 Coverage Gate
 
 테스트 저장소에 다음 변경을 준비합니다.
 
@@ -222,7 +242,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - blocking finding이 있으면 실패로 보고
 - commit 계획·staging·commit 없음
 
-## 14. 조건부 Reviewer
+## 15. 조건부 Reviewer
 
 각각 별도 테스트 변경으로 다음 trigger를 준비합니다.
 
@@ -243,7 +263,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - Requirements/Product는 명시적 기준이 없을 때 추측하지 않음
 - 수정 후 trigger를 다시 판정하고 활성 reviewer를 재실행
 
-## 15. Reviewer 실패와 Finding Schema
+## 16. Reviewer 실패와 Finding Schema
 
 테스트 환경에서 선택 reviewer 하나를 사용할 수 없게 한 뒤 `/cr --no-fix`를 실행합니다.
 
@@ -254,7 +274,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - finding에 stable ID, reviewer, fingerprint, severity, status, 위치, evidence, blocking 포함
 - 중복 root cause가 하나의 owner finding으로 통합
 
-## 16. Release 재현성
+## 17. Release 재현성
 
 ```bash
 python3 release.py --check
@@ -266,7 +286,7 @@ python3 -m unittest tests.test_release -v
 - metadata가 현재 source와 일치
 - 서로 다른 임시 디렉터리에서 생성한 ZIP/TAR.GZ가 byte-identical
 
-## 17. 비교 범위와 PR 리뷰
+## 18. 비교 범위와 PR 리뷰
 
 ```text
 /cr --base main --no-fix
@@ -281,7 +301,7 @@ python3 -m unittest tests.test_release -v
 - 과거 commit 범위는 소스 자동 수정 없음
 - 모든 모드에서 Atomic 계획·staging·commit 없음
 
-## 18. JSON·SARIF와 Baseline
+## 19. JSON·SARIF와 Baseline
 
 ```text
 /cr --no-fix --format json --output review.json
@@ -295,7 +315,7 @@ python3 -m unittest tests.test_release -v
 - 만료된 baseline은 `STALE`
 - CRITICAL·secret·인증 우회·데이터 손실 finding은 억제되지 않음
 
-## 19. 대형 Diff와 Snapshot 감사
+## 20. 대형 Diff와 Snapshot 감사
 
 정책 기준을 낮춘 테스트 `.commitforge/review.yml`을 만들고 여러 domain의 변경을 준비합니다.
 
@@ -306,7 +326,7 @@ python3 -m unittest tests.test_release -v
 - snapshot metadata에 파일별 크기·SHA-256 존재
 - snapshot 파일을 변조하면 `audit-snapshot`과 `finish`가 실패하고 snapshot이 보존됨
 
-## 20. Claude Code Live Eval
+## 21. Claude Code Live Eval
 
 ```bash
 python3 evals/run_evals.py --check

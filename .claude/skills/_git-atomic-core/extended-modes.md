@@ -3,7 +3,7 @@
 ## 목차
 
 1. 공통 해석 규칙
-2. `today`
+2. `today`·`weekly`
 3. `release`
 4. `emergency`
 5. `learn`
@@ -11,7 +11,7 @@
 
 ## 1. 공통 해석 규칙
 
-`/cca`의 첫 번째 위치 인자가 `today`, `release`, `emergency`, `learn` 중 하나면 확장 모드로 해석한다. 그 외에는 기본 `/cca` 흐름을 사용한다.
+`/cca`의 첫 번째 위치 인자가 `today`, `weekly`, `release`, `emergency`, `learn` 중 하나면 확장 모드로 해석한다. 그 외에는 기본 `/cca` 흐름을 사용한다.
 
 - 확장 모드 이름 뒤의 일반 문장은 작업 맥락으로 사용한다.
 - 알 수 없는 모드처럼 보이는 단어는 자동 실행하지 말고 일반 맥락으로 취급한다.
@@ -19,53 +19,18 @@
 - 어떤 모드도 push, tag, GitHub Release 생성 또는 배포를 수행하지 않는다.
 - `.commitforge/profile.md`가 있으면 저장소의 명시적 규칙과 충돌하지 않는 범위에서 메시지·분리·검증 선호에 적용한다.
 
-## 2. `today`
+## 2. `today`·`weekly`
 
-호출 예:
+두 모드는 `_git-atomic-core/period-review-modes.md`를 따른다.
 
 ```text
 /cca today
-/cca today 인증 처리 작업
 /cca today --all-authors
+/cca weekly
+/cca weekly --week-start sunday --all-authors
 ```
 
-목적:
-
-- 현재 브랜치에서 오늘 수행한 작업과 현재 미커밋 변경을 하나의 작업 맥락으로 리뷰한다.
-- 이미 생성된 commit은 분석·보고에만 사용한다.
-- 현재 미커밋 변경만 기본 `/cca` 품질 파이프라인으로 수정·검증·commit한다.
-
-오늘의 범위:
-
-1. Claude Code를 실행하는 호스트의 로컬 시간대를 기준으로 자정 이후를 사용한다.
-2. 사용자가 시간대 또는 날짜 경계를 명시하면 그 값을 우선하고 최종 보고에 기준을 표시한다.
-3. 기본값은 `git config --get user.email`과 일치하는 작성자의 현재 브랜치 도달 가능 commit이다.
-4. `--all-authors`이면 작성자 제한을 제거한다.
-5. merge commit은 별도 표시하고 중복 통계가 생기지 않도록 diff 합산 기준을 명시한다.
-6. 작성자 이메일이 없으면 임의 추정하지 말고 현재 브랜치의 오늘 commit 전체를 사용했다는 경고를 남긴다.
-
-권장 조회:
-
-```bash
-git config --get user.email
-git log --since=midnight --date=iso-local \
-  --pretty=format:'%H%x09%an%x09%ae%x09%ad%x09%s'
-```
-
-실행:
-
-1. 오늘 commit 목록과 시작 HEAD를 기록한다.
-2. 각 commit의 목적·통계·검증 정보를 읽고 전체 작업 위험을 검토한다.
-3. working tree가 깨끗하면 기존 commit을 재작성하지 않고 오늘 작업 보고만 반환한다.
-4. 미커밋 변경이 있으면 기본 `/cca` Guard부터 Commit 실행까지 수행한다.
-5. 최종 보고에는 기존 오늘 commit과 새 commit을 구분한다.
-
-금지:
-
-- 오늘 commit을 다시 commit하기
-- 자동 squash/amend/rebase
-- 날짜만으로 다른 branch의 도달 불가능 commit을 섞기
-- 오늘 이전 commit을 암묵적으로 포함하기
+기간의 기존 commit은 강화된 이력·net-effect 리뷰와 보고에만 사용한다. 현재 미커밋 변경만 기본 `/cca` 품질 파이프라인으로 수정·검증·commit한다.
 
 ## 3. `release`
 

@@ -28,5 +28,27 @@
       ["drop", "삭제", "손실", "rollback"]
     ],
     "expected_reviewers": ["cca-data-migration-reviewer"]
+  },
+  {
+    "name": "today committed regression",
+    "base_files": {
+      "collector.py": "def collect(item, values=None):\n    values = [] if values is None else values\n    values.append(item)\n    return values\n"
+    },
+    "committed_changes": [
+      {
+        "message": "refactor: simplify collector defaults",
+        "files": {
+          "collector.py": "def collect(item, values=[]):\n    values.append(item)\n    return values\n"
+        }
+      }
+    ],
+    "changed_files": {},
+    "prompt": "/cr today --no-fix --timezone +09:00 오늘 커밋 회귀를 엄격히 리뷰",
+    "expected_terms": [
+      ["mutable default", "기본 인자"],
+      ["공유", "shared", "상태"],
+      ["today", "오늘", "기간"]
+    ],
+    "expected_reviewers": ["cca-correctness-reviewer", "cca-language-api-reviewer"]
   }
 ]

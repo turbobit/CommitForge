@@ -27,7 +27,7 @@ class ReviewFeatureTest(unittest.TestCase):
         result = self.run_python(ROOT / "evals/run_evals.py", "--check")
         payload = json.loads(result.stdout)
         self.assertTrue(payload["ok"])
-        self.assertGreaterEqual(payload["scenarios"], 2)
+        self.assertGreaterEqual(payload["scenarios"], 3)
 
     def test_baseline_example_is_valid(self) -> None:
         result = self.run_python(
@@ -121,6 +121,49 @@ class ReviewFeatureTest(unittest.TestCase):
         self.assertIn('PYTHONUTF8: "1"', text)
         attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
         self.assertIn("* text=auto eol=lf", attributes)
+
+    def test_period_range_uses_calendar_boundaries(self) -> None:
+        script = CORE_SCRIPTS / "period_range.py"
+        today = self.run_python(
+            script,
+            "today",
+            "--timezone",
+            "+09:00",
+            "--now",
+            "2026-07-24T13:45:00+09:00",
+        )
+        weekly = self.run_python(
+            script,
+            "weekly",
+            "--timezone",
+            "+09:00",
+            "--now",
+            "2026-07-24T13:45:00+09:00",
+        )
+        sunday = self.run_python(
+            script,
+            "weekly",
+            "--timezone",
+            "+09:00",
+            "--week-start",
+            "sunday",
+            "--now",
+            "2026-07-24T13:45:00+09:00",
+        )
+        today_payload = json.loads(today.stdout)
+        self.assertEqual(
+            "2026-07-24T00:00:00+09:00",
+            today_payload["start"],
+        )
+        self.assertEqual("+09:00", today_payload["utc_offset"])
+        self.assertEqual(
+            "2026-07-20T00:00:00+09:00",
+            json.loads(weekly.stdout)["start"],
+        )
+        self.assertEqual(
+            "2026-07-19T00:00:00+09:00",
+            json.loads(sunday.stdout)["start"],
+        )
 
 
 if __name__ == "__main__":

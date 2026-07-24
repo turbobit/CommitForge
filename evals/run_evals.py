@@ -12,6 +12,7 @@ import shlex
 import shutil
 import subprocess
 import tempfile
+from typing import Optional
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,10 +20,17 @@ SCENARIOS = ROOT / "evals/live-review-scenarios.json"
 TRIGGERS = ROOT / ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py"
 
 
-def run(command: list[str], cwd: Path, *, timeout: int = 180) -> subprocess.CompletedProcess[str]:
+def run(
+    command: list[str],
+    cwd: Path,
+    *,
+    timeout: int = 180,
+    env: Optional[dict[str, str]] = None,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
         cwd=cwd,
+        env=env,
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -54,15 +62,31 @@ def load_scenarios() -> list[dict]:
         missing = required - set(scenario)
         if missing:
             raise ValueError(f"scenario {index} 필드 누락: {sorted(missing)}")
-        if not scenario["prompt"].startswith("/cr --no-fix"):
+        if not scenario["prompt"].startswith("/cr") or "--no-fix" not in scenario["prompt"]:
             raise ValueError(f"scenario {index}: live eval은 /cr --no-fix만 허용")
+        for change_index, change in enumerate(scenario.get("committed_changes", [])):
+            if not isinstance(change.get("message"), str) or not isinstance(
+                change.get("files"), dict
+            ):
+                raise ValueError(
+                    f"scenario {index} committed change {change_index} 형식 오류"
+                )
     return scenarios
 
 
 def contract_check(scenarios: list[dict]) -> None:
     classifier = load_classifier_module()
     for scenario in scenarios:
-        paths = sorted(set(scenario["base_files"]) | set(scenario["changed_files"]))
+        committed_paths = {
+            path
+            for change in scenario.get("committed_changes", [])
+            for path in change["files"]
+        }
+        paths = sorted(
+            set(scenario["base_files"])
+            | set(scenario["changed_files"])
+            | committed_paths
+        )
         active = classifier.classify(paths, scenario["prompt"])["active"]
         conditional = [
             reviewer
@@ -105,9 +129,30 @@ def live_case(scenario: dict, command: list[str], keep_temp: bool) -> dict:
 
         write_files(temp_path, scenario["base_files"])
         run(["git", "add", "."], temp_path)
-        committed = run(["git", "commit", "-m", "test: base"], temp_path)
+        old_commit_env = dict(os.environ)
+        old_commit_env.update(
+            {
+                "GIT_AUTHOR_DATE": "2000-01-01T00:00:00+00:00",
+                "GIT_COMMITTER_DATE": "2000-01-01T00:00:00+00:00",
+            }
+        )
+        committed = run(
+            ["git", "commit", "-m", "test: base"],
+            temp_path,
+            env=old_commit_env,
+        )
         if committed.returncode != 0:
             raise RuntimeError(committed.stderr)
+
+        for change in scenario.get("committed_changes", []):
+            write_files(temp_path, change["files"])
+            run(["git", "add", "."], temp_path)
+            committed = run(
+                ["git", "commit", "-m", change["message"]],
+                temp_path,
+            )
+            if committed.returncode != 0:
+                raise RuntimeError(committed.stderr)
         write_files(temp_path, scenario["changed_files"])
 
         start_head = run(["git", "rev-parse", "HEAD"], temp_path).stdout.strip()

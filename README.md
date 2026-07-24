@@ -11,7 +11,7 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 | `/cr` | 기본 10개+조건부 전문 심층 리뷰, 확정적 수정, 재리뷰, 검증 | 없음 | 필요 시 있음 |
 | `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
-`/cca`는 `today`, `release`, `emergency`, `learn` 확장 모드도 제공합니다.
+`/cr`은 `today`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
 
 커밋 메시지는 기본적으로 다음 형태를 사용합니다.
 
@@ -284,14 +284,34 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 ### 확장 모드
 
-#### 오늘 작업 전체 분석
+#### 오늘·이번 주 심층 리뷰
+
+```text
+/cr today --no-fix
+/cr weekly --all-authors --no-fix
+```
+
+`/cr`은 오늘 또는 이번 주의 기존 commit과 현재 working tree를 함께 심층 리뷰합니다. 기간 commit은 읽기 전용이며 Atomic Commit 계획·staging·commit을 만들지 않습니다. working tree가 깨끗해도 기간 commit이 있으면 검토합니다.
+
+#### 오늘 작업 전체 분석·커밋
 
 ```text
 /cca today
 /cca today 인증 처리 작업
 ```
 
-현재 브랜치에서 Claude Code 실행 호스트의 로컬 자정 이후 현재 Git 작성자가 만든 commit과 미커밋 변경을 함께 분석합니다. 기존 commit은 재작성하지 않으며 현재 미커밋 변경만 `/cca` 파이프라인으로 commit합니다. `--all-authors`를 지정하면 작성자 제한 없이 오늘의 commit을 분석합니다.
+호스트 로컬 달력의 오늘 00:00부터 현재까지 commit과 미커밋 변경을 함께 분석합니다. 커밋별 원장, 되돌림·후속 수정, 최종 net effect와 교차 commit 회귀를 검토합니다. 기존 commit은 재작성하지 않으며 현재 미커밋 변경만 `/cca` 파이프라인으로 commit합니다.
+
+#### 이번 주 작업 전체 분석·커밋
+
+```text
+/cca weekly
+/cca weekly --week-start sunday --all-authors
+```
+
+기본 월요일 00:00부터 현재까지를 날짜·domain·작성자별로 집계합니다. 반복 수정, revert, flaky test, 미완료 기능과 테스트·문서·migration·관측성 공백을 분석하고 현재 미커밋 변경만 commit합니다.
+
+`today`는 최근 24시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start monday|sunday`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
 
 #### 릴리스 준비
 
@@ -338,7 +358,9 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 | `pr` | `/cr` | 현재 GitHub PR의 base/head 범위 검토 |
 | `--format human\|json\|sarif` | `/cr`, `/cca` | 보고서 형식 선택 |
 | `--output <path>` | `/cr`, `/cca` | machine-readable 보고서 저장 |
-| `--all-authors` | `/cca today` | 오늘 commit의 작성자 제한 제거 |
+| `--all-authors` | `/cr`, `/cca`의 `today|weekly` | 기간 commit의 작성자 제한 제거 |
+| `--week-start monday|sunday` | `/cr weekly`, `/cca weekly` | 주간 달력 시작 요일 |
+| `--timezone <IANA\|±HH:MM>` | `/cr`, `/cca`의 `today|weekly` | 기간 계산 시간대 |
 | `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정 |
 | `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
 
@@ -538,6 +560,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │       ├── validation-strategy.md
 │       ├── project-profiles.md
 │       ├── extended-modes.md
+│       ├── period-review-modes.md
 │       ├── deep-review-protocol.md
 │       ├── language-api-pitfalls.md
 │       ├── review-policy.md
@@ -551,7 +574,8 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │           ├── guard.py
 │           ├── reviewer_triggers.py
 │           ├── report_validator.py
-│           └── baseline.py
+│           ├── baseline.py
+│           └── period_range.py
 └── agents/
     ├── cca-git-reviewer.md
     ├── cca-correctness-reviewer.md

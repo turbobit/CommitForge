@@ -2,6 +2,9 @@
 
 ## 완료한 자동 검증
 
+- `/cr`·`/cca` today/weekly 공통 기간 규칙과 명령 연결 검증
+- today·weekly 월요일·weekly 일요일 고정 시각 경계 회귀 검증
+- 기간 commit 불변, `/cr` Atomic 계획 금지, `/cca` working-only commit 경계 검증
 - Python 파일 syntax compile
 - Skill/Agent YAML frontmatter parser 검증
 - `SKILL.md` 각각 500줄 미만 확인
@@ -29,6 +32,7 @@
 - snapshot inventory SHA-256 감사와 변조 차단 검증
 - 실제 Claude Code 평가 scenario 계약 검증
 - 실제 Claude Code CLI + Sonnet으로 Python mutable-default 회귀 `/cr --no-fix` E2E 통과
+- 실제 Claude Code CLI + Sonnet으로 clean working tree의 `/cr today --no-fix` 기간 커밋 회귀 E2E 통과
 
 ### Guard 통합 테스트
 
@@ -45,7 +49,10 @@
 
 ### 확장 모드 검증
 
-- `/cca today`, `release`, `emergency`, `learn` 분기 존재
+- `/cca today`, `weekly`, `release`, `emergency`, `learn` 분기 존재
+- `/cr today`, `weekly` 기간 리뷰 분기 존재
+- today는 최근 24시간, weekly는 최근 7일로 해석하지 않는 달력 경계 확인
+- commit 원장·net effect·revert·교차 commit finding 귀속 규칙 확인
 - 확장 모드 공통 규칙 파일 설치 대상 포함
 - `learn` 프로필을 `/ccr`, `/cc`, `/cr`, `/cca`가 참조
 - README·MANIFEST·VERSION의 CommitForge 브랜딩과 버전 일치
@@ -65,4 +72,4 @@
 
 Claude Code 계정·권한·모델 변화가 결과에 영향을 줄 수 있으므로 live 결과는 고정적인 단위 테스트가 아니라 보조 품질 신호로 취급합니다. 중요한 저장소에서는 별도 worktree에서 수동 체크리스트도 함께 수행하십시오.
 
-이번 릴리스에서는 `python mutable default regression` 시나리오를 Sonnet으로 실행해 기대한 상태 공유 회귀를 탐지하고 HEAD·index 불변 조건을 지키는 것을 확인했습니다. destructive migration 시나리오는 계약 검증까지만 수행했습니다.
+이번 릴리스에서는 `python mutable default regression`과 `today committed regression` 시나리오를 Sonnet으로 실행했습니다. 일반 working diff와 clean working tree의 오늘 커밋 모두에서 상태 공유 회귀를 탐지하고 HEAD·index 불변 조건을 지키는 것을 확인했습니다. destructive migration 시나리오는 계약 검증까지만 수행했습니다.

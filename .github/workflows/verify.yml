@@ -41,6 +41,7 @@ jobs:
             .claude/skills/_git-atomic-core/scripts/reviewer_triggers.py \
             .claude/skills/_git-atomic-core/scripts/report_validator.py \
             .claude/skills/_git-atomic-core/scripts/baseline.py \
+            .claude/skills/_git-atomic-core/scripts/period_range.py \
             evals/run_evals.py
 
       - name: Verify checksums

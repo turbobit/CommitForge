@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.6.0 — 2026-07-24
+
+- `/cr today`, `/cr weekly` 기간 심층 리뷰 모드 추가
+- `/cca today`를 커밋 원장·net effect·revert·후속 수정·교차 커밋 finding 귀속으로 강화
+- `/cca weekly`에 날짜·domain·작성자 집계와 반복 수정·미완료 위험 분석 추가
+- today는 로컬 달력 자정, weekly는 기본 월요일 자정으로 명확히 정의
+- `--all-authors`, `--week-start monday|sunday`, `--timezone <IANA|±HH:MM>` 기간 옵션 추가
+- 기존 기간 commit은 불변으로 유지하고 `/cr`은 Atomic 계획 없이, `/cca`는 미커밋 변경만 commit하도록 경계 강화
+- Python 3.9 호환 기간 경계 계산기와 고정 시각 회귀 테스트 추가
+- clean working tree의 오늘 커밋을 검토하는 실제 Claude Code E2E 평가 추가
+
 ## 1.5.0 — 2026-07-23
 
 - `/cr --base`, `--range`, `pr`로 branch·commit range·GitHub PR 심층 리뷰 지원

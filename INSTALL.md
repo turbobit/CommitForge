@@ -28,10 +28,13 @@
 /ccr
 /cc
 /cr
+/cr today --no-fix
+/cr weekly --no-fix
 /cr --base main --no-fix
 /cr pr --no-fix
 /cca
 /cca today
+/cca weekly
 /cca release
 /cca emergency
 /cca learn

@@ -24,18 +24,45 @@ class PackageMetadataTest(unittest.TestCase):
         modes = (
             ROOT / ".claude/skills/_git-atomic-core/extended-modes.md"
         ).read_text(encoding="utf-8")
+        period = (
+            ROOT / ".claude/skills/_git-atomic-core/period-review-modes.md"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("extended-modes.md", cca)
-        for mode in ("today", "release", "emergency", "learn"):
+        for mode in ("today", "weekly", "release", "emergency", "learn"):
             self.assertIn(f"`{mode}`", cca)
             self.assertIn(f"`{mode}`", modes)
-        self.assertIn("호스트의 로컬 시간대", modes)
+        self.assertIn("호스트 로컬 달력", period)
         self.assertIn("git merge-base --is-ancestor", modes)
         self.assertIn("working tree가 깨끗해도", modes)
         self.assertIn("Guard `finish --allow-dirty`", modes)
         self.assertIn("learn-status-before.z", modes)
         self.assertIn("cmp -s", modes)
         self.assertIn("이 시점에 `finish`하지 않고", cca)
+
+    def test_period_modes_are_shared_by_cr_and_cca(self) -> None:
+        period = (
+            ROOT / ".claude/skills/_git-atomic-core/period-review-modes.md"
+        ).read_text(encoding="utf-8")
+        for command in ("cr", "cca"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("period-review-modes.md", skill)
+            self.assertIn("today", skill)
+            self.assertIn("weekly", skill)
+        self.assertIn("최근 24시간이 아니다", period)
+        self.assertIn("최근 7일이 아니다", period)
+        self.assertIn("period-interaction", period)
+        self.assertIn(
+            "Atomic Commit 계획·메시지·staging·commit·push는 항상 금지",
+            period,
+        )
+        cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn(
+            "기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속",
+            cca,
+        )
 
     def test_all_commands_load_learned_profile(self) -> None:
         for command in ("ccr", "cc", "cr", "cca"):

@@ -1,7 +1,7 @@
 ---
 name: cca
-description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
-argument-hint: "[today|release|emergency|learn] [추가 맥락] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/weekly/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
+argument-hint: "[today|weekly|release|emergency|learn] [추가 맥락] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -39,6 +39,7 @@ allowed-tools:
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
+  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
 ---
 
 # `/cca` — CommitForge All
@@ -73,6 +74,7 @@ $ARGUMENTS
 14. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
 15. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
 16. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
+17. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`weekly`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -83,7 +85,7 @@ $ARGUMENTS
 
 ## 0. 인자 해석
 
-- 첫 번째 위치 인자가 `today`, `release`, `emergency`, `learn`이면 `extended-modes.md`의 해당 흐름을 적용한다.
+- 첫 번째 위치 인자가 `today`, `weekly`, `release`, `emergency`, `learn`이면 `extended-modes.md`의 해당 흐름을 적용한다.
 - 확장 모드가 아니면 아래 기본 `/cca` 흐름을 적용한다.
 - 일반 문장은 구현 의도, 사용자 요구, commit 메시지 맥락으로 사용한다.
 - `--scope <경로...>`: 지정 범위 중심으로 처리하되 필수 의존성은 분석한다.
@@ -94,17 +96,19 @@ $ARGUMENTS
 - `--iterations N`: 리뷰-수정 반복 상한. 기본 3, 최소 1, 최대 5.
 - `--keep-snapshot`: 성공 후 snapshot을 보존한다.
 - `--format human|json|sarif`, `--output <경로>`: 검증된 추가 보고 형식을 생성한다.
+- `--all-authors`, `--week-start`, `--timezone`: `today`·`weekly` 기간 계산과 작성자 범위에만 적용한다.
 - 알 수 없는 옵션은 자연어 맥락으로 취급한다.
 - 새 dependency 설치, 외부 서비스 변경, 데이터 파괴 작업은 인자로 명시돼도 별도 안전 판단 없이 수행하지 않는다.
 
 ### 확장 모드 분기
 
-- `today`: 오늘의 기존 commit을 읽기 전용으로 분석하고 현재 미커밋 변경만 아래 기본 파이프라인으로 commit한다. 기존 commit은 재작성하지 않는다.
+- `today`: 오늘의 기존 commit을 기본·조건부 reviewer로 읽기 전용 심층 분석하고 현재 미커밋 변경만 아래 기본 파이프라인으로 commit한다. 기존 commit은 재작성하지 않는다.
+- `weekly`: 이번 주의 기존 commit을 날짜·domain·net effect와 기본·조건부 reviewer로 심층 분석하고 현재 미커밋 변경만 commit한다.
 - `release`: 최근 tag 또는 `--from <ref>` 이후와 현재 변경을 검토한다. 현재 변경만 commit하고 버전 제안·릴리스 노트 초안을 반환한다.
 - `emergency`: 아래 파이프라인을 최소 hotfix 범위로 제한하고 보안·정확성·데이터 무결성·직접 회귀 검증을 우선한다.
 - `learn`: 기본 리뷰/commit 파이프라인을 실행하지 않는다. history를 분석해 `.commitforge/profile.md`만 생성·갱신하고 stage/commit하지 않는다.
 
-`today`, `release`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
+`today`, `weekly`, `release`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
 
 `allowed-tools`에 없는 프로젝트별 테스트·lint·build 명령은 사용할 수 없는 것이 아니다. Claude Code 권한 설정에 따라 사용자 승인을 요청한 뒤 실행한다. 승인을 받지 못하거나 실행할 수 없으면 해당 검증을 생략했다고 명시하며, 필수 검증이 없는 `emergency` 작업을 성공으로 처리하지 않는다.
 
@@ -122,6 +126,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" begin \
 - `ok: false`면 즉시 중단한다.
 - merge/rebase/cherry-pick/revert/bisect, Git lock, 동일 worktree의 다른 `/cc`·`/cca` 실행이 있으면 자동 해결하지 않는다.
 - 이후 실패·중단 시 `abort`로 자신의 lock만 해제하고 원본 Diff snapshot은 보존한다.
+- `today`·`weekly`는 Guard를 획득한 뒤 `period_range.py`로 경계를 확정하고 기간 commit 원장을 수집한다.
 
 ## 2. 저장소·변경 전체 스캔
 
@@ -160,11 +165,11 @@ policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 c
 - 위험 파일과 binary/submodule/LFS
 - scope 밖 의존성
 
-변경이 없으면 기본 모드와 `today`·`release`는 guard `finish`로 정리한다. 기본 모드는 종료하고, `today`와 `release`는 사전 분석한 기존 commit 범위의 모드별 보고를 완료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
+변경이 없으면 기본 모드와 `release`는 guard `finish`로 정리한다. 기본 모드는 종료하고 `release`는 사전 분석한 범위 보고를 완료한다. `today`·`weekly`는 기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속한 뒤 Atomic 계획·commit 없이 `finish`하고 기간 보고를 반환한다. 기간 commit도 없을 때만 즉시 “검토 대상 없음”으로 종료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
 
 ## 3. 병렬 전문 리뷰
 
-가능하면 다음 custom subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다.
+가능하면 다음 custom subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`·`weekly`에서는 동일한 기간 commit 원장·net diff·working tree를 함께 제공하고 finding 원인을 `period-review-modes.md` 형식으로 귀속한다.
 
 1. `cca-git-reviewer`
 2. `cca-correctness-reviewer`
