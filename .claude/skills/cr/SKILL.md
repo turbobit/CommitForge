@@ -101,7 +101,7 @@ $ARGUMENTS
 - 일반 문장은 구현 의도와 리뷰 맥락으로 사용한다.
 - 첫 번째 위치 인자가 `today`, `3days`, `weekly` 중 하나면 `period-review-modes.md`의 기간 범위와 review-only 정책을 적용한다.
 - 첫 번째 위치 인자가 `release`, `emergency`, `learn`이면 `extended-modes.md`의 해당 read-only 흐름을 적용한다. Atomic Commit 계획이나 메시지 초안을 만들지 않는다.
-- `release`: `--from`, `--target`, `--bump`, `--channel`, `--package`, `--tag-prefix`를 검증해 릴리스 위험·다음 version/tag·릴리스 노트만 제안한다. `--prepare`, `--tag`, `--fix`는 실행하지 않는다.
+- `release`: `--from`, `--target`, `--bump`, `--channel`, `--package`, `--tag-prefix`를 검증해 릴리스 위험·다음 version/tag·릴리스 노트를 제안한다. `--prepare --tag`가 있으면 `/cca`가 바꿀 version/CHANGELOG, 만들 commit과 로컬 annotated tag를 시뮬레이션해 보고하되 실행하지 않는다. `--fix`도 실행하지 않는다.
 - `emergency`: incident·severity·base·scope 증거를 바탕으로 원인 후보, rollback/containment, 최소 수정·검증 계획만 제안한다. `--diagnose` 유무와 관계없이 소스를 고치지 않는다.
 - `learn`: `--since`, `--branches`, `--exclude-bots`, `--package`, `--commits` 범위에서 profile 후보와 근거·확신도만 보여주며 프로필 파일을 쓰지 않는다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.

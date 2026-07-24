@@ -13,6 +13,13 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 
 `/cr`과 `/cca`는 모두 `today`, `3days`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다. `/cr release|emergency|learn`은 `--fix`를 붙여도 항상 읽기 전용이고, `/cca`만 명시적인 실행 옵션으로 릴리스 준비·hotfix·프로필 저장을 수행합니다.
 
+> **Release tag 실행 경계**
+>
+> - `/cca release --prepare --tag`만 최종 clean HEAD에 **로컬 annotated tag를 실제 생성**합니다.
+> - `/cr release --prepare --tag`는 같은 준비·tag 실행 결과를 **읽기 전용으로 미리 보고**할 뿐, version 파일·CHANGELOG·commit·tag를 변경하지 않습니다.
+> - `/cr release`만 실행해도 권장 version/tag는 보고합니다. `--prepare --tag`를 붙이면 실제 실행 시 바뀔 파일과 생성될 tag까지 시뮬레이션합니다.
+> - 두 명령 모두 remote tag push, GitHub Release, package publish, deploy는 수행하지 않습니다.
+
 ### 빠른 선택
 
 | 원하는 결과 | 명령 |
@@ -366,13 +373,14 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 ```text
 /cr release --from v1.8.0
 /cr release --channel rc --target 2.0.0-rc.1
+/cr release --target 1.9.0 --prepare --tag
 /cca release --dry-run
 /cca release --target 1.9.0 --prepare
 /cca release --channel rc --target 2.0.0-rc.1 --prepare --tag
 /cca release --package mobile --from mobile-v1.8.0 --bump minor
 ```
 
-`/cr release`는 최근 도달 가능한 tag 또는 검증된 `--from` 이후의 변경을 읽기 전용으로 분석해 다음 version/tag, 릴리스 노트, migration·배포 위험을 제안합니다. `/cca release`도 기본은 분석만 하며, `--prepare`를 명시해야 저장소의 기존 canonical version source와 CHANGELOG를 갱신하고 검증된 Atomic Commit을 만듭니다.
+`/cr release`는 최근 도달 가능한 tag 또는 검증된 `--from` 이후의 변경을 읽기 전용으로 분석해 다음 version/tag, 릴리스 노트, migration·배포 위험을 제안합니다. `/cr release --prepare --tag`는 `/cca`가 실제 실행할 version/CHANGELOG 변경, commit, 로컬 annotated tag를 시뮬레이션해 보고하지만 아무것도 생성하지 않습니다. `/cca release`도 기본은 분석만 하며, `--prepare`를 명시해야 저장소의 기존 canonical version source와 CHANGELOG를 갱신하고 검증된 Atomic Commit을 만듭니다.
 
 tag는 문자열을 추측하지 않고 전용 계산기가 SemVer와 기존 tag를 기준으로 결정합니다. `stable`, `rc`, `beta`, `alpha`, monorepo package prefix를 지원하며 같은 prerelease channel은 `rc.1 → rc.2`처럼 자동 증가합니다. `--tag`는 `--prepare`와 함께만 허용되고 최종 clean HEAD에 로컬 annotated tag를 만듭니다. tag push, GitHub Release, package publish, deploy는 수행하지 않습니다.
 
@@ -457,8 +465,10 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 | `--package <name>` | `/cr release`, `/cca release` | monorepo package 범위와 기본 `<name>-v` tag namespace |
 | `--tag-prefix <prefix>` | `/cr release`, `/cca release` | 명시적 tag 접두사 |
 | `--dry-run` | `/cca release` | 수정·commit·tag 없이 예상 결과만 보고 |
+| `--prepare` | `/cr release` | 실제 변경 없이 version/CHANGELOG 준비 계획을 시뮬레이션해 보고 |
+| `--tag` | `/cr release --prepare` | 실제 생성 없이 예상 로컬 annotated tag와 대상 commit을 보고 |
 | `--prepare` | `/cca release` | version source·CHANGELOG 갱신, 검증, Atomic Commit |
-| `--tag` | `/cca release --prepare` | 최종 HEAD에 로컬 annotated tag 생성; push하지 않음 |
+| `--tag` | `/cca release --prepare` | 최종 HEAD에 로컬 annotated tag를 실제 생성; push하지 않음 |
 
 ### Emergency 옵션
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.9.1 — 2026-07-24
+
+- README 상단에 release tag 실행 경계를 눈에 띄는 안내로 추가
+- `/cca release --prepare --tag`만 로컬 annotated tag를 실제 생성한다고 명시
+- `/cr release --prepare --tag`는 예상 version/CHANGELOG·commit·tag를 읽기 전용으로 시뮬레이션한다고 명시
+- 두 흐름 모두 remote tag push, GitHub Release, publish, deploy를 수행하지 않는 경계 재강조
+
 ## 1.9.0 — 2026-07-24
 
 - `/cr release`, `/cr emergency`, `/cr learn` 읽기 전용 분석 모드 추가

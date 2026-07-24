@@ -179,6 +179,7 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 
 ```text
 /cr release --from <test-tag>
+/cr release --target 1.9.0 --prepare --tag
 /cca release --from <test-tag> --dry-run
 /cca release --target 1.9.0 --prepare
 ```
@@ -186,7 +187,8 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 확인:
 
 - 지정 ref부터 HEAD까지의 범위 표시
-- 첫 두 호출은 HEAD·index·working tree 불변
+- 앞의 세 read-only 호출은 HEAD·index·working tree와 tag refs 불변
+- `/cr --prepare --tag`는 예상 변경 파일·commit·tag 대상만 보고
 - major/minor/patch와 다음 tag 제안 및 자동 증가 근거
 - 릴리스 노트 초안과 차단 요소
 - `--prepare`에서만 version/CHANGELOG 갱신과 Atomic Commit

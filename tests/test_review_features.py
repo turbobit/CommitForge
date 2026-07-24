@@ -196,6 +196,14 @@ class ReviewFeatureTest(unittest.TestCase):
             "`--tag` | `/cca release --prepare`",
             readme,
         )
+        self.assertIn(
+            "/cca release --prepare --tag`만 최종 clean HEAD",
+            readme,
+        )
+        self.assertIn(
+            "/cr release --prepare --tag`는 같은 준비·tag 실행 결과",
+            readme,
+        )
         self.assertIn("│   ├── cr/SKILL.md", readme)
         self.assertIn("│           ├── cr_edit_gate.py", readme)
 

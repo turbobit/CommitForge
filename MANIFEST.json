@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "reproducible": true,
   "file_count": 78,
-  "total_bytes": 361331,
+  "total_bytes": 363903,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -122,8 +122,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/extended-modes.md",
-      "size": 15112,
-      "sha256": "6f42623f294b130490bd49c10ef1cfc733e8805b63d7535384fb91d19cc075da"
+      "size": 15499,
+      "sha256": "84f70c1907e276ca39cb025d541f42d56771c4c6d5e5587631886547d95fe5f9"
     },
     {
       "path": ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
@@ -247,8 +247,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 16096,
-      "sha256": "c6a73432626f3d35638e9139c8ead211cd6f031284ec957abd0e98b5b9d5aa6c"
+      "size": 16238,
+      "sha256": "b3ab329efcab45f66fd666e9fc2e7f40c96d649237a618ad63c43886a9e44550"
     },
     {
       "path": ".gitattributes",
@@ -267,8 +267,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 8140,
-      "sha256": "96b8f44cf4c997703e7b549f3178f285ff88a0f54d6e3cc1de3ca28fd9d7dfa9"
+      "size": 8572,
+      "sha256": "e07e7f6e8e2c4a85f5633107108514b2c9c64b5793f07d4634285cd155c1615e"
     },
     {
       "path": "INSTALL.md",
@@ -277,23 +277,23 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 11116,
-      "sha256": "248a73b159c27465e2e320d38931de27fad4b9b8ddd2465444a960d91884ef13"
+      "size": 11262,
+      "sha256": "66bb00ff9a84e5a4e3eb1b558c02b860d6e42e96e98c434b27816c52629b59a4"
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 5415,
-      "sha256": "60b25b6dea639b34e8f797eda3126c4235a4df17ff3e35bb6d3cbb1a8ccf9dd1"
+      "size": 5522,
+      "sha256": "c443d18ad97978fff421b557ea7641bd53eec3a1eaf3e44537609dcb3668b21f"
     },
     {
       "path": "README.md",
-      "size": 31927,
-      "sha256": "c78648d7c8336091f099f312afd34a9b52a1ea6c106e5f2a5e000507fae461ca"
+      "size": 33033,
+      "sha256": "090f3ac5c8c91836c24968f257ecc0dcf4f51183c2ae93d1087994e8a3258323"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "30f4611383aa30a15753789f40effde81332f2f8714e6d3b2940bf0fc4592377"
+      "sha256": "0ab4fa190ca1b1d1f630ac87cf34672bfbaf1395d0148c7568d38e58335b8d68"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
@@ -372,8 +372,8 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 7144,
-      "sha256": "6ea05327c4643522b21cbe3a7139d42c08c696652bb6adebee778fbf66f4f975"
+      "size": 7396,
+      "sha256": "bd09aaffb358593d3cd2090174d44d3a53efaea3d80b04461e16664870ab2347"
     },
     {
       "path": "uninstall.ps1",

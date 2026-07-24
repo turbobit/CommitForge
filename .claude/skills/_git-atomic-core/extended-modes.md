@@ -52,6 +52,7 @@
 역할:
 
 - `/cr release`: 릴리스 범위·현재 변경·버전·tag·릴리스 위험을 분석하고 보고만 한다.
+- `/cr release --prepare --tag`: 실제 `/cca` 준비 흐름에서 변경할 파일·commit·로컬 annotated tag를 시뮬레이션해 보고하며 저장소는 변경하지 않는다.
 - `/cca release`: 릴리스 후보를 리뷰·검증하며, 명시적 `--prepare`에서만 버전 파일과 CHANGELOG를 갱신해 Atomic Commit한다.
 - `/cca release --tag`: 검증된 release commit에 로컬 annotated tag를 생성한다. push와 publish는 별도 작업이다.
 
@@ -66,6 +67,8 @@
 - `--prepare`: canonical version source와 CHANGELOG를 수정·검증·commit한다.
 - `--tag`: `--prepare`와 함께만 허용하며 최종 HEAD에 로컬 annotated tag를 만든다.
 - `--dry-run`: `/cca`에서도 모든 수정·stage·commit·tag를 금지하고 예상 결과만 보고한다.
+
+위 `--prepare`·`--tag`의 실제 실행 의미는 `/cca`에만 적용한다. `/cr`에 같은 옵션을 전달하면 예상 변경 파일, commit 경계, tag 이름과 대상 commit만 보고한다.
 
 범위 결정:
 
