@@ -13,6 +13,19 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 
 `/cr`은 `today`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
 
+### 빠른 선택
+
+| 원하는 결과 | 명령 |
+|---|---|
+| 변경을 커밋하지 않고 Atomic Commit 구성을 먼저 확인 | `/ccr` |
+| 이미 만든 변경을 수정하지 않고 Atomic Commit으로 생성 | `/cc` |
+| 코드를 바꾸지 않고 현재·기간·PR 변경을 심층 리뷰 | `/cr` |
+| 리뷰에서 확인한 현재 working 문제만 고치고 커밋하지 않음 | `/cr --fix` |
+| 리뷰·안전한 수정·검증·Atomic Commit을 한 번에 실행 | `/cca` |
+| `/cca`에서 소스 수정 없이 blocker만 확인 | `/cca --no-fix` |
+
+`/cr --fix`와 `/cca`의 자동 수정은 현재 working tree가 만든 확정적·국소적 문제로 제한됩니다. 기존 commit을 amend하거나 history를 재작성하지 않습니다.
+
 커밋 메시지는 기본적으로 다음 형태를 사용합니다.
 
 ```text
@@ -49,7 +62,7 @@ type(scope): 한글 제목
 
 Python은 lock, Diff snapshot, untracked 보존, fingerprint, 안전한 cleanup을 담당합니다. Python이 없거나 guard가 실패하면 `/cc`, `/cr`, `/cca`는 변경을 시작하지 않도록 설계했습니다.
 
-`/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged binary diff를 직접 비교합니다. 프롬프트 판단과 별개로 index나 commit이 바뀌었다면 성공과 snapshot 삭제를 차단합니다.
+기본 `/cr` 종료 시에는 Guard가 시작 snapshot과 현재 HEAD·branch·staged/unstaged binary diff, status, untracked content를 직접 비교합니다. 프롬프트 판단과 별개로 저장소 상태가 바뀌었다면 성공과 snapshot 삭제를 차단합니다. `--fix`를 명시한 실행에서도 HEAD·branch·staging 불변 조건은 유지합니다.
 
 ## 설치
 
@@ -92,6 +105,19 @@ Windows PowerShell:
 ```
 
 기존 같은 이름의 skill/agent는 삭제하지 않고 `.claude/.commitforge-backups/<timestamp>/` 아래에 먼저 백업합니다. 이전 버전의 `.cca-backups`도 제거하지 않습니다. 심볼릭 링크 대상은 자동 교체하지 않습니다.
+
+### 업그레이드
+
+CommitForge 저장소를 갱신한 뒤 기존 설치와 같은 범위로 설치 명령을 다시 실행합니다.
+
+```bash
+git pull
+./install.sh project /path/to/repository
+# 또는
+./install.sh global
+```
+
+Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사용합니다. 설치 프로그램은 기존 파일을 먼저 백업합니다. 실행 중인 Claude Code가 새 Skill Hook이나 agent를 찾지 못하면 세션을 한 번 재시작합니다.
 
 ### 수동 설치
 
@@ -277,6 +303,8 @@ Guard + 원본 Diff 보존
 
 JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생성된 결과는 `report_validator.py`로 구조를 검증합니다.
 
+`--output`을 생략하면 machine-readable 결과를 응답의 fenced block으로 반환합니다. 저장소 내부에 출력한 보고서는 `/cca`의 Atomic Commit 대상에 포함하지 않으며 최종 상태에 미커밋 파일로 명시합니다.
+
 ### Baseline과 억제
 
 기존 finding은 `.commitforge/review-baseline.json`에 stable ID, fingerprint, 이유, 소유자, 만료일을 기록해 `BASELINED`로 분리할 수 있습니다. CRITICAL, secret, 인증 우회, 데이터 손실 위험은 baseline으로 억제할 수 없습니다. 시작 예시는 [examples/review-baseline.json](examples/review-baseline.json)입니다.
@@ -314,7 +342,7 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 기본 월요일 00:00부터 현재까지를 날짜·domain·작성자별로 집계합니다. 반복 수정, revert, flaky test, 미완료 기능과 테스트·문서·migration·관측성 공백을 분석하고 현재 미커밋 변경만 commit합니다.
 
-`today`는 최근 24시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start monday|sunday`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
+`today`는 최근 24시간, `weekly`는 최근 7일이 아닙니다. `--timezone <IANA|±HH:MM>`, `--week-start <monday|sunday>`, `--all-authors`로 명시적으로 범위를 조정할 수 있습니다.
 
 #### 릴리스 준비
 
@@ -347,6 +375,8 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 
 이 옵션들은 별도 shell parser가 아니라 Skill이 해석하는 명시적 프롬프트 규약입니다.
 
+### 공통·리뷰 옵션
+
 | 옵션 | 적용 | 의미 |
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
@@ -360,12 +390,33 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 | `--base <ref>` | `/cr` | merge-base부터 HEAD 및 현재 변경 검토 |
 | `--range <A..B>` | `/cr` | 명시한 commit 범위 검토 |
 | `pr` | `/cr` | 현재 GitHub PR의 base/head 범위 검토 |
-| `--format human\|json\|sarif` | `/cr`, `/cca` | 보고서 형식 선택 |
-| `--output <path>` | `/cr`, `/cca` | machine-readable 보고서 저장 |
-| `--all-authors` | `/cr`, `/cca`의 `today|weekly` | 기간 commit의 작성자 제한 제거 |
-| `--week-start monday|sunday` | `/cr weekly`, `/cca weekly` | 주간 달력 시작 요일 |
-| `--timezone <IANA\|±HH:MM>` | `/cr`, `/cca`의 `today|weekly` | 기간 계산 시간대 |
-| `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정 |
+| `--format <human\|json\|sarif>` | `/cr`, `/cca` | 보고서 형식 선택; 기본값은 `human` |
+| `--output <path>` | `/cr`, `/cca` | `--format json` 또는 `--format sarif` 보고서를 파일로 저장 |
+
+`--output`으로 저장소 내부 경로를 지정하면 보고서 파일은 commit 대상에서 제외되고 미커밋 상태로 남습니다. `/cr`은 Guard 불변식 검증과 종료 후, `/cca`는 commit 실행 종료 후 보고서를 생성합니다.
+
+### Today·Weekly 기간 옵션
+
+| 옵션 | 적용 | 의미 |
+|---|---|---|
+| `--all-authors` | `/cr today`, `/cr weekly`, `/cca today`, `/cca weekly` | 기본 Git 사용자 이메일 제한을 제거하고 모든 작성자의 기간 commit 포함 |
+| `--week-start <monday\|sunday>` | `/cr weekly`, `/cca weekly` | 주간 시작 요일 선택; 기본값은 `monday` |
+| `--timezone <IANA\|±HH:MM>` | `/cr today`, `/cr weekly`, `/cca today`, `/cca weekly` | 기간 경계 계산 시간대 지정; 기본값은 호스트 로컬 시간대 |
+
+```text
+/cr today --timezone Asia/Seoul
+/cr weekly --all-authors --week-start sunday
+/cca today --timezone +09:00
+/cca weekly --all-authors --week-start monday
+```
+
+`today`는 선택한 시간대의 오늘 00:00부터 현재까지이며 최근 24시간이 아닙니다. `weekly`는 선택한 시작 요일의 00:00부터 현재까지이며 최근 7일이 아닙니다.
+
+### `/cca` 확장 모드 옵션
+
+| 옵션 | 적용 | 의미 |
+|---|---|---|
+| `--from <ref>` | `/cca release` | 릴리스 분석 시작 ref 지정; 생략하면 HEAD에서 도달 가능한 최근 tag 사용 |
 | `--commits 20-500` | `/cca learn` | 학습할 최근 non-merge commit 수 |
 
 `--no-verify`여도 staged diff 직접 검토, whitespace, secret, 저장소 안전 검사는 생략하지 않습니다.
@@ -472,7 +523,7 @@ commit hook과 서명 설정을 기본적으로 존중합니다.
 
 ## Permission
 
-Skill frontmatter는 invocation turn 동안 필요한 Git 조회·staging·commit 및 guard 실행을 사전 승인합니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
+Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
 
 저장소에 포함된 Skill은 workspace trust를 승인하기 전에 내용을 검토하십시오.
 
@@ -545,7 +596,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 - 같은 worktree를 수정하는 비협조적 외부 프로세스까지 완전히 차단하지 못합니다.
 - 매우 큰 diff는 자동 분할하지만 복잡한 generated source, binary, 초기 unborn branch의 부분 staging은 여전히 제한될 수 있습니다.
 - 프로젝트 테스트 환경이 준비되지 않으면 일부 검증을 수행할 수 없으며 결과에 명시합니다.
-- `/cca` reviewer는 finding을 제안하며 main agent가 근거를 재검증하도록 설계했지만, 자동 리뷰가 인간의 도메인 검토를 완전히 대체하지는 않습니다.
+- `/cr`·`/cca` reviewer는 finding을 제안하며 main agent가 근거를 재검증하도록 설계했지만, 자동 리뷰가 인간의 도메인 검토를 완전히 대체하지는 않습니다.
 
 ## 파일 구조
 
@@ -554,6 +605,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 ├── skills/
 │   ├── cc/SKILL.md
 │   ├── ccr/SKILL.md
+│   ├── cr/SKILL.md
 │   ├── cca/SKILL.md
 │   └── _git-atomic-core/
 │       ├── atomic-commit-rules.md
@@ -575,6 +627,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │       ├── recovery.md
 │       ├── examples.md
 │       └── scripts/
+│           ├── cr_edit_gate.py
 │           ├── guard.py
 │           ├── reviewer_triggers.py
 │           ├── report_validator.py

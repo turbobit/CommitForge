@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "reproducible": true,
   "file_count": 76,
-  "total_bytes": 318232,
+  "total_bytes": 322546,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -262,8 +262,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 5839,
-      "sha256": "1222110b66d71f9e835d0a41a85f2c42f08eb130236a48e42489836ca7cce716"
+      "size": 6427,
+      "sha256": "7fe412158bdd14190c864d1fa9aac6c85c2fe88414500785e77c36963f8928bc"
     },
     {
       "path": "INSTALL.md",
@@ -282,13 +282,13 @@
     },
     {
       "path": "README.md",
-      "size": 23100,
-      "sha256": "0820975c7ec2e3f2ebc20102235edcb3051e1c223df9e6fd92d751b8b8348535"
+      "size": 26243,
+      "sha256": "528638edb193cfe85e0731e8247c66f7acc0e181a9b567d551b6eca8faf78d2c"
     },
     {
       "path": "VERSION",
       "size": 6,
-      "sha256": "bb7320d831e7a151aa901c35e7326c752fa2ef5024f30768c42319b8bed171ed"
+      "sha256": "249182a01164b81a5f7af87e5c5cdbd3344a80a7a66dfca624cecfb1501b2420"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
@@ -362,8 +362,8 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 6007,
-      "sha256": "1edb348058fe26d9bd0d50f76339d101dd9b2afd038f25b1a3debbf1bf57e4ba"
+      "size": 6590,
+      "sha256": "a6068503c6324692f1153e8149323aa32da425f444593d4c4902d850cf527533"
     },
     {
       "path": "uninstall.ps1",

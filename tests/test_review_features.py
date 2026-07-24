@@ -169,6 +169,16 @@ class ReviewFeatureTest(unittest.TestCase):
             json.loads(sunday.stdout)["start"],
         )
 
+    def test_readme_option_tables_escape_pipe_separators(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("`today|weekly`", readme)
+        self.assertNotIn("`--week-start monday|sunday`", readme)
+        self.assertIn("`--week-start <monday\\|sunday>`", readme)
+        self.assertIn("`--timezone <IANA\\|±HH:MM>`", readme)
+        self.assertIn("`--from <ref>` | `/cca release`", readme)
+        self.assertIn("│   ├── cr/SKILL.md", readme)
+        self.assertIn("│           ├── cr_edit_gate.py", readme)
+
 
 if __name__ == "__main__":
     unittest.main()
