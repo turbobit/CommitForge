@@ -55,12 +55,12 @@ git log --oneline --decorate -10
 git show --stat HEAD
 ```
 
-## 4. `/cr --no-fix` 확인
+## 4. `/cr` 기본 read-only 확인
 
 새로운 작은 변경을 만든 뒤:
 
 ```text
-/cr --no-fix 테스트 변경
+/cr 테스트 변경
 ```
 
 확인:
@@ -79,12 +79,12 @@ git show --stat HEAD
 - Guard `verify-review`와 `finish --review-only` 통과
 - commit과 push 없음
 
-## 5. `/cr` 자동 수정 확인
+## 5. `/cr --fix` 자동 수정 확인
 
 의도적으로 명백하고 국소적인 회귀 테스트 누락 또는 null 경계 오류를 만든 테스트 저장소에서:
 
 ```text
-/cr 테스트 변경
+/cr --fix 테스트 변경
 ```
 
 확인:
@@ -139,8 +139,8 @@ commit hook 실패를 재현하거나 작업을 중단합니다.
 오늘과 이번 주에 해당하는 여러 commit, 되돌림 commit, 새 미커밋 변경을 준비합니다.
 
 ```text
-/cr today --no-fix
-/cr weekly --all-authors --no-fix
+/cr today
+/cr weekly --all-authors
 ```
 
 확인:
@@ -229,7 +229,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - 언어별 lifecycle 또는 async API 오류
 
 ```text
-/cr --no-fix 심층 리뷰 시험
+/cr 심층 리뷰 시험
 ```
 
 확인:
@@ -253,7 +253,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 - 명시적인 acceptance criteria와 구현
 
 ```text
-/cr --no-fix 조건부 reviewer 시험
+/cr 조건부 reviewer 시험
 ```
 
 확인:
@@ -265,7 +265,7 @@ history가 있는 테스트 저장소에서 실행합니다.
 
 ## 16. Reviewer 실패와 Finding Schema
 
-테스트 환경에서 선택 reviewer 하나를 사용할 수 없게 한 뒤 `/cr --no-fix`를 실행합니다.
+테스트 환경에서 선택 reviewer 하나를 사용할 수 없게 한 뒤 `/cr`을 실행합니다.
 
 확인:
 
@@ -289,9 +289,9 @@ python3 -m unittest tests.test_release -v
 ## 18. 비교 범위와 PR 리뷰
 
 ```text
-/cr --base main --no-fix
-/cr --range HEAD~2..HEAD --no-fix
-/cr pr --no-fix
+/cr --base main
+/cr --range HEAD~2..HEAD
+/cr pr
 ```
 
 확인:
@@ -304,8 +304,8 @@ python3 -m unittest tests.test_release -v
 ## 19. JSON·SARIF와 Baseline
 
 ```text
-/cr --no-fix --format json --output review.json
-/cr --no-fix --format sarif --output review.sarif
+/cr --format json --output review.json
+/cr --format sarif --output review.sarif
 ```
 
 확인:
@@ -335,6 +335,6 @@ python3 evals/run_evals.py --live --scenario "python mutable default regression"
 
 확인:
 
-- 격리된 임시 저장소에서 `/cr --no-fix` 실행
+- 격리된 임시 저장소에서 기본 read-only `/cr` 실행
 - 기대한 정확성 개념을 finding에서 탐지
 - HEAD와 staged diff가 실행 전후 동일

@@ -28,10 +28,10 @@
 /ccr
 /cc
 /cr
-/cr today --no-fix
-/cr weekly --no-fix
-/cr --base main --no-fix
-/cr pr --no-fix
+/cr today
+/cr weekly
+/cr --base main
+/cr pr
 /cca
 /cca today
 /cca weekly
@@ -59,9 +59,9 @@
 전체 리뷰 자동화는:
 
 ```text
-/cr --no-fix 테스트 변경
+/cr 테스트 변경
 ```
 
-`/cr --no-fix`로 읽기 전용 심층 리뷰를 확인한 뒤 `/cr` 또는 `/cca`를 사용하는 방식이 안전합니다.
+`/cr`은 기본 읽기 전용입니다. 검토 결과를 확인한 뒤 현재 미커밋 변경의 안전한 국소 수정을 원할 때만 `/cr --fix`를 사용합니다.
 
 프로젝트별 리뷰 설정은 `examples/review.yml`을 `.commitforge/review.yml`로 복사해 조정할 수 있습니다. JSON·SARIF 결과가 필요하면 `/cr --format json|sarif --output <경로>`를 사용합니다.

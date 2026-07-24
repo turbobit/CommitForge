@@ -62,8 +62,8 @@ def load_scenarios() -> list[dict]:
         missing = required - set(scenario)
         if missing:
             raise ValueError(f"scenario {index} 필드 누락: {sorted(missing)}")
-        if not scenario["prompt"].startswith("/cr") or "--no-fix" not in scenario["prompt"]:
-            raise ValueError(f"scenario {index}: live eval은 /cr --no-fix만 허용")
+        if not scenario["prompt"].startswith("/cr") or "--fix" in scenario["prompt"]:
+            raise ValueError(f"scenario {index}: live eval은 기본 read-only /cr만 허용")
         for change_index, change in enumerate(scenario.get("committed_changes", [])):
             if not isinstance(change.get("message"), str) or not isinstance(
                 change.get("files"), dict
@@ -107,7 +107,12 @@ def write_files(root: Path, files: dict[str, str]) -> None:
         path.write_text(content, encoding="utf-8")
 
 
-def live_case(scenario: dict, command: list[str], keep_temp: bool) -> dict:
+def live_case(
+    scenario: dict,
+    command: list[str],
+    keep_temp: bool,
+    timeout: int,
+) -> dict:
     temp_path = Path(tempfile.mkdtemp(prefix="commitforge-live-eval-"))
     try:
         run(["git", "init"], temp_path)
@@ -157,7 +162,12 @@ def live_case(scenario: dict, command: list[str], keep_temp: bool) -> dict:
 
         start_head = run(["git", "rev-parse", "HEAD"], temp_path).stdout.strip()
         start_index = run(["git", "diff", "--cached", "--binary"], temp_path).stdout
-        result = run([*command, scenario["prompt"]], temp_path, timeout=300)
+        start_working = run(["git", "diff", "--binary"], temp_path).stdout
+        start_status = run(
+            ["git", "status", "--porcelain=v2", "--untracked-files=all"],
+            temp_path,
+        ).stdout
+        result = run([*command, scenario["prompt"]], temp_path, timeout=timeout)
         output = result.stdout + "\n" + result.stderr
         if result.returncode != 0:
             raise RuntimeError(
@@ -172,8 +182,15 @@ def live_case(scenario: dict, command: list[str], keep_temp: bool) -> dict:
         ]
         end_head = run(["git", "rev-parse", "HEAD"], temp_path).stdout.strip()
         end_index = run(["git", "diff", "--cached", "--binary"], temp_path).stdout
+        end_working = run(["git", "diff", "--binary"], temp_path).stdout
+        end_status = run(
+            ["git", "status", "--porcelain=v2", "--untracked-files=all"],
+            temp_path,
+        ).stdout
         if start_head != end_head or start_index != end_index:
             raise RuntimeError(f"{scenario['name']}: /cr HEAD/index 불변 위반")
+        if start_working != end_working or start_status != end_status:
+            raise RuntimeError(f"{scenario['name']}: /cr read-only working tree 불변 위반")
         if missing_terms:
             raise RuntimeError(
                 f"{scenario['name']}: 기대 개념 누락 {missing_terms}\n{output}"
@@ -202,6 +219,12 @@ def main() -> None:
     )
     parser.add_argument("--scenario")
     parser.add_argument("--keep-temp", action="store_true")
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        help="live scenario당 제한 시간(초, 기본 600)",
+    )
     args = parser.parse_args()
     if not args.check and not args.live:
         parser.error("--check 또는 --live가 필요합니다")
@@ -219,7 +242,9 @@ def main() -> None:
         if not command:
             raise SystemExit("live command가 비어 있습니다")
         for scenario in scenarios:
-            results.append(live_case(scenario, command, args.keep_temp))
+            results.append(
+                live_case(scenario, command, args.keep_temp, args.timeout)
+            )
 
     print(
         json.dumps(

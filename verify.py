@@ -175,6 +175,7 @@ def main() -> None:
     cr_path = ROOT / ".claude/skills/cr/SKILL.md"
     if cr_path.exists():
         cr_text = cr_path.read_text(encoding="utf-8")
+        cr_frontmatter = frontmatter(cr_text)
         for reviewer in (
             "cca-line-reviewer",
             "cca-architecture-reviewer",
@@ -186,7 +187,7 @@ def main() -> None:
             if reviewer not in cr_text:
                 errors.append(f"cr/SKILL.md: {reviewer} 연결 누락")
         for forbidden in ("Bash(git add ", "Bash(git commit "):
-            if forbidden in frontmatter(cr_text):
+            if forbidden in cr_frontmatter:
                 errors.append(f"cr/SKILL.md: 금지 도구 허용 {forbidden.strip()}")
         if "cca-git-reviewer" in cr_text:
             errors.append("cr/SKILL.md: Atomic Commit 전용 git reviewer 연결")
@@ -194,6 +195,22 @@ def main() -> None:
             errors.append("cr/SKILL.md: review-only 출력 경계 누락")
         if "--review-only" not in cr_text or "verify-review" not in cr_text:
             errors.append("cr/SKILL.md: deterministic review invariant 연결 누락")
+        if "[--fix]" not in cr_frontmatter or "[--no-fix]" in cr_frontmatter:
+            errors.append("cr/SKILL.md: 기본 read-only/--fix opt-in 인자 계약 오류")
+        if "기본은 모든 소스 수정을 금지하는 읽기 전용 리뷰" not in cr_text:
+            errors.append("cr/SKILL.md: 기본 read-only 정책 누락")
+        for contract in (
+            "SOURCE_EDIT_ALLOWED=false",
+            "--source-read-only",
+            "cr_edit_gate.py",
+        ):
+            if contract not in cr_text:
+                errors.append(f"cr/SKILL.md: source read-only 강제 계약 누락 {contract}")
+        for required in ("\n  - Edit\n", "\n  - Write\n"):
+            if required not in cr_frontmatter:
+                errors.append(
+                    f"cr/SKILL.md: --fix 편집 도구 사전 승인 누락 {required.strip()}"
+                )
 
     conditional_path = ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
     conditional_reviewers = (

@@ -28,6 +28,10 @@ class ReviewFeatureTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertTrue(payload["ok"])
         self.assertGreaterEqual(payload["scenarios"], 3)
+        scenarios = json.loads(
+            (ROOT / "evals/live-review-scenarios.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(all("--fix" not in item["prompt"] for item in scenarios))
 
     def test_baseline_example_is_valid(self) -> None:
         result = self.run_python(

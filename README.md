@@ -8,7 +8,7 @@ CommitForge는 Claude Code에서 변경 분석, 심층 코드 리뷰, Atomic Com
 |---|---|---:|---:|
 | `/ccr` | Atomic Commit 계획, 분리 기준, 순서, 한글 메시지 초안 | 없음 | 없음 |
 | `/cc` | 현재 변경을 의미 단위로 나눠 여러 commit을 순차 생성 | staging/commit | 없음 |
-| `/cr` | 기본 10개+조건부 전문 심층 리뷰, 확정적 수정, 재리뷰, 검증 | 없음 | 필요 시 있음 |
+| `/cr` | 기본 read-only 심층 리뷰, `--fix` 시 확정적 working 문제 수정·재리뷰 | 없음 | `--fix`만 |
 | `/cca` | 기본 11개+조건부 전문 리뷰, 수정, 검증, Atomic Commit 전체 실행 | staging/commit | 필요 시 있음 |
 
 `/cr`은 `today`, `weekly` 기간 리뷰를 제공하며 `/cca`는 `today`, `weekly`, `release`, `emergency`, `learn` 확장 모드를 제공합니다.
@@ -168,17 +168,19 @@ Windows PowerShell:
 ```
 
 ```text
-/cr --strict 인증 및 세션 처리 변경
+/cr --fix 인증 및 세션 처리 변경
 ```
 
-`/cr`은 Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 심층 리뷰, 확정적 결함의 국소 수정, 전면 재리뷰와 테스트·검증까지만 수행합니다. Atomic Commit 계획과 메시지 초안을 만들지 않으며 Git index, commit, push도 변경하지 않습니다. `--no-fix`를 사용하면 소스까지 완전한 읽기 전용으로 검토합니다.
+`/cr`은 기본적으로 소스를 수정하지 않는 읽기 전용 심층 리뷰입니다. Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 검토하고 테스트·검증합니다. 현재 미커밋 변경에서 발견한 확정적·국소적 문제를 수정하려면 `/cr --fix`처럼 명시해야 합니다. 어느 경우에도 Atomic Commit 계획, 메시지 초안, staging, commit, push는 만들지 않습니다.
+
+기본 모드에서는 Skill 범위의 `PreToolUse` Hook이 `Edit`, `Write`, `NotebookEdit`를 실행 전에 차단합니다. 따라서 프롬프트 준수에만 의존하지 않으며, 자연어로 “수정해 줘”라고 적는 것은 권한을 열지 않습니다. 독립된 `--fix` 옵션만 편집 권한 평가를 통과시킵니다.
 
 기본 working tree 외에도 비교 대상을 지정할 수 있습니다.
 
 ```text
 /cr --base main
-/cr --range v1.4.0..HEAD --no-fix
-/cr pr --no-fix
+/cr --range v1.4.0..HEAD
+/cr pr
 ```
 
 - `--base <ref>`: merge-base부터 현재 HEAD까지의 commit과 현재 변경을 함께 검토
@@ -267,8 +269,8 @@ Guard + 원본 Diff 보존
 ### JSON·SARIF 보고서
 
 ```text
-/cr --no-fix --format json --output review.json
-/cr --base main --no-fix --format sarif --output review.sarif
+/cr --format json --output review.json
+/cr --base main --format sarif --output review.sarif
 /cca --format json --output .git/commitforge-reports/cca.json
 ```
 
@@ -287,8 +289,8 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 #### 오늘·이번 주 심층 리뷰
 
 ```text
-/cr today --no-fix
-/cr weekly --all-authors --no-fix
+/cr today
+/cr weekly --all-authors
 ```
 
 `/cr`은 오늘 또는 이번 주의 기존 commit과 현재 working tree를 함께 심층 리뷰합니다. 기간 commit은 읽기 전용이며 Atomic Commit 계획·staging·commit을 만들지 않습니다. working tree가 깨끗해도 기간 commit이 있으면 검토합니다.
@@ -348,7 +350,8 @@ JSON은 `commitforge-review/v1`, SARIF는 2.1.0 계약을 사용합니다. 생�
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
 | `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
-| `--no-fix` | `/cr`, `/cca` | 소스 수정 금지; blocker에서 중단 |
+| `--fix` | `/cr` | 현재 working hunk의 확정적·국소 문제 수정 허용 |
+| `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
 | `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |
 | `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
 | `--iterations 1-5` | `/cr`, `/cca` | 리뷰-수정 반복 상한, 기본 3 |

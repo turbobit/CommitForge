@@ -19,6 +19,8 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - `.cca-snapshot.json`: 소유 세션, HEAD, branch, fingerprint
 
 `.cca-snapshot.json`의 `snapshot_files`에는 복구 자산별 크기와 SHA-256이 저장된다. 복구 전 `guard.py audit-snapshot`을 실행해 snapshot 자체가 생성 후 변조되거나 손상되지 않았는지 확인한다.
+
+기본 `/cr`의 `--source-read-only` 실패는 소스·working diff·untracked 내용이 시작 상태와 달라졌다는 뜻이다. 자동 복원하지 말고 snapshot과 현재 상태를 비교해 원인을 보고한 뒤 `abort`로 snapshot을 보존한다.
 - `staged.diff`: 작업 시작 시 index 변경
 - `working.diff`: 작업 시작 시 index 대비 working tree 변경
 - `status.txt`

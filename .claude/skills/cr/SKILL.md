@@ -1,7 +1,7 @@
 ---
 name: cr
-description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 today/weekly/branch/range/PR 범위를 심층 리뷰하고 확정적 working-tree 문제만 수정·재리뷰·검증하며 Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
-argument-hint: "[today|weekly|pr] [추가 맥락] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 today/weekly/branch/range/PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정·재리뷰·검증한다. Atomic Commit 계획, staging, commit, push는 하지 않는다. 사용자가 직접 /cr로 요청할 때만 실행한다.
+argument-hint: "[today|weekly|pr] [추가 맥락] [--fix] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -33,6 +33,12 @@ allowed-tools:
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
+hooks:
+  PreToolUse:
+    - matcher: "Edit|Write|NotebookEdit"
+      hooks:
+        - type: command
+          command: 'python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/cr_edit_gate.py"'
 ---
 
 # `/cr` — CommitForge Review
@@ -45,12 +51,22 @@ $ARGUMENTS
 
 **ultrathink.** `/cca`의 심층 품질 파이프라인 중 리뷰·수정·재리뷰·검증만 수행한다.
 
+## 수정 권한 Gate
+
+`$ARGUMENTS`에 독립된 옵션 token `--fix`가 정확히 존재하는지 먼저 판정한다.
+
+- 없으면 `SOURCE_EDIT_ALLOWED=false`다. `Edit`·`Write`로 source, test, config, docs 또는 untracked 파일을 생성·수정·삭제하지 않는다.
+- 있으면 `SOURCE_EDIT_ALLOWED=true`지만 현재 working hunk가 만든 확정적·국소 문제만 수정할 수 있다.
+- 자연어의 “고쳐”, `fix`, `수정`은 `--fix`를 대신하지 않는다.
+- report output은 Guard 불변식 검증과 `finish`가 성공한 뒤 마지막에 생성한다.
+
 결과 경계:
 
-- 수행: 전체 diff 분석, 기본 10개 관점과 변경 유형별 조건부 전문 리뷰, 확정적 결함의 국소 수정, 재리뷰, 테스트·검증
+- 기본 수행: 전체 diff 분석, 기본 10개 관점과 변경 유형별 조건부 전문 리뷰, 테스트·검증
+- `--fix` 수행: 현재 working tree가 만든 확정적 결함의 국소 수정과 전면 재리뷰
 - 금지: Atomic Commit 계획, commit 메시지 초안, `git add`, index 변경, `git commit`, push, amend, rebase, squash, history rewrite
 - 종료 시 HEAD와 staging area는 시작 상태와 같아야 한다.
-- 소스를 수정했다면 working tree에는 검증된 수정 결과가 남을 수 있다.
+- `--fix`를 명시해 소스를 수정했다면 working tree에는 검증된 수정 결과가 남을 수 있다.
 
 ## 필수 지침 로드
 
@@ -81,12 +97,14 @@ $ARGUMENTS
 - 첫 번째 위치 인자가 `today` 또는 `weekly`이면 `period-review-modes.md`의 기간 범위와 review-only 정책을 적용한다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.
 - `--base <ref>`: `merge-base(<ref>, HEAD)..HEAD`와 현재 working change를 함께 리뷰한다.
-- `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 자동으로 `--no-fix`다.
+- `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 `--fix`를 허용하지 않는다.
 - 첫 인자가 `pr`이면 `gh pr view --json baseRefName,headRefName,number,url`로 현재 PR의 base를 읽어 `--base`처럼 처리한다. PR을 찾지 못하면 변경하지 말고 base를 요청한다.
 - `--format human|json|sarif`과 `--output`은 `reporting-formats.md`를 따른다.
 - `--all-authors`, `--week-start`, `--timezone`은 `today`·`weekly`에서만 적용한다.
-- 기본은 현재 변경이 만든 확정적 CRITICAL/MAJOR 문제만 국소 수정한다.
-- `--no-fix`는 모든 소스 수정을 금지한다.
+- 기본은 모든 소스 수정을 금지하는 읽기 전용 리뷰다.
+- `--fix`를 명시한 경우에만 현재 working hunk가 만든 확정적·국소적 CRITICAL/MAJOR 문제를 수정할 수 있다.
+- `--fix`가 없으면 blocker를 보고하고 소스는 그대로 둔다.
+- 과거 commit·기간·PR 범위의 문제만으로 새 corrective change를 만들지 않는다.
 - `--strict`는 확인된 MINOR도 해결하거나 명시적으로 차단한다.
 - `--iterations N`은 리뷰-수정 반복 상한이며 기본 3, 최소 1, 최대 5다.
 - `--no-verify`는 프로젝트 테스트·lint·build를 생략할 수 있지만 diff·secret·safety 검사는 유지한다.
@@ -175,11 +193,11 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 
 `review-gates.md`를 적용한다.
 
-- CRITICAL/MAJOR: 차단하거나 안전하게 수정
+- CRITICAL/MAJOR: 기본은 차단·보고하고, `--fix`일 때만 허용 범위 안에서 안전하게 수정
 - MINOR: scope와 위험에 따라 수정 또는 기록
 - NOTE: 범위를 확대하지 않고 기록
 
-자동 수정은 현재 변경이 만든 문제이고, 실패 시나리오와 검증법이 명확하며, 국소적이고 원래 의도를 보존할 때만 허용한다.
+자동 수정은 `--fix`가 명시됐고 현재 working hunk가 만든 문제이며, 실패 시나리오와 검증법이 명확하고 국소적이며 원래 의도를 보존할 때만 허용한다.
 
 수정 후에는:
 
@@ -209,8 +227,11 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" verify-review \
   --session "<session>" \
   --token "<token>" \
-  --snapshot "<snapshot>"
+  --snapshot "<snapshot>" \
+  --source-read-only
 ```
+
+기본 `/cr`은 반드시 `--source-read-only`를 사용한다. 사용자가 `--fix`를 명시한 경우에만 이 flag를 생략한다.
 
 검증 항목:
 
@@ -226,10 +247,11 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>" \
-  --review-only
+  --review-only \
+  --source-read-only
 ```
 
-`finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
+기본 `/cr`은 `finish`에도 반드시 `--source-read-only`를 사용하고, `--fix`일 때만 생략한다. `finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
 
 불변식 위반, 검증 실패, unresolved blocker이면 `abort`로 lock만 해제하고 snapshot을 보존한다.
 
@@ -245,6 +267,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 - 현재 working tree 상태
 - snapshot 삭제/보존과 lock 해제
 - Atomic Commit 계획, staging, commit, push를 하지 않았음
+- `--fix` 요청 여부와 실제 수정 파일
 - `today`·`weekly`이면 정확한 기간 경계, 작성자 조건, commit 원장, net effect와 finding 귀속
 
 JSON/SARIF를 생성했다면 `report_validator.py` 검증 결과와 출력 경로를 포함한다.

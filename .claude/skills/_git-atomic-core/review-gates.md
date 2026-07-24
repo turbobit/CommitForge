@@ -163,7 +163,7 @@
 
 ## 4. 자동 수정 정책
 
-`/cr`과 `/cca` 기본 동작은 다음 범위의 확정적 문제를 안전하게 수정할 수 있다.
+`/cr`은 기본 읽기 전용이며 `--fix`를 명시한 경우에만, `/cca`는 기본 동작에서 다음 범위의 확정적 문제를 안전하게 수정할 수 있다.
 
 - diff가 의도한 동작과 명백히 모순되는 오류
 - 누락된 직접 호출부·타입 오류
@@ -182,7 +182,8 @@
 - unrelated pre-existing issue
 - 데이터 파괴적 migration
 
-`--no-fix`가 있으면 어떤 소스 수정도 하지 않고 blocking finding에서 중단한다.
+- `/cr`: `--fix`가 없으면 어떤 소스 수정도 하지 않고 blocking finding을 보고한다.
+- `/cca`: `--no-fix`가 있으면 어떤 소스 수정도 하지 않고 blocking finding에서 중단한다.
 
 수정 후에는 모든 reviewer 결과를 폐기하고 현재 diff를 다시 리뷰한다.
 

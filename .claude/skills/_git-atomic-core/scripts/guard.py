@@ -447,6 +447,8 @@ def review_invariants(
     ctx: dict[str, Path],
     snapshot: Path,
     metadata: dict[str, Any],
+    *,
+    source_read_only: bool = False,
 ) -> dict[str, Any]:
     start_head = metadata.get("head", "")
     start_branch = metadata.get("branch", "")
@@ -462,6 +464,27 @@ def review_invariants(
         "branch_unchanged": current_branch_value == start_branch,
         "staged_diff_unchanged": current_staged == start_staged,
     }
+    if source_read_only:
+        start_working = (snapshot / "working.diff").read_bytes()
+        current_working = run_git(
+            ["diff", "--binary", "--full-index", "--no-ext-diff"],
+            cwd=ctx["root"],
+        )
+        start_status = (snapshot / "status-porcelain-v2.z").read_bytes()
+        current_status = run_git(
+            ["status", "--porcelain=v2", "-z", "--untracked-files=all"],
+            cwd=ctx["root"],
+        )
+        current_untracked, _ = untracked_manifest(ctx["root"])
+        checks.update(
+            {
+                "working_diff_unchanged": current_working == start_working,
+                "status_unchanged": current_status == start_status,
+                "untracked_content_unchanged": (
+                    current_untracked == metadata.get("untracked_manifest", [])
+                ),
+            }
+        )
     return {
         "ok": all(checks.values()),
         "checks": checks,
@@ -478,7 +501,12 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
     verify_owner(ctx, session, args.token)
     snapshot = Path(args.snapshot)
     metadata = validate_snapshot(ctx, snapshot, session, args.token)
-    result = review_invariants(ctx, snapshot, metadata)
+    result = review_invariants(
+        ctx,
+        snapshot,
+        metadata,
+        source_read_only=args.source_read_only,
+    )
     if not result["ok"]:
         failed = [name for name, passed in result["checks"].items() if not passed]
         raise GuardError(
@@ -541,6 +569,8 @@ def cmd_finish(args: argparse.Namespace) -> None:
     verify_owner(ctx, session, args.token)
     snapshot = Path(args.snapshot)
     metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    if args.source_read_only and not args.review_only:
+        raise GuardError("--source-read-only는 --review-only와 함께 사용해야 합니다.")
     audit_result = None
     if isinstance(metadata.get("snapshot_files"), dict):
         audit_result = audit_snapshot(snapshot, metadata)
@@ -554,7 +584,12 @@ def cmd_finish(args: argparse.Namespace) -> None:
 
     review_result = None
     if args.review_only:
-        review_result = review_invariants(ctx, snapshot, metadata)
+        review_result = review_invariants(
+            ctx,
+            snapshot,
+            metadata,
+            source_read_only=args.source_read_only,
+        )
         if not review_result["ok"]:
             failed = [
                 name for name, passed in review_result["checks"].items() if not passed
@@ -648,6 +683,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Require HEAD, branch, and staged diff to match the snapshot",
     )
+    finish.add_argument(
+        "--source-read-only",
+        action="store_true",
+        help="Also require working diff, status, and untracked content to match",
+    )
     finish.add_argument("--keep-snapshot", action="store_true")
 
     verify_review = sub.add_parser(
@@ -657,6 +697,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify_review.add_argument("--session", required=True)
     verify_review.add_argument("--token", required=True)
     verify_review.add_argument("--snapshot", required=True)
+    verify_review.add_argument("--source-read-only", action="store_true")
 
     audit = sub.add_parser(
         "audit-snapshot",

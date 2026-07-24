@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.0 — 2026-07-24
+
+- `/cr`의 기본 동작을 소스 수정 없는 read-only 리뷰로 변경
+- 현재 working hunk의 확정적·국소 문제 수정은 `--fix`를 명시한 경우에만 허용
+- `/cr today`, `weekly`, `--base`, `--range`, `pr`도 같은 opt-in 수정 정책 적용
+- committed range finding만으로 corrective working change를 자동 생성하지 않는 경계 강화
+- Skill 범위 PreToolUse Hook이 기본 `/cr`의 Edit·Write·NotebookEdit 호출을 실행 전에 차단
+- `/cca`는 기존 기본 수정 정책과 `--no-fix` 옵션 유지
+- Live eval에서 별도 `--no-fix` 없이 `/cr`의 HEAD·index·working tree 불변 검증
+
 ## 1.6.0 — 2026-07-24
 
 - `/cr today`, `/cr weekly` 기간 심층 리뷰 모드 추가

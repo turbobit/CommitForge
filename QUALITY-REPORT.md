@@ -2,6 +2,10 @@
 
 ## 완료한 자동 검증
 
+- `/cr` 기본 read-only와 명시적 `--fix` opt-in 수정 계약 검증
+- `/cr` frontmatter의 `--fix`와 `/cca --no-fix` 독립 정책 검증
+- 기본 `/cr` 편집 도구 호출을 Skill 범위 PreToolUse Hook으로 실행 전 차단
+- Live eval의 HEAD·index·working diff·status 불변 검증
 - `/cr`·`/cca` today/weekly 공통 기간 규칙과 명령 연결 검증
 - today·weekly 월요일·weekly 일요일 고정 시각 경계 회귀 검증
 - 기간 commit 불변, `/cr` Atomic 계획 금지, `/cca` working-only commit 경계 검증
@@ -31,8 +35,8 @@
 - 대형 diff shard/cross-file 집계 규칙 연결 검증
 - snapshot inventory SHA-256 감사와 변조 차단 검증
 - 실제 Claude Code 평가 scenario 계약 검증
-- 실제 Claude Code CLI + Sonnet으로 Python mutable-default 회귀 `/cr --no-fix` E2E 통과
-- 실제 Claude Code CLI + Sonnet으로 clean working tree의 `/cr today --no-fix` 기간 커밋 회귀 E2E 통과
+- 실제 Claude Code CLI + Sonnet으로 Python mutable-default 회귀 기본 read-only `/cr` E2E 통과
+- 실제 Claude Code CLI + Sonnet으로 clean working tree의 기본 read-only `/cr today` 기간 커밋 회귀 E2E 통과
 
 ### Guard 통합 테스트
 
@@ -68,7 +72,7 @@
 
 ## 선택적 실제 모델 평가
 
-`evals/run_evals.py`는 격리된 임시 Git 저장소에 CommitForge를 설치하고 실제 Claude Code CLI로 `/cr --no-fix`를 호출하는 opt-in 평가를 제공합니다. CI에서는 비용과 인증 의존성을 피하기 위해 scenario·trigger 계약만 검증합니다.
+`evals/run_evals.py`는 격리된 임시 Git 저장소에 CommitForge를 설치하고 실제 Claude Code CLI로 기본 read-only `/cr`을 호출하는 opt-in 평가를 제공합니다. CI에서는 비용과 인증 의존성을 피하기 위해 scenario·trigger 계약만 검증합니다.
 
 Claude Code 계정·권한·모델 변화가 결과에 영향을 줄 수 있으므로 live 결과는 고정적인 단위 테스트가 아니라 보조 품질 신호로 취급합니다. 중요한 저장소에서는 별도 worktree에서 수동 체크리스트도 함께 수행하십시오.
 

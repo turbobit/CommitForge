@@ -227,6 +227,59 @@ class GuardIntegrationTest(unittest.TestCase):
             "--snapshot", branch_changed["snapshot"],
         )
 
+    def test_source_read_only_preserves_working_tree(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nreview target\n", encoding="utf-8")
+        _, started = self.guard("begin", "--session", "source-read-only")
+
+        _, verified = self.guard(
+            "verify-review",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--source-read-only",
+        )
+        self.assertTrue(verified["checks"]["working_diff_unchanged"])
+        self.assertTrue(verified["checks"]["untracked_content_unchanged"])
+
+        (self.tmp / "tracked.txt").write_text(
+            "base\nreview target\nforbidden fix\n",
+            encoding="utf-8",
+        )
+        proc, payload = self.guard(
+            "verify-review",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--source-read-only",
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("working_diff_unchanged", payload["error"])
+
+        (self.tmp / "tracked.txt").write_text("base\nreview target\n", encoding="utf-8")
+        (self.tmp / "unexpected.txt").write_text("new\n", encoding="utf-8")
+        proc, payload = self.guard(
+            "verify-review",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--source-read-only",
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertIn("status_unchanged", payload["error"])
+        (self.tmp / "unexpected.txt").unlink()
+
+        _, finished = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--review-only",
+            "--source-read-only",
+        )
+        self.assertTrue(finished["review_invariants"]["ok"])
+
     def test_linked_worktrees_use_independent_locks(self) -> None:
         linked = self.tmp.parent / f"{self.tmp.name}-linked"
         run(["git", "worktree", "add", "-b", "linked-test", str(linked)], self.tmp)

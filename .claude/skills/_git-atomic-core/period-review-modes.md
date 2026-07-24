@@ -60,8 +60,8 @@ finding에는 원인을 다음 중 하나로 귀속한다.
 
 - 기간 commit과 현재 working tree를 함께 심층 리뷰한다.
 - 기간 commit과 그로 인한 현재 HEAD 문제는 읽기 전용이다. history를 수정하거나 자동 corrective change를 만들지 않는다.
-- 현재 working hunk가 만든 확정적 문제만 기본 `/cr` 정책에 따라 국소 수정할 수 있다.
-- `--no-fix`이면 working tree도 수정하지 않는다.
+- 기본은 working tree를 포함한 전체 읽기 전용 리뷰다.
+- `--fix`를 명시한 경우에만 현재 working hunk가 만든 확정적 문제를 `/cr` 정책에 따라 국소 수정할 수 있다.
 - Atomic Commit 계획·메시지·staging·commit·push는 항상 금지한다.
 - working tree가 깨끗해도 기간 commit이 있으면 리뷰를 수행한다.
 - 기간 commit이 없고 working tree도 깨끗할 때만 “검토 대상 없음”으로 종료한다.

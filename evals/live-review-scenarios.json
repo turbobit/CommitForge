@@ -7,9 +7,9 @@
     "changed_files": {
       "service.py": "def collect(item, values=[]):\n    values.append(item)\n    return values\n"
     },
-    "prompt": "/cr --no-fix Python 기본 인자 변경을 엄격히 리뷰",
+    "prompt": "/cr Python 기본 인자 변경을 엄격히 리뷰",
     "expected_terms": [
-      ["mutable default", "기본 인자"],
+      ["mutable default", "기본 인자", "가변 기본 인수"],
       ["공유", "shared", "상태"]
     ],
     "expected_reviewers": ["cca-correctness-reviewer", "cca-language-api-reviewer"]
@@ -22,7 +22,7 @@
     "changed_files": {
       "db/migrations/002_drop_legacy.sql": "ALTER TABLE users DROP COLUMN legacy_name;\n"
     },
-    "prompt": "/cr --no-fix 데이터 마이그레이션 위험을 엄격히 리뷰",
+    "prompt": "/cr 데이터 마이그레이션 위험을 엄격히 리뷰",
     "expected_terms": [
       ["데이터", "data"],
       ["drop", "삭제", "손실", "rollback"]
@@ -43,7 +43,7 @@
       }
     ],
     "changed_files": {},
-    "prompt": "/cr today --no-fix --timezone +09:00 오늘 커밋 회귀를 엄격히 리뷰",
+    "prompt": "/cr today --timezone +09:00 오늘 커밋 회귀를 엄격히 리뷰",
     "expected_terms": [
       ["mutable default", "기본 인자"],
       ["공유", "shared", "상태"],

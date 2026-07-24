@@ -34,7 +34,7 @@
 
 - `--output <path>`가 있으면 해당 파일에 기록한다.
 - 경로가 없으면 응답의 fenced JSON으로 반환한다.
-- 저장소 안 파일을 생성했다면 `/cr` working change로 명시한다.
+- `/cr` report output은 Guard 불변식 검증과 `finish`가 성공한 뒤 생성한다. 저장소 안 파일이면 의도적인 새 working change로 명시한다.
 - `/cca` 보고서는 Atomic Commit 대상에서 제외하며 commit 실행이 끝난 뒤 생성한다. 저장소 내부 경로를 명시했다면 결과 파일은 미커밋 상태로 남기고 보고한다.
 - `.git/commitforge-reports/`를 기본 임시 위치로 사용할 수 있다.
 - 생성 후 `report_validator.py`로 검증한다.

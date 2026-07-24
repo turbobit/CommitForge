@@ -58,6 +58,10 @@ class PackageMetadataTest(unittest.TestCase):
             "Atomic Commit 계획·메시지·staging·commit·push는 항상 금지",
             period,
         )
+        self.assertIn(
+            "`--fix`를 명시한 경우에만 현재 working hunk",
+            period,
+        )
         cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
         self.assertIn(
             "기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속",
@@ -84,6 +88,15 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("Atomic Commit 계획이나 메시지 후보를 만들지 않는다", cr)
         self.assertNotIn("Bash(git add ", frontmatter)
         self.assertNotIn("Bash(git commit ", frontmatter)
+        self.assertIn("[--fix]", frontmatter)
+        self.assertNotIn("[--no-fix]", frontmatter)
+        self.assertIn("기본은 모든 소스 수정을 금지하는 읽기 전용 리뷰", cr)
+        self.assertIn("`--fix`를 명시한 경우에만", cr)
+        self.assertIn("SOURCE_EDIT_ALLOWED=false", cr)
+        self.assertIn("--source-read-only", cr)
+        self.assertIn("cr_edit_gate.py", cr)
+        self.assertIn("\n  - Edit\n", frontmatter)
+        self.assertIn("\n  - Write\n", frontmatter)
 
         gates = (
             ROOT / ".claude/skills/_git-atomic-core/review-gates.md"
