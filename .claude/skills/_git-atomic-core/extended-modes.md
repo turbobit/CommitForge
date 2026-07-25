@@ -93,7 +93,7 @@ git diff --stat <from>..HEAD
 4. 모델이 tag 문자열을 직접 조합하지 않는다. 다음 계산기의 JSON 결과를 사용한다.
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" \
+python3 "<absolute-CF_CORE>/scripts/release_version.py" \
   --bump <major|minor|patch> \
   [--target <semver>] [--channel <stable|rc|beta|alpha>] \
   [--package <name>] [--tag-prefix <prefix>]
@@ -256,8 +256,8 @@ python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" \
 Guard 명령:
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" begin \
-  --session "${CLAUDE_SESSION_ID}"
+bash "<absolute-CF_CORE>/scripts/guard.sh" begin \
+  --session "<current-session-id>"
 git diff --cached --binary --full-index -- . \
   ':(exclude).commitforge/profile.md' \
   ':(exclude).commitforge/profile.json' > "<snapshot>/learn-staged-before.diff"
@@ -271,7 +271,7 @@ git status --porcelain=v2 -z --untracked-files=all -- . \
 cmp -s "<snapshot>/learn-staged-before.diff" "<snapshot>/learn-staged-after.diff"
 cmp -s "<snapshot>/learn-working-before.diff" "<snapshot>/learn-working-after.diff"
 cmp -s "<snapshot>/learn-status-before.z" "<snapshot>/learn-status-after.z"
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
+bash "<absolute-CF_CORE>/scripts/guard.sh" finish \
   --session "<session>" --token "<token>" --snapshot "<snapshot>" --allow-dirty
 ```
 

@@ -1,7 +1,7 @@
 ---
 name: cc
 description: 현재 Git 변경사항 전체를 분석하고 의미·기능별로 분리해 한글 제목과 상세한 한글 본문의 여러 Atomic Commit을 순차 생성한다. 사용자가 직접 /cc로 커밋 실행을 요청할 때만 사용한다.
-argument-hint: "[추가 맥락] [--scope <경로...>] [--no-verify] [--keep-snapshot]"
+argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--no-verify] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: high
@@ -27,7 +27,7 @@ allowed-tools:
   - Bash(git apply --check *)
   - Bash(git commit *)
   - Bash(git diff-tree *)
-  - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
 ---
 
 # `/cc` — CommitForge Atomic Commit 실행기
@@ -40,16 +40,37 @@ $ARGUMENTS
 
 이 명령은 **현재 변경을 편집하지 않고**, staging과 commit만 수행해 여러 개의 의미 단위 커밋을 만든다. 하나의 커밋으로 합치는 것이 목표가 아니다. 모든 의도된 변경이 소진될 때까지 반복한다.
 
+## Skill 경로 확정 (필수 Preflight)
+
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
+`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
+치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
+
+다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
+
+1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
+2. 실패하면 `Glob`으로 `**/_git-atomic-core/scripts/guard.py`를 찾아 다시 정한다.
+3. 이후 모든 `.claude/skills/_git-atomic-core`를 확정된 `CF_CORE` 절대경로로 바꾼다.
+
+둘 다 실패하면 fail-closed다. core 미설치로 보고하고 즉시 종료하며, 경로 해석 실패를 이유로
+Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수행하지 않는다.
+
+## `clean` 조기 종료
+
+첫 번째 위치 인자가 정확히 `clean`이면
+`.claude/skills/_git-atomic-core/lock-cleanup.md`만 읽어 잠금 정리를
+실행하고 즉시 종료한다. Guard `begin`, staging과 commit은 실행하지 않는다.
+
 ## 필수 지침 로드
 
 작업 전에 다음 파일을 읽고 적용한다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/atomic-commit-rules.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/staging-strategy.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/commit-message-guide.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
-5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
-6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
+1. `.claude/skills/_git-atomic-core/atomic-commit-rules.md`
+2. `.claude/skills/_git-atomic-core/staging-strategy.md`
+3. `.claude/skills/_git-atomic-core/commit-message-guide.md`
+4. `.claude/skills/_git-atomic-core/safety-and-concurrency.md`
+5. `.claude/skills/_git-atomic-core/project-profiles.md`
+6. `.claude/skills/_git-atomic-core/reporting.md`
 
 규칙이 충돌하면 안전·작업 유실 방지 규칙을 최우선으로 한다.
 
@@ -69,14 +90,28 @@ $ARGUMENTS
 다음을 실행한다.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" begin \
-  --session "${CLAUDE_SESSION_ID}"
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
+  --session "<current-session-id>"
 ```
 
 JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`를 작업 완료까지 보관한다.
 
 - `ok: false`이면 어떤 Git 변경도 수행하지 않고 원인을 보고한다.
+- Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
+  `No such file or directory`, `command not found`, Python 미탐지, permission
+  거부가 여기에 해당한다. Guard를 생략하고 진행하지 않는다. Preflight로 `CF_CORE`를
+  다시 확정해 한 번만 재시도하고, 그래도 실패하면 종료한다.
 - 진행 중 merge/rebase/cherry-pick/revert/bisect, Git lock, 다른 `/cc`·`/cca` lock이 있으면 중단한다.
+- `reason=git_external_lock`은 Git 자체 lock이 원인이다. `git_locks`의
+  `age_seconds`, `size`, `writer_pids`, `stale_candidate`와
+  `recovery.remove_hint`를 그대로 보고하고 `/cc clean`을 안내한다. `clean`은
+  안전 조건을 모두 통과한 stale lock만 제거하며 남은 lock은 강제로 삭제하지 않는다.
+- Guard `begin` 실패 후 `git status`·`git diff`·`git log`로 변경을 스캔하거나
+  `git -C <경로>`로 우회해 작업을 이어가지 않는다.
+- `reason=guard_lock_conflict`이면 `stale_candidate`, `lock_owner_same_host`,
+  `lock_owner_same_session`, `lock_age_seconds`를 그대로 보고한다. stale 후보여도
+  스스로 회수하지 않고 `/cc clean` 또는 `begin --reclaim-stale`을 안내한 뒤
+  사용자 승인을 받아 실행한다.
 - snapshot 경고가 있으면 위험을 평가하고 결과에 기록한다.
 - 이후 실패하거나 중단하면 반드시 `abort`로 **자신의 lock만 해제하고 snapshot은 보존**한다.
 
@@ -138,7 +173,7 @@ git ls-files --others --exclude-standard
 ### 4.1 상태 재검사
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" fingerprint
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" fingerprint
 git status --short --branch --untracked-files=all
 ```
 
@@ -245,7 +280,7 @@ hook이 파일을 수정했거나 예상하지 않은 변경이 생겼으면 이
 ### 전체 성공 + clean
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>"
@@ -260,7 +295,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 ### 실패·중단·불확실
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" abort \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>"
@@ -270,7 +305,7 @@ snapshot을 삭제하지 않는다.
 
 ## 7. 최종 보고
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`의 `/cc` 형식을 따라 한글로 보고한다.
+`.claude/skills/_git-atomic-core/reporting.md`의 `/cc` 형식을 따라 한글로 보고한다.
 
 반드시 포함:
 

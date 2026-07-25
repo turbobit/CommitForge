@@ -7,9 +7,9 @@
 먼저 `period_range.py`로 정확한 경계를 계산한다.
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" today
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" 3days
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" weekly
+python3 "<absolute-CF_CORE>/scripts/period_range.py" today
+python3 "<absolute-CF_CORE>/scripts/period_range.py" 3days
+python3 "<absolute-CF_CORE>/scripts/period_range.py" weekly
 ```
 
 - `today`: 호스트 로컬 달력의 오늘 00:00부터 현재까지다. 최근 24시간이 아니다.

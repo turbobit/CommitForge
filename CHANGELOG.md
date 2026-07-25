@@ -1,5 +1,96 @@
 # Changelog
 
+## 1.12.1 — 2026-07-26
+
+- `/cr`의 `PreToolUse` Write/Edit 훅이 셸에 존재하지 않는
+  `${CLAUDE_SKILL_DIR}` 환경변수에 의존하지 않도록 설치 시 현재 Python과
+  `cr_edit_gate.py`의 절대경로를 고정
+- 모든 Skill frontmatter의 Guard·검토 보조 스크립트 권한 패턴도 설치 시 core
+  절대경로로 고정하고, 모델용 경로·세션 표기는 셸 환경변수와 구분되는 명시적
+  placeholder로 변경
+- 검증기가 Skill frontmatter뿐 아니라 모든 Skill Markdown의 `${...}` 런타임
+  변수형 placeholder를 거부하도록 보강해 같은 종류의 hook·permission·명령
+  경로 회귀를 패키징 전에 차단
+- 공백·작은따옴표가 포함된 설치 경로와 Windows 명령줄 quoting을 처리하고,
+  `CLAUDE_SKILL_DIR`가 없는 환경에서 설치된 훅이 실제로 fail-closed 실행되는
+  회귀 테스트 추가
+- 프로젝트 검증 명령은 광범위하게 자동 승인하지 않는 안전 경계를 유지하되,
+  실행 전 “allowed-tools 밖이라 거부될 수 있음” 같은 추측성 문구를 금지하고
+  실제 permission 요청·거절·환경 실패가 발생했을 때만 정확히 보고
+- 모든 명령의 성공·실패·중단 결과에 승인 대기, reviewer, 검증, Guard 정리를
+  포함한 전체 소요 시간을 분 단위로 표시하고 JSON review report에도
+  `timing.elapsed_minutes` 추가
+
+## 1.12.0 — 2026-07-25
+
+- `/ccr`, `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`에 현재 Git worktree의
+  CommitForge advisory lock만 명시적으로 해제하는 `clean` 조기 종료 명령 추가
+- `clean`은 다른 저장소·worktree, working tree/index/commit과 보존된 Diff
+  snapshot을 건드리지 않으며 잠금 없음 재실행은 성공한 no-op 처리
+- `/cr` source-read-only, `/ccr`, `/cpr`에 환경·변경 규모·domain·고위험
+  trigger 기반 선택적·적응형 Agent Team 모드와 `--team`·`--no-team` 추가
+- 읽기 전용 대상은 Agent Teams 환경 활성 시 Team-first를 기본으로 변경하고,
+  모든 대상 명령을 core 3명으로 단순화. 파일 2개·80 changed lines 이하의
+  저위험 단일 domain만 Team 생략
+- 대형 변경을 파일 수로 균등 분할하지 않고 package/domain/runtime shard와
+  core 3명·조건부 specialist 관점을 겹쳐 배정하며 lead aggregator가 contract와
+  hunk coverage 통합
+- 대형 diff 시작 공지에 실제 초과 값·적용 threshold와 core 3명+specialist
+  구조를 분리해 표시하고, 계산하지 않은 hunk 수나 임의 threshold 보고를 금지
+- 문서 전용이 아닌 행위 변경은 Testing/Independent Verification을 필수
+  specialist로 활성화하고 Reliability, UX, Migration, Requirements, Release,
+  Domain/Framework는 의미 trigger로 조건부 추가
+- `/cr --fix`, `/cc`, `/cca`, `/cp`는 기존 custom subagent + lead 단독 변경
+  구조를 유지하고 Team 환경이 꺼졌거나 coordination 실패 시 subagent fallback
+- Agent Team을 명령별 core 역할과 조건부 specialist로 구성하고 shared task와
+  peer messaging을 통해 cross-file contract와 finding을 교차검증하도록 실행 계약 보강
+- OWASP Top 10:2025·ASVS 5.0, WCAG 2.2, NIST SSDF와 OpenTelemetry 최신 관점을
+  반영해 공급망·artifact integrity/provenance, exceptional conditions,
+  compatibility, observability/alerting, 접근성·migration/rollback 검토 강화
+- Agent Teams 환경변수는 정확히 `1`일 때만 활성으로 판정하며 CommitForge가
+  사용자 환경을 설정·변경하지 않는다는 경계 추가
+- 모든 명령 본문 첫 섹션에 `${CLAUDE_SKILL_DIR}` 해석 규칙과 `CF_CORE` 확정
+  Preflight를 추가해 skills 루트로 잘못 치환된 경로가 만드는 실행 실패 차단
+- Guard 실행 자체가 실패한 경우(exit code 126·127, `command not found`,
+  Python 미탐지)도 fail-closed 사유로 명시해 Guard 생략 후 진행을 금지
+- Guard owner에 `hostname`을 기록하고 `begin`·`status` 결과에 `stale_candidate`,
+  `lock_owner_same_host`, `lock_owner_same_session`, `stale_after_seconds` 보고
+- 같은 호스트의 오래된 잠금이나 동일 세션 재진입만 회수하는
+  `begin --reclaim-stale [--stale-after <초>]` 추가. 기존 owner의 snapshot은 보존하고
+  다른 호스트·신선한 잠금·비정상 잠금 내용은 `reclaim_refused_reason`으로 거부
+- 잠금 충돌 결과의 `recovery`에 `clean_hint`, `clean_argv`, `reclaim_hint`를 추가해
+  복구 경로를 명시
+- Git 자체 lock(`index.lock` 등) 차단을 `reason=git_external_lock`으로 분리하고 각
+  lock의 `size`, `age_seconds`, `writer_pids`, `stale_candidate` 진단 보고. 크기 0,
+  5분 경과, 쓰기 프로세스 없음을 모두 만족할 때만 stale 후보로 표시하며 읽기 전용
+  핸들은 사용 중으로 보지 않음
+- 명시적 `clean`은 알려진 Git lock(`index.lock`, `HEAD.lock`,
+  `packed-refs.lock`, `config.lock`)이 5분 이상·0바이트·writer 없음·진행 중 Git
+  operation 없음·검사 중 identity 불변을 모두 만족할 때만 제거
+- macOS `lsof` 접근 모드, Linux `/proc` fd flags, Windows Win32 share-mode로
+  writer를 판별하고 Finder·Spotlight·Explorer·인덱서의 읽기 전용 핸들은 제외.
+  판별 불능은 자동 제거하지 않는 fail-closed 상태로 처리
+- `clean`이 제거한 Git lock과 안전 조건 미충족으로 남긴 Git lock을 각각
+  `git_locks_removed`, `git_lock_cleanup`, `git_locks`로 보고
+- Guard `begin` 실패 후 `git status`·`git diff`·`git log` 또는 `git -C <경로>`로
+  우회해 작업을 이어가는 것을 모든 명령에서 명시적으로 금지
+- `verify-review`·`finish`가 session과 일치하는 현재 worktree owner token과
+  유일한 snapshot을 자동 해석하도록 보강해 장시간 리뷰 후 인자 유실·basename
+  오사용·존재하지 않는 `snapshot-path` 추측을 제거. 명시적 오입력은 계속 거부
+
+## 1.10.1 — 2026-07-25
+
+- Guard 잠금 충돌 결과에 `project_root`, `git_dir`, `lock_scope`, owner를 구조화해 다른 저장소의 잠금과 구분
+- 잠금 범위가 실제 worktree Git directory이며 같은 부모 아래 독립 저장소는 서로 차단하지 않는다는 계약 명시
+- 독립 저장소 동시 실행과 같은 저장소 하위 폴더 중복 차단 회귀 테스트 추가
+- 중간 종료로 남은 stale lock을 현재 세션에서도 확인 후 안전하게 `abort`할 수 있도록 복구 지침 보강
+- `abort --session --token`이 일치하는 owner snapshot을 자동 선택하도록 복구 API 개선
+- 잠금 충돌과 status 결과에 `lock_owner_snapshots`와 구조화된 recovery 정보 추가
+- 실제 `abort` 성공 결과 전에는 잠금 해제를 단정하거나 `begin`을 재시도하지 않는 `/cr` 계약 추가
+- Guard가 `lock_age_seconds`와 실행 가능한 `recovery.abort_argv`를 반환해 시간대 오산·깨진 명령 방지
+- `/cr` Guard begin 실패 후 변경 스캔·reviewer·테스트를 실행하지 않는 fail-closed 시작 Gate 강화
+- `/cpr`, `/cp`를 포함하도록 Guard 중복 실행 오류 메시지 갱신
+
 ## 1.10.0 — 2026-07-24
 
 - `/cpr` read-only Pull Request 미리보기 명령 추가

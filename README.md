@@ -31,6 +31,7 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | release 준비·hotfix·프로필 저장을 실제 실행 | `/cca release`, `/cca emergency`, `/cca learn` |
 | PR 생성 전 결과와 blocker만 확인 | `/cpr --base main` |
 | 검증된 현재 branch로 GitHub PR 생성 | `/cp --base main` |
+| 현재 프로젝트에 남은 CommitForge 잠금 해제 | `/cr clean` 등 모든 명령의 `clean` |
 
 > [!IMPORTANT]
 > **Release tag 실행 경계**
@@ -177,7 +178,11 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
     └── cca-requirements-product-reviewer.md
 ```
 
-패키지의 `.claude` 내용을 대상 저장소의 `.claude`에 병합하면 됩니다.
+패키지의 `.claude` 내용을 대상 저장소의 `.claude`에 병합하면 됩니다. 다만 `/cr`
+Write 훅과 Skill 권한 패턴은 설치 위치의 절대경로를 사용해야 하므로, 가능하면 위
+설치 프로그램을 사용하십시오. 수동 복사 시 각 `SKILL.md`의
+`.claude/skills/_git-atomic-core` 경로를 대상 core의 절대경로로 바꾸고,
+`cr/SKILL.md`의 `cr_edit_gate.py` 명령도 절대경로로 바꿔야 합니다.
 
 전역 범위는 `~/.claude/skills`와 `~/.claude/agents`에 같은 구조로 복사합니다.
 
@@ -202,6 +207,11 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 ```
 
 `/ccr`은 staging, commit, 파일 수정, 테스트/빌드를 수행하지 않습니다.
+Agent Teams 환경이 활성화되면 `/ccr`은 3개 teammate를 고정 기본으로 사용해
+commit 경계와 의존 순서를 교차검증합니다. multi-domain이어도 인원을 늘리지 않고
+domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명백히
+사소한 단일 영역 변경과 Team fallback만 기존 subagent 또는 main agent 분석을
+사용합니다.
 
 ### 여러 Atomic Commit 생성
 
@@ -230,6 +240,25 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 ```
 
 `/cr`은 기본적으로 소스를 수정하지 않는 읽기 전용 심층 리뷰입니다. Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 검토하고 테스트·검증합니다. 현재 미커밋 변경에서 발견한 확정적·국소적 문제를 수정하려면 `/cr --fix`처럼 명시해야 합니다. 어느 경우에도 Atomic Commit 계획, 메시지 초안, staging, commit, push는 만들지 않습니다.
+
+읽기 전용 `/cr`, `/cpr`, `/ccr`은 Claude Code Agent Teams 환경이 활성화돼
+있으면 core 3명을 기본으로 사용합니다. 파일 2개 이하·80 changed lines 이하인
+단일 domain이며 고위험 trigger와 cross-file contract가 없는 경우에만 Team을
+생략할 수 있습니다. `--team`이면 사소한 변경도 core 3명으로
+실행하고 `--no-team`이면 subagent를 사용합니다. 환경이
+꺼져 있거나 coordination을 사용할 수 없으면 기존 subagent로 안전하게
+fallback합니다. Team 생성은 Claude Code가 요구하는 승인을 거치며, 승인하지
+않아도 subagent 리뷰는 계속됩니다. CommitForge는
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`를 설정하거나 변경하지 않습니다.
+`/cr --fix`, `/cc`, `/cca`, `/cp`는 항상 기존 subagent + lead 단독 변경
+구조를 유지합니다.
+
+`/cr`·`/cpr`의 core 3명은 Correctness/State/Concurrency,
+Security/Privacy/Supply Chain/Integrity, Architecture/API/Compatibility를
+담당합니다. 실행 행위가 바뀌면 Testing/Independent Verification을 필수로
+추가하고, trigger에 따라 Reliability/Observability, UX/Accessibility,
+Data/Migration, Requirements/Product, Release/Deployment, Domain/Framework
+specialist를 활성화합니다.
 
 기본 모드에서는 Skill 범위의 `PreToolUse` Hook이 `Edit`, `Write`, `NotebookEdit`를 실행 전에 차단합니다. 따라서 프롬프트 준수에만 의존하지 않으며, 자연어로 “수정해 줘”라고 적는 것은 권한을 열지 않습니다. 독립된 `--fix` 옵션만 편집 권한 평가를 통과시킵니다.
 
@@ -311,6 +340,17 @@ Guard + 원본 Diff 보존
 
 ### Reviewer 실행 신뢰성
 
+- 읽기 전용 `/cr`·`/cpr`·`/ccr`은 core 3명 Team이 기본이며, 명백히 사소한
+  단일 영역 변경만 생략
+- 대형 diff는 파일 수 균등 분할 대신 package/domain/runtime shard와 위험
+  관점을 겹쳐 배정하고 lead aggregator가 contract graph와 hunk coverage 통합
+- Testing은 문서 전용 변경 외에는 필수 specialist로 활성화하고 Reliability·UX·
+  Migration·Requirements·Release·Domain specialist는 의미 trigger로 추가
+- 모든 specialist를 `ACTIVE`, 근거 있는 `N/A`, `UNKNOWN`으로 기록하고
+  `UNKNOWN` 필수 관점은 성공을 차단
+- Team 역할은 correctness/state, security/privacy/supply-chain/integrity,
+  architecture/API/compatibility, performance/reliability/observability,
+  testing/UX/WCAG 2.2/requirements/migration 관점으로 교차검증
 - 기본 6개 reviewer를 병렬 실행하고 고위험·대형 diff는 환경 상한 안에서 최대 8개까지 확대
 - rate-limit·agent 시작 실패·반복 timeout 시 다음 batch를 3~4개로 자동 축소
 - Line·Correctness·Security와 활성 조건부 reviewer는 필수
@@ -474,6 +514,8 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
 | `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
+| `--team` | `/cr`, `/ccr`, `/cpr` | 환경이 활성화된 경우 Agent Team 강제 선호 |
+| `--no-team` | `/cr`, `/ccr`, `/cpr` | Agent Team을 끄고 기존 subagent 사용 |
 | `--fix` | `/cr` 일반 리뷰 | 현재 working hunk의 확정적·국소 문제 수정 허용; `release`·`emergency`·`learn`에서는 거부 |
 | `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
 | `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |
@@ -595,6 +637,64 @@ type(scope): 한글 제목
 
 ## 동시 세션 안전성
 
+### 현재 프로젝트 잠금 정리
+
+모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
+
+```text
+/cr clean
+/cc clean
+/ccr clean
+/cca clean
+/cpr clean
+/cp clean
+```
+
+현재 디렉터리가 속한 Git worktree의 CommitForge advisory lock을 해제합니다.
+다른 저장소·worktree, 작업 파일·index·commit은 건드리지 않으며 Diff snapshot도
+보존합니다. 실행 중인 기존 세션의 lock까지 해제할 수 있으므로 그 세션이 끝났거나
+중단됐음을 확인한 뒤 사용하십시오.
+
+### Git 자체 lock으로 차단된 경우
+
+`index.lock` 같은 Git 자체 lock이 있으면 `begin`은
+`reason=git_external_lock`으로 중단하고 각 lock의 경로, 크기, 경과 시간,
+쓰기 중인 프로세스 PID, stale 후보 여부를 보고합니다. 이때 해당 명령의
+`clean`을 다시 실행하면 안전 판정을 통과한 stale Git lock도 정리합니다.
+
+정상적인 index 연산은 1초 이내에 끝나므로, 5분(기본값) 이상 지났고 크기가 0이며
+쓰기 중인 프로세스가 없을 때만 stale 후보로 표시합니다. macOS의 Finder·Spotlight,
+Windows의 Explorer·인덱서 등 읽기 전용 핸들은 writer로 보지 않습니다.
+
+`clean`은 알려진 Git lock 네 종류(`index.lock`, `HEAD.lock`,
+`packed-refs.lock`, `config.lock`)에 한해 stale 조건, 진행 중 Git operation 없음,
+symbolic link 아님, 재검사 중 파일 identity 불변을 모두 확인한 뒤 제거합니다.
+macOS는 `lsof`, Linux는 `/proc`, Windows는 Win32 share-mode를 사용합니다.
+writer 판별이 불가능하거나 상태가 바뀌면 삭제하지 않고 남은 경로와 사유를
+보고합니다. `begin`, `status`, `--reclaim-stale`은 Git lock을 삭제하지 않습니다.
+
+### 오래된 잠금 회수
+
+잠금 충돌 결과에는 `stale_candidate`, `lock_age_seconds`, `lock_owner_same_host`,
+`lock_owner_same_session`이 함께 보고됩니다. `stale_candidate: true`는 잠금이
+임계값(기본 1시간)보다 오래됐다는 뜻일 뿐 원래 세션이 죽었다는 증거가 아니므로
+자동으로 회수하지 않습니다.
+
+원래 실행이 끝났음을 확인했다면 `clean` 대신 회수를 요청할 수 있습니다.
+
+```bash
+python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py begin \
+  --session "<현재-세션>" --reclaim-stale
+```
+
+같은 호스트의 오래된 잠금이거나 동일 세션 재진입일 때만 해제 후 재획득하며,
+기존 owner의 snapshot은 그대로 보존합니다. 다른 호스트의 잠금, 아직 신선한
+잠금, 예상치 못한 잠금 내용은 `reclaim_refused_reason`으로 거부됩니다. 임계값은
+`--stale-after <초>`로 조정합니다.
+
+`clean`은 조건 없이 해제만 하고 종료하며, `--reclaim-stale`은 안전 조건을
+만족할 때만 해제하고 곧바로 작업을 이어갑니다.
+
 ### 같은 worktree
 
 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
@@ -653,7 +753,16 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 
 상세 복구 방법은 `_git-atomic-core/recovery.md`를 참고하십시오.
 
-비정상 종료 후 stale lock이 있으면 현재 작업 세션이 끝났는지 확인하고 `status`에 표시된 동일 session/token/snapshot으로 `guard.py abort`를 실행합니다. lock 디렉터리를 무조건 삭제하지 마십시오.
+잠금은 명령 이름이나 상위 개발 폴더가 아니라 현재 worktree의 실제 Git
+directory를 기준으로 분리됩니다. 같은 부모 폴더 아래의 서로 다른 Git
+저장소는 서로 차단하지 않습니다.
+
+비정상 종료 후 stale lock이 있으면 `status`의 `project_root`, `git_dir`,
+session/token과 `lock_owner_snapshots`를 확인하십시오. 생성 시각만으로 stale이라고 단정하지
+말고 원래 작업 세션이 끝났는지 확인한 뒤, 원래 세션에 돌아갈 수 없으면 현재
+세션에서 동일한 owner session/token으로 `guard.py abort`를 실행할 수 있습니다.
+일치하는 snapshot이 하나면 Guard가 자동 선택합니다. lock 디렉터리를 무조건
+삭제하지 마십시오.
 
 ## 안전상 하지 않는 작업
 
@@ -662,7 +771,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - rebase/squash/history rewrite
 - force push
 - hard reset
-- clean
+- `git clean`
 - stash 삭제
 - branch 강제 삭제
 - Git lock 강제 삭제
@@ -673,7 +782,11 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 
 ## 권한과 실행 통제
 
-Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 일반 리뷰에서 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. `release`·`emergency`·`learn`은 `--fix`가 있어도 차단됩니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다.
+Skill frontmatter는 invocation turn 동안 각 명령에 필요한 Git 조회·staging·commit 및 Guard 실행만 사전 승인합니다. 기본 `/cr`은 Skill 범위의 `PreToolUse` Hook이 편집 도구를 차단하며, 일반 리뷰에서 독립된 `--fix` 옵션이 있을 때만 편집 권한 평가를 통과합니다. `release`·`emergency`·`learn`은 `--fix`가 있어도 차단됩니다. 테스트, 빌드, package manager 등 프로젝트별 명령은 넓게 사전 승인하지 않았기 때문에 사용자의 Claude Code permission 설정에 따라 승인을 요청할 수 있습니다. CommitForge는 실행 전에 거부 가능성을 추측해 알리지 않고, 실제 permission 요청이나 실패가 발생했을 때만 정확한 명령과 미검증 범위를 표시합니다.
+
+모든 최종 결과에는 명령 시작부터 검증·Guard 정리까지의 전체 소요 시간을 분
+단위로 포함합니다. 6초 미만은 `0.1분 미만`, 그 외에는 소수점 첫째 자리까지
+표시하며 측정값을 잃은 경우에는 임의로 추정하지 않습니다.
 
 저장소에 포함된 Skill은 workspace trust를 승인하기 전에 내용을 검토하십시오.
 

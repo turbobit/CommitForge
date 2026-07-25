@@ -1,7 +1,7 @@
 ---
 name: cca
 description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/3days/weekly/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
-argument-hint: "[today|3days|weekly|release|emergency|learn] [추가 맥락] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[clean|today|3days|weekly|release|emergency|learn] [추가 맥락] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -35,12 +35,12 @@ allowed-tools:
   - Bash(git commit *)
   - Bash(git diff-tree *)
   - Bash(cmp *)
-  - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" *)'
+  - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/report_validator.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/period_range.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/release_version.py" *)'
 ---
 
 # `/cca` — CommitForge All
@@ -55,29 +55,51 @@ $ARGUMENTS
 
 `/cca`는 push, amend, rebase, squash, force 작업을 하지 않는다.
 
+## Skill 경로 확정 (필수 Preflight)
+
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
+`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
+치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
+
+다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
+
+1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
+2. 실패하면 `Glob`으로 `**/_git-atomic-core/scripts/guard.py`를 찾아 다시 정한다.
+3. 이후 모든 `.claude/skills/_git-atomic-core`를 확정된 `CF_CORE` 절대경로로 바꾼다.
+
+둘 다 실패하면 fail-closed다. core 미설치로 보고하고 즉시 종료하며, 경로 해석 실패를 이유로
+Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수행하지 않는다.
+
+## `clean` 조기 종료
+
+첫 번째 위치 인자가 정확히 `clean`이면
+`.claude/skills/_git-atomic-core/lock-cleanup.md`만 읽어 잠금 정리를
+실행하고 즉시 종료한다. Guard `begin`, 수정, 리뷰, staging과 commit은 실행하지
+않는다.
+
 ## 필수 지침 로드
 
 작업 전에 다음 파일을 읽는다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/atomic-commit-rules.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/staging-strategy.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/commit-message-guide.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
-5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-gates.md`
-6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
-7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
-8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
-9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md`
-10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
-11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
-12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
-13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-policy.md`
-14. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
-15. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
-16. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
-17. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+1. `.claude/skills/_git-atomic-core/atomic-commit-rules.md`
+2. `.claude/skills/_git-atomic-core/staging-strategy.md`
+3. `.claude/skills/_git-atomic-core/commit-message-guide.md`
+4. `.claude/skills/_git-atomic-core/safety-and-concurrency.md`
+5. `.claude/skills/_git-atomic-core/review-gates.md`
+6. `.claude/skills/_git-atomic-core/validation-strategy.md`
+7. `.claude/skills/_git-atomic-core/project-profiles.md`
+8. `.claude/skills/_git-atomic-core/reporting.md`
+9. `.claude/skills/_git-atomic-core/extended-modes.md`
+10. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
+11. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
+12. `.claude/skills/_git-atomic-core/review-execution.md`
+13. `.claude/skills/_git-atomic-core/review-policy.md`
+14. `.claude/skills/_git-atomic-core/reporting-formats.md`
+15. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
+16. `.claude/skills/_git-atomic-core/large-diff-review.md`
+17. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
 
-변경 언어·프레임워크를 판별한 뒤 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
+변경 언어·프레임워크를 판별한 뒤 `.claude/skills/_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
 안전 규칙과 품질 gate가 다른 지침보다 우선한다.
 
@@ -116,21 +138,38 @@ $ARGUMENTS
 
 `today`, `3days`, `weekly`, `release --prepare`, `emergency`는 모드별 사전 분석 후 아래 단계로 합류한다. 단, `release`에서 `--prepare`가 없거나 `--dry-run`인 경우와 `emergency --diagnose`는 source-read-only Guard 검증 후 commit 단계 없이 종료한다. `learn`은 `extended-modes.md`의 전용 종료 조건을 따른다.
 
-`allowed-tools`에 없는 프로젝트별 테스트·lint·build 명령은 사용할 수 없는 것이 아니다. Claude Code 권한 설정에 따라 사용자 승인을 요청한 뒤 실행한다. 승인을 받지 못하거나 실행할 수 없으면 해당 검증을 생략했다고 명시하며, 필수 검증이 없는 `emergency` 작업을 성공으로 처리하지 않는다.
+`allowed-tools` 밖의 프로젝트별 테스트·lint·build도 실행 가능하다. 실행 전 거부
+가능성을 추측해 공지하지 말고 저장소에서 확인한 명령을 permission 흐름으로
+요청한다. 실제 거절·실행 실패 때만 명령과 미검증 범위를 밝히며, 필수 검증 없는
+`emergency`를 성공 처리하지 않는다.
 
 ## 1. Guard 및 원본 상태 보존
 
 다음을 실행한다.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" begin \
-  --session "${CLAUDE_SESSION_ID}"
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
+  --session "<current-session-id>"
 ```
 
 `session`, `token`, `snapshot`, `fingerprint`, 시작 `head`를 보관한다.
 
 - `ok: false`면 즉시 중단한다.
+- Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
+  `No such file or directory`, `command not found`, Python 미탐지, permission
+  거부가 여기에 해당한다. Guard를 생략하고 진행하지 않는다. Preflight로 `CF_CORE`를
+  다시 확정해 한 번만 재시도하고, 그래도 실패하면 종료한다.
 - merge/rebase/cherry-pick/revert/bisect, Git lock, 동일 worktree의 다른 `/cc`·`/cca` 실행이 있으면 자동 해결하지 않는다.
+- `reason=git_external_lock`은 Git 자체 lock이 원인이다. `git_locks`의
+  `age_seconds`, `size`, `writer_pids`, `stale_candidate`와
+  `recovery.remove_hint`를 그대로 보고하고 `/cca clean`을 안내한다. `clean`은
+  안전 조건을 모두 통과한 stale lock만 제거하며 남은 lock은 강제로 삭제하지 않는다.
+- Guard `begin` 실패 후 `git status`·`git diff`·`git log`로 변경을 스캔하거나
+  `git -C <경로>`로 우회해 작업을 이어가지 않는다.
+- `reason=guard_lock_conflict`이면 `stale_candidate`, `lock_owner_same_host`,
+  `lock_owner_same_session`, `lock_age_seconds`를 그대로 보고한다. stale 후보여도
+  스스로 회수하지 않고 `/cca clean` 또는 `begin --reclaim-stale`을 안내한 뒤
+  사용자 승인을 받아 실행한다.
 - 이후 실패·중단 시 `abort`로 자신의 lock만 해제하고 원본 Diff snapshot은 보존한다.
 - `today`·`3days`·`weekly`는 Guard를 획득한 뒤 `period_range.py`로 경계를 확정하고 기간 commit 원장을 수집한다.
 
@@ -158,7 +197,7 @@ git log -20 --pretty=format:'%h%x09%s'
 - 프로젝트 규칙(`CLAUDE.md`, `AGENTS.md`, 기여 가이드)
 - 검증 명령 정의
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`에 따라 모든 hunk를 내부 변경 원장에 배정한다. 삭제된 라인과 wrapper/proxy/adapter는 별도 항목으로 추적한다.
+`.claude/skills/_git-atomic-core/deep-review-protocol.md`에 따라 모든 hunk를 내부 변경 원장에 배정한다. 삭제된 라인과 wrapper/proxy/adapter는 별도 항목으로 추적한다.
 
 policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 cross-file aggregator로 처리한다.
 
@@ -216,7 +255,7 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 
 ## 4. 품질 Gate와 수정 반복
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-gates.md`를 적용한다.
+`.claude/skills/_git-atomic-core/review-gates.md`를 적용한다.
 
 ### 기본 Gate
 
@@ -280,7 +319,7 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 
 ## 5. 검증 전략 수립 및 실행
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`에 따라 저장소가 정의한 명령을 우선한다.
+`.claude/skills/_git-atomic-core/validation-strategy.md`에 따라 저장소가 정의한 명령을 우선한다.
 
 기본 순서:
 
@@ -330,7 +369,7 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 ### 7.1 TOCTOU 확인
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" fingerprint
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" fingerprint
 git status --short --branch --untracked-files=all
 ```
 
@@ -416,7 +455,7 @@ hash, 제목, 목적, 통계, 검증을 기록한다. hook/도구가 새로운 �
 ### 완전 성공 + clean
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>"
@@ -431,7 +470,7 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
 ### 실패·중단·부분 완료
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" abort \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
   --session "<session>" \
   --token "<token>" \
   --snapshot "<snapshot>"
@@ -441,7 +480,7 @@ snapshot은 삭제하지 않는다.
 
 ## 10. 최종 보고
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`의 `/cca` 형식으로 한글 보고한다.
+`.claude/skills/_git-atomic-core/reporting.md`의 `/cca` 형식으로 한글 보고한다.
 
 포함:
 

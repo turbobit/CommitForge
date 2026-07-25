@@ -1,7 +1,7 @@
 ---
 name: cp
 description: CommitForge의 안전한 Pull Request 생성 명령이다. 현재 clean branch와 base 사이의 committed diff를 심층 리뷰·검증하고 fast-forward 가능한 일반 push를 수행한 뒤 GitHub Pull Request를 실제 생성한다. source, index, commit history는 바꾸지 않으며 사용자가 직접 /cp로 요청할 때만 실행한다.
-argument-hint: "[추가 맥락] [--base <branch>] [--remote <name>] [--branch <name>] [--draft] [--title <text>] [--no-verify] [--strict] [--keep-snapshot]"
+argument-hint: "[clean] [추가 맥락] [--base <branch>] [--remote <name>] [--branch <name>] [--draft] [--title <text>] [--no-verify] [--strict] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -36,10 +36,10 @@ allowed-tools:
   - Bash(gh pr list *)
   - Bash(gh pr create *)
   - Bash(gh pr view *)
-  - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/pr_context.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
+  - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/pr_context.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
 ---
 
 # `/cp` — Create Pull Request
@@ -52,18 +52,40 @@ $ARGUMENTS
 
 `/cpr`과 같은 PR readiness 검토를 통과한 현재 committed branch를 push하고 실제 GitHub PR을 생성한다.
 
+## Skill 경로 확정 (필수 Preflight)
+
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
+`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
+치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
+
+다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
+
+1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
+2. 실패하면 `Glob`으로 `**/_git-atomic-core/scripts/guard.py`를 찾아 다시 정한다.
+3. 이후 모든 `.claude/skills/_git-atomic-core`를 확정된 `CF_CORE` 절대경로로 바꾼다.
+
+둘 다 실패하면 fail-closed다. core 미설치로 보고하고 즉시 종료하며, 경로 해석 실패를 이유로
+Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수행하지 않는다.
+
+## `clean` 조기 종료
+
+첫 번째 위치 인자가 정확히 `clean`이면
+`.claude/skills/_git-atomic-core/lock-cleanup.md`만 읽어 잠금 정리를
+실행하고 즉시 종료한다. Guard `begin`, branch 변경, push와 PR 생성은 실행하지
+않는다.
+
 ## 필수 규칙
 
 작업 전에 다음을 읽는다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/pull-request-workflow.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
-5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
-6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-policy.md`
-7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
-8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
+1. `.claude/skills/_git-atomic-core/pull-request-workflow.md`
+2. `.claude/skills/_git-atomic-core/safety-and-concurrency.md`
+3. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
+4. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
+5. `.claude/skills/_git-atomic-core/review-execution.md`
+6. `.claude/skills/_git-atomic-core/review-policy.md`
+7. `.claude/skills/_git-atomic-core/validation-strategy.md`
+8. `.claude/skills/_git-atomic-core/large-diff-review.md`
 
 언어·프레임워크에 해당하는 `language-api-pitfalls.md` 섹션만 추가로 읽는다. 저장소 PR template, 프로젝트 규칙, `.commitforge/profile.md`, `.commitforge/profile.json` 학습 프로필을 순서대로 적용한다.
 
@@ -78,7 +100,16 @@ $ARGUMENTS
 
 ## 실행
 
-1. Guard `begin`으로 시작 상태를 보존한다.
+1. Guard `begin`으로 시작 상태를 보존한다. exit code가 0이 아니거나 `ok`가 `false`면
+   fail-closed로 중단한다. exit code 126·127, `No such file or directory`,
+   `command not found`, Python 미탐지도 같은 실패이며 Guard를 생략하고 push나 PR
+   생성을 진행하지 않는다. `reason=guard_lock_conflict`이면 `stale_candidate`,
+   `lock_owner_same_host`, `lock_owner_same_session`을 그대로 보고하고, 회수는
+   `/cp clean` 또는 `begin --reclaim-stale`로 사용자 승인을 받은 뒤에만 한다.
+   `reason=git_external_lock`은 Git 자체 lock이 원인이다. `git_locks` 진단과
+   `recovery.remove_hint`를 보고하고 `/cp clean`을 안내한다. `clean`은 안전 조건을
+   모두 통과한 stale lock만 제거하며 남은 lock은 강제로 삭제하지 않는다.
+   Guard 실패 후 `git` 명령으로 우회해 push나 PR 생성을 진행하지 않는다.
 2. base를 확정하고 `pr_context.py`로 clean branch와 committed range를 계산한다. 현재가 base인 `main`/`master`이면 `--allow-base-head`를 사용한다.
 3. 모든 hunk와 net effect를 심층 리뷰하고 프로젝트 검증을 수행한다.
 4. blocker가 없을 때 PR template 기반 제목·본문을 확정한다.

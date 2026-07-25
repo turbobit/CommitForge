@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 from pathlib import Path
+import shlex
 import shutil
+import subprocess
 import sys
 
 
@@ -31,6 +33,86 @@ AGENTS = (
     "cca-privacy-governance-reviewer.md",
     "cca-requirements-product-reviewer.md",
 )
+CORE_REFERENCE = ".claude/skills/_git-atomic-core"
+
+
+def shell_join(argv: list[str]) -> str:
+    """Render a command for the shell used by Claude Code hooks."""
+    if sys.platform == "win32":
+        return subprocess.list2cmdline(argv)
+    return shlex.join(argv)
+
+
+def yaml_single_quoted(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def configure_skill_core_paths(claude_dir: Path, dry_run: bool) -> None:
+    """Replace project-relative template paths with this installation's path."""
+    core_path = (claude_dir / "skills" / "_git-atomic-core").resolve()
+    if dry_run:
+        print(f"[dry-run] configure skill core paths -> {core_path}")
+        return
+
+    for name in SKILLS:
+        if name == "_git-atomic-core":
+            continue
+        skill_path = claude_dir / "skills" / name / "SKILL.md"
+        text = skill_path.read_text(encoding="utf-8")
+        if CORE_REFERENCE not in text:
+            raise RuntimeError(
+                f"Skill core 경로 template을 찾을 수 없습니다: {skill_path}"
+            )
+        frontmatter, separator, body = text.partition("\n---\n")
+        if not separator:
+            raise RuntimeError(f"Skill frontmatter 종료가 없습니다: {skill_path}")
+        # Frontmatter uses YAML single-quoted permission patterns.
+        configured_frontmatter = frontmatter.replace(
+            CORE_REFERENCE, str(core_path).replace("'", "''")
+        )
+        configured_body = body.replace(CORE_REFERENCE, str(core_path))
+        skill_path.write_text(
+            configured_frontmatter + separator + configured_body,
+            encoding="utf-8",
+        )
+
+
+def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
+    """Pin the /cr edit hook to this installation without runtime env vars."""
+    skill_path = claude_dir / "skills" / "cr" / "SKILL.md"
+    gate_path = (
+        claude_dir
+        / "skills"
+        / "_git-atomic-core"
+        / "scripts"
+        / "cr_edit_gate.py"
+    )
+    command = shell_join(
+        [str(Path(sys.executable).resolve()), str(gate_path.resolve())]
+    )
+    if dry_run:
+        print(f"[dry-run] configure /cr edit hook -> {command}")
+        return
+
+    text = skill_path.read_text(encoding="utf-8")
+    lines = text.splitlines(keepends=True)
+    matching = [
+        index
+        for index, line in enumerate(lines)
+        if line.lstrip().startswith("command:") and "cr_edit_gate.py" in line
+    ]
+    if len(matching) != 1:
+        raise RuntimeError(
+            "/cr Write hook 설정을 하나로 확정할 수 없습니다: "
+            f"{skill_path} (matches={len(matching)})"
+        )
+    index = matching[0]
+    newline = "\n" if lines[index].endswith("\n") else ""
+    indent = lines[index][: len(lines[index]) - len(lines[index].lstrip())]
+    lines[index] = (
+        f"{indent}command: {yaml_single_quoted(command)}{newline}"
+    )
+    skill_path.write_text("".join(lines), encoding="utf-8")
 
 
 def copy_with_backup(src: Path, dst: Path, backup: Path, dry_run: bool) -> None:
@@ -91,6 +173,9 @@ def main() -> None:
             backup_root / "agents" / name,
             args.dry_run,
         )
+
+    configure_skill_core_paths(claude_dir, args.dry_run)
+    configure_cr_edit_gate(claude_dir, args.dry_run)
 
     print()
     print(f"설치 범위: {args.scope}")

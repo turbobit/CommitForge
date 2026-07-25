@@ -9,6 +9,7 @@
   "schema": "commitforge-review/v1",
   "mode": "cr",
   "fingerprint": "...",
+  "timing": {"started_at": "...", "finished_at": "...", "elapsed_minutes": 1.2},
   "range": {"kind": "working|base|range|pr", "value": "..."},
   "summary": {"critical": 0, "major": 0, "minor": 0, "note": 0},
   "reviewers": [],

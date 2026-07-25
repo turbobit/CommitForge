@@ -3,11 +3,23 @@
 ## 완료한 자동 검증
 
 - `/cr` 기본 read-only와 명시적 `--fix` opt-in 수정 계약 검증
+- `/cr`·`/ccr`·`/cpr`의 환경·규모·위험 기반 Agent Team 선택과
+  `/cr --fix`·`/cc`·`/cca`·`/cp` subagent 유지 계약 검증
+- Agent Team 환경변수의 정확한 `1` 판정과 환경 비변경 fallback 검증
+- OWASP Top 10:2025·ASVS 5.0, WCAG 2.2, NIST SSDF, OpenTelemetry 관점의
+  공급망·무결성·예외 처리·접근성·관찰 가능성 역할 보강
 - `/cpr` 완전 read-only PR 미리보기와 `/cp` 일반 push·PR 생성 경계 검증
 - `main`/`master`에서 제안 branch와 실제 자동 branch 생성을 분리하고 Guard의 예상 branch 불변식 검증
 - PR context의 merge-base·commit range·dirty·ahead commit 회귀 검증
 - `/cr` frontmatter의 `--fix`와 `/cca --no-fix` 독립 정책 검증
 - 기본 `/cr` 편집 도구 호출을 Skill 범위 PreToolUse Hook으로 실행 전 차단
+- `/cr` Write/Edit Hook과 모든 Skill script 권한 패턴을 설치 위치의
+  절대경로로 고정하고 `CLAUDE_SKILL_DIR`가 없는 환경에서 실제 실행 검증
+- 모든 Skill Markdown의 `${...}` 런타임 변수형 placeholder를 정적 검증에서
+  거부하고, 공백·작은따옴표 경로 및 Windows command-line quoting 회귀 검증
+- 프로젝트 검증 명령의 광범위한 wildcard 자동 승인을 금지하면서 실행 전
+  추측성 permission 실패 공지를 하지 않는 진행 메시지 계약 검증
+- 성공·실패·중단·부분 완료 보고의 분 단위 전체 소요 시간과 JSON timing 필드 검증
 - Live eval의 HEAD·index·working diff·status 불변 검증
 - `/cr`·`/cca` today/3days/weekly 공통 기간 규칙과 명령 연결 검증
 - `/cr release`·`emergency`·`learn`의 강제 read-only 계약과 `--fix` 편집 Hook 차단 검증
@@ -24,7 +36,14 @@
 - skeleton/TODO placeholder 검색
 - 설치 → 재설치 backup → 제거 backup 통합 시험
 - 공백이 포함된 경로에서 guard launcher 및 설치 시험
-- guard 통합 테스트 6개
+- guard 통합 테스트 7개
+- 모든 slash command의 현재 worktree 전용 `clean`, snapshot 보존,
+  no-op 재실행, 알 수 없는 lock 내용과 symbolic-link 경로 차단 검증
+- 같은 부모 폴더 아래 독립 Git 저장소의 동시 lock과 같은 저장소 하위 폴더의 중복 차단 검증
+- Guard 충돌 결과의 project root·Git directory·lock scope·owner 구조화 검증
+- `/cr` Guard begin 실패 후 후속 스캔·reviewer·테스트·abort 금지 계약 검증
+- owner session/token 기반 snapshot 자동 선택과 실제 abort 성공 확인 계약 검증
+- Guard 계산 잠금 경과 시간과 cwd·argv 기반 복구 명령 계약 검증
 - CommitForge 브랜딩·버전·확장 모드 정적 검증
 - 심층 리뷰 reference와 전문 reviewer 6종 연결 검증
 - `/cr`의 기본 10개 리뷰와 Atomic 계획·staging·commit 금지 검증
@@ -55,10 +74,15 @@
 5. 성공 시 snapshot 삭제 + lock 해제
 6. merge 등 진행 중 Git operation에서 시작 차단
 7. 서로 다른 linked worktree의 독립 lock/snapshot
-8. `/cr` working tree 수정 허용 + HEAD·branch·index 불변 확인
-9. `/cr` index 변경 시 verify와 finish 모두 차단
-10. snapshot 파일 변조 시 `audit-snapshot`과 `finish` 차단
-11. `main`/`master` 시작 시 지정한 새 branch 하나만 허용하고 HEAD·source·index 불변 확인
+8. 같은 부모 폴더 아래 독립 저장소의 동시 lock과 같은 저장소 하위 폴더의 중복 차단
+9. `/cr` working tree 수정 허용 + HEAD·branch·index 불변 확인
+10. `/cr` index 변경 시 verify와 finish 모두 차단
+11. snapshot 파일 변조 시 `audit-snapshot`과 `finish` 차단
+12. `main`/`master` 시작 시 지정한 새 branch 하나만 허용하고 HEAD·source·index 불변 확인
+13. 명시적 `clean`의 현재 worktree lock 해제와 snapshot 보존
+14. linked worktree 한쪽 `clean`이 다른 worktree lock을 유지하는지 확인
+15. 알 수 없는 lock 내용이 있으면 `clean` 차단
+16. lock 경로 symbolic link를 따라 외부 owner 파일을 삭제하지 않는지 확인
 
 ### 확장 모드 검증
 

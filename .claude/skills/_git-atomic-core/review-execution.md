@@ -1,5 +1,103 @@
 # Reviewer 실행·결과 규약
 
+## 0. 실행 구조 선택
+
+Agent Team은 `/cr`의 source-read-only 실행, `/ccr`, `/cpr`에서만 사용할 수 있다.
+`/cr --fix`, `/cc`, `/cca`, `/cp`와 그 밖의 실행형 흐름은 기존 custom
+subagent 구조를 유지하고 lead만 파일·Git·remote 상태를 변경한다.
+
+대상 명령은 reviewer를 시작하기 직전에 다음 도구로 환경 활성 상태를 확인한다.
+
+```bash
+python3 "<absolute-CF_CORE>/scripts/agent_team_mode.py"
+```
+
+선택 규칙:
+
+1. `--no-team`이면 환경과 무관하게 subagent를 사용한다.
+2. `--team`이고 환경 결과의 `enabled=true`이며 팀 coordination 도구를 사용할 수
+   있으면 사소한 변경도 기본 3명 Agent Team을 사용한다.
+3. `--team`인데 환경이 꺼져 있거나 coordination 도구를 사용할 수 없으면
+   subagent로 fallback하고 이유를 보고한다. 환경변수를 직접 변경하지 않는다.
+4. 명시 옵션이 없고 `enabled=true`이면 Agent Team을 기본으로 선택하고 Claude
+   Code가 요구하는 사용자 승인을 거쳐 생성한다. 승인이 없거나 거절되면
+   subagent로 fallback한다.
+5. 다음을 **모두** 만족하는 명백히 사소한 변경만 Team 생성을 축소할 수 있다.
+   - 변경 파일 2개 이하, 추가+삭제 80줄 이하
+   - 단일 package/domain/runtime boundary
+   - security, privacy, migration, dependency/supply-chain, reliability,
+     concurrency 고위험 trigger 없음
+   - cross-file public contract, schema, API, event, shared type 변경 없음
+6. 사소하지 않은 변경은 명령과 규모에 무관하게 core 3명을 기본으로 한다.
+   규모는 Team 사용 여부가 아니라 shard 수와 조건부 specialist 추가 여부에만
+   영향을 준다.
+
+Agent Team 선택 시:
+
+- 별도 team 생성·삭제 도구를 찾지 않는다. 현재 세션의 implicit team에서
+  `Agent`로 이름 있는 core teammate 3명을 생성하고 활성 specialist는 환경
+  상한 안에서 추가한다.
+- 기존 `.claude/agents/cca-*.md` custom agent를 teammate type으로 재사용하고,
+  각 teammate prompt에 묶어서 담당할 관점과 정확한 read-only 경계를 명시한다.
+- lead가 공유 task를 만들고 owner를 배정한다. teammate는 진행 상태를 갱신하고
+  `SendMessage`로 관련 finding과 반론을 peer에게 직접 전달한다.
+- 파일 수로 균등 분할하지 않는다. package/domain/runtime boundary로 hunk를
+  shard하고, 아래 위험 관점 owner를 겹쳐 배치한다. public contract·schema·API·
+  event·shared type·migration은 생산자와 소비자 shard가 함께 검토한다.
+- large-diff 공지에서는 shard mode와 Team 인원은 별개임을 밝히고 실제로 초과한
+  값과 적용 threshold만 보고한다. 계산하지 않은 값이나 임의 threshold를
+  추정하지 않는다.
+- 공통 contract·보안 경계처럼 둘 이상의 영역에 걸친 finding은 관련 teammate가
+  서로 메시지로 교차검증한 뒤 lead에게 근거와 이견을 함께 반환한다.
+- teammate는 source, index, snapshot, lock, branch, remote를 변경하거나 Guard를
+  실행하지 않는다. Guard의 획득·검증·종료는 lead만 수행한다.
+- 모든 task가 terminal 상태이고 필수 관점 결과가 lead에게 전달된 뒤 teammate를
+  종료한다. resume 후 teammate가 복원되지 않으면 미완료 task를 subagent 또는
+  lead가 다시 검증한다.
+- team 시작·messaging·task coordination이 실패하면 미완료 관점만 subagent로
+  fallback한다. `UNKNOWN` 처리와 필수 관점 차단 규칙은 동일하다.
+
+기본 구성:
+
+- `/cr`·`/cpr`: 다음 3개 core를 기본으로 사용한다.
+  1. **Correctness + Line + State/Concurrency**: 모든 hunk·삭제·예외 경로,
+     race·idempotency·resource lifecycle과 fail-open/fail-closed 동작
+  2. **Security + Privacy + Supply Chain + Integrity**: authn/authz·입력·암호화·
+     secret·데이터 최소화뿐 아니라 설정, transitive dependency, build/CI,
+     artifact provenance·SBOM·서명과 software/data integrity
+  3. **Architecture + Language/API + Quality + Compatibility**: 경계·의존 방향,
+     public contract, 버전별 API 의미, maintainability, backward/forward
+     compatibility와 deprecation
+
+- 다음 trigger는 core에 억지로 합치지 않고 조건부 specialist로 다룬다.
+  - 문서·주석·표시용 metadata만의 변경이 아닌 실행 코드·설정·API·schema·bug
+    fix·refactoring: **Testing/Independent Verification** 필수
+  - I/O·async·queue·network·cache·retry·timeout·resource·분산 상태:
+    **Performance/Reliability/Observability/Operability**, traces/metrics/logs의
+    correlation·alert·민감정보 비노출
+  - UI 변경: **UX/Accessibility**, WCAG 2.2, 사용자 흐름
+  - schema·저장 형식 변경: **Data/Migration**, backfill·부분 배포·rollback
+  - 비교 가능한 ticket·ADR·명세: **Requirements/Product**, acceptance criterion
+  - CI/CD·infra·feature flag·배포 순서 변경:
+    **Release/Deployment/Rollback**
+  - Flutter·React·DB·암호화·결제·분산 시스템 등 전문 기술:
+    **Domain/Framework**
+- 각 specialist는 `ACTIVE`, 근거 있는 `N/A`, `UNKNOWN` 중 하나를 기록한다.
+  활성 specialist를 환경 상한 때문에 추가할 수 없으면 가장 가까운 core owner와
+  lead가 해당 관점을 명시적으로 교차검증한다. 그것도 완료하지 못하면
+  `UNKNOWN`으로 성공을 차단하며 조용히 생략하지 않는다.
+- `/cpr`은 Release/Deployment/Rollback trigger를 항상 평가하고 build pipeline,
+  artifact provenance, 호환성, migration 순서, rollback과 관찰 가능성을
+  관련 core와 조건부 specialist가 교차검증한다.
+- `/ccr`: Git/Atomicity, Architecture+Dependencies, Correctness+Testing의 3개
+  묶음을 고정 기본으로 사용한다. multi-domain은 인원을 늘리는 대신 domain shard와
+  cross-file dependency task를 세 owner에게 배정한다.
+
+이 구성은 security를 단순 취약 dependency 검사로 축소하지 않고 전체 공급망과
+무결성까지 보며, logging을 “로그가 있음”이 아니라 실제 correlation·alert·대응
+가능성으로 판정한다. 자동 생성 코드나 reviewer 제안도 신뢰 신호로 취급하지
+않고 실제 코드 경로, contract와 독립 검증 증거로 재판정한다.
+
 ## 1. 실행 단계
 
 1. 동일 fingerprint에서 변경 경로와 의미를 triage한다.

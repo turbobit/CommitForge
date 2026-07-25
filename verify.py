@@ -31,8 +31,10 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/reporting-formats.md",
     ".claude/skills/_git-atomic-core/baseline-and-suppressions.md",
     ".claude/skills/_git-atomic-core/large-diff-review.md",
+    ".claude/skills/_git-atomic-core/lock-cleanup.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
+    ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
     ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
     ".claude/skills/_git-atomic-core/scripts/report_validator.py",
     ".claude/skills/_git-atomic-core/scripts/baseline.py",
@@ -94,8 +96,20 @@ def main() -> None:
         for field in ("description:", "disable-model-invocation: true", "argument-hint:"):
             if field not in fm:
                 errors.append(f"{path}: frontmatter 필드 누락 {field}")
+        if re.search(r"\$\{[A-Za-z_][A-Za-z0-9_]*", fm):
+            errors.append(
+                f"{path}: frontmatter가 런타임 환경변수 형태의 경로에 의존함"
+            )
         if len(text.splitlines()) > 500:
             errors.append(f"{path}: SKILL.md 500줄 초과")
+
+    for path in sorted((ROOT / ".claude/skills").rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        if re.search(r"\$\{[A-Za-z_][A-Za-z0-9_]*", text):
+            errors.append(
+                f"{path}: Markdown에 셸 환경변수로 오인될 수 있는 "
+                "${...} placeholder가 있음"
+            )
 
     valid_colors = {"red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"}
     for path in sorted((ROOT / ".claude/agents").glob("cca-*.md")):

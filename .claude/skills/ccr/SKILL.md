@@ -1,7 +1,7 @@
 ---
 name: ccr
 description: 현재 Git 변경사항을 읽기 전용으로 분석해 최적의 Atomic Commit 순서, 분리 기준, 포함 파일·hunk, 한글 메시지 초안과 검증 계획을 제시한다. 실제 staging이나 commit은 수행하지 않는다.
-argument-hint: "[추가 맥락] [--scope <경로...>] [--compact]"
+argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--compact] [--team|--no-team]"
 disable-model-invocation: true
 model: inherit
 effort: high
@@ -9,6 +9,12 @@ allowed-tools:
   - Read
   - Grep
   - Glob
+  - Agent
+  - SendMessage
+  - TaskCreate
+  - TaskGet
+  - TaskList
+  - TaskUpdate
   - Bash(git status *)
   - Bash(git diff *)
   - Bash(git log *)
@@ -21,6 +27,8 @@ allowed-tools:
   - Bash(git cat-file *)
   - Bash(git submodule status *)
   - Bash(git worktree list *)
+  - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py")'
 ---
 
 # `/ccr` — CommitForge Atomic Commit 계획 리뷰
@@ -33,15 +41,38 @@ $ARGUMENTS
 
 **읽기 전용 명령이다.** Git index, working tree, branch, stash, commit, 파일 내용을 변경하지 않는다. 테스트·빌드처럼 산출물을 만들 수 있는 명령도 실행하지 않는다.
 
+## Skill 경로 확정 (필수 Preflight)
+
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
+`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
+치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
+
+다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
+
+1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
+2. 실패하면 `Glob`으로 `**/_git-atomic-core/scripts/guard.py`를 찾아 다시 정한다.
+3. 이후 모든 `.claude/skills/_git-atomic-core`를 확정된 `CF_CORE` 절대경로로 바꾼다.
+
+둘 다 실패하면 fail-closed다. core 미설치로 보고하고 즉시 종료하며, 경로 해석 실패를 이유로
+Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수행하지 않는다.
+
+## `clean` 조기 종료
+
+첫 번째 위치 인자가 정확히 `clean`이면
+`.claude/skills/_git-atomic-core/lock-cleanup.md`만 읽어 잠금 정리를
+실행하고 즉시 종료한다. 일반 상태 분석과 Agent 실행은 하지 않는다.
+
 ## 필수 지침 로드
 
 다음을 읽는다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/atomic-commit-rules.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/commit-message-guide.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
-5. 필요하면 `${CLAUDE_SKILL_DIR}/../_git-atomic-core/examples.md`
+1. `.claude/skills/_git-atomic-core/atomic-commit-rules.md`
+2. `.claude/skills/_git-atomic-core/commit-message-guide.md`
+3. `.claude/skills/_git-atomic-core/project-profiles.md`
+4. `.claude/skills/_git-atomic-core/reporting.md`
+5. `.claude/skills/_git-atomic-core/review-execution.md`
+6. `.claude/skills/_git-atomic-core/large-diff-review.md`
+7. 필요하면 `.claude/skills/_git-atomic-core/examples.md`
 
 저장소 루트에 `.commitforge/profile.json`과 `.commitforge/profile.md`가 있으면 읽고, 명시적 프로젝트 규칙 다음 우선순위로 메시지·scope·분리 선호를 적용한다.
 
@@ -50,6 +81,9 @@ $ARGUMENTS
 - 일반 문장은 작업 목적과 분리 의도에 참고한다.
 - `--scope <경로...>`가 있으면 분석 범위를 제한하되, 의존성 판단에 필요한 관련 파일은 읽을 수 있다.
 - `--compact`가 있으면 본문 초안은 핵심 bullet만 제시한다.
+- `--team`은 Agent Team을 강제 선호하고 `--no-team`은 끈다. 둘을 함께 쓰면 오류다.
+  옵션이 없고 환경이 활성화되어 있으면 Agent Team이 기본이며, 명백히 사소한
+  단일 영역 변경만 `review-execution.md` 기준으로 축소한다.
 - 알 수 없는 인자는 자연어 맥락으로 취급한다.
 
 ## 2. 저장소 상태 확인
@@ -87,6 +121,13 @@ git log -20 --pretty=format:'%h%x09%s'
 변경이 없으면 계획을 만들지 말고 “분석할 변경 없음”을 보고한다.
 
 ## 3. 의미 분석
+
+분석 범위를 수집한 뒤 `review-execution.md`에 따라 실행 구조를 고른다. 환경이
+활성화되어 있고 명백히 사소한 변경이 아니면 Git/Atomicity,
+Architecture+Dependencies, Correctness+Testing의 3개 teammate를 고정 기본으로
+사용한다. multi-domain에서도 인원을 늘리지 않고 domain/runtime shard와
+cross-file dependency task를 세 owner에게 배정해 commit 경계와 선행 순서를
+교차검증한다. Team fallback에서는 기존 subagent 또는 main agent 분석을 사용한다.
 
 각 file/hunk를 다음 기준으로 분류한다.
 
@@ -130,7 +171,7 @@ git log -20 --pretty=format:'%h%x09%s'
 
 ## 5. 계획 작성
 
-`${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`의 `/ccr` 형식을 따른다.
+`.claude/skills/_git-atomic-core/reporting.md`의 `/ccr` 형식을 따른다.
 
 각 커밋마다 반드시 제시:
 

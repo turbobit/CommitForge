@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import os
 import runpy
+import subprocess
+import sys
 import unittest
 
 
@@ -86,6 +89,163 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn(contract, execution)
         self.assertNotIn("최대 4개 agent", execution)
 
+    def test_read_only_commands_have_adaptive_agent_team_contract(self) -> None:
+        execution = (
+            ROOT / ".claude/skills/_git-atomic-core/review-execution.md"
+        ).read_text(encoding="utf-8")
+        for command in ("cr", "ccr", "cpr"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            frontmatter = skill.split("\n---\n", 1)[0]
+            self.assertIn("--team|--no-team", frontmatter)
+            self.assertIn("agent_team_mode.py", skill)
+            self.assertIn("Agent", frontmatter)
+        for command in ("cc", "cca", "cp"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertNotIn("--team|--no-team", skill.split("\n---\n", 1)[0])
+        for contract in (
+            "source-read-only 실행, `/ccr`, `/cpr`",
+            "`/cr --fix`, `/cc`, `/cca`, `/cp`",
+            "implicit team",
+            "core 3명을 기본",
+            "Agent Team을 기본으로 선택",
+            "변경 파일 2개 이하, 추가+삭제 80줄 이하",
+            "파일 수로 균등 분할하지 않는다",
+            "`ACTIVE`, 근거 있는 `N/A`, `UNKNOWN`",
+            "Testing/Independent Verification",
+            "Performance/Reliability/Observability/Operability",
+            "UX/Accessibility",
+            "Data/Migration",
+            "Requirements/Product",
+            "Release/Deployment/Rollback",
+            "Domain/Framework",
+            "shard mode와 Team 인원은 별개",
+            "계산하지 않은 값",
+            "SendMessage",
+            "WCAG 2.2",
+            "artifact provenance",
+            "traces/metrics/logs",
+        ):
+            self.assertIn(contract, execution)
+
+    def test_agent_team_environment_probe_is_exact_and_read_only(self) -> None:
+        script = (
+            ROOT
+            / ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py"
+        )
+        for raw, expected in ((None, False), ("0", False), ("true", False), ("1", True)):
+            env = os.environ.copy()
+            if raw is None:
+                env.pop("CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS", None)
+            else:
+                env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = raw
+            proc = subprocess.run(
+                [sys.executable, str(script)],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=True,
+            )
+            self.assertEqual(
+                json.loads(proc.stdout)["enabled"],
+                expected,
+            )
+            payload = json.loads(proc.stdout)
+            self.assertEqual(
+                payload["default_mode"],
+                "team_first" if expected else "subagent_fallback",
+            )
+            self.assertEqual(
+                payload["eligible_commands"],
+                ["cr_read_only", "ccr", "cpr"],
+            )
+            self.assertEqual(
+                payload["default_team_size"],
+                {"cr_read_only": 3, "cpr": 3, "ccr": 3},
+            )
+            self.assertEqual(payload["trivial_downgrade"]["max_files"], 2)
+            self.assertTrue(
+                payload["trivial_downgrade"]["disabled_by_force_team"]
+            )
+            self.assertEqual(
+                payload["conditional_specialists"],
+                [
+                    "testing_independent_verification",
+                    "performance_reliability_observability",
+                    "ux_accessibility",
+                    "data_migration",
+                    "requirements_product",
+                    "release_deployment_rollback",
+                    "domain_framework",
+                ],
+            )
+            self.assertEqual(
+                payload["testing_policy"],
+                "required_for_any_non_documentation_behavior_change",
+            )
+
+    def test_every_command_supports_current_project_lock_clean(self) -> None:
+        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            frontmatter = skill.split("\n---\n", 1)[0]
+            self.assertIn("[clean", frontmatter)
+            self.assertIn("lock-cleanup.md", skill)
+        cleanup = (
+            ROOT / ".claude/skills/_git-atomic-core/lock-cleanup.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("현재 worktree 잠금만", cleanup)
+        self.assertIn("Diff snapshot은 삭제하지 않는다", cleanup)
+
+    def test_every_command_resolves_core_path_before_running_anything(self) -> None:
+        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+            skill_path = ROOT / f".claude/skills/{command}/SKILL.md"
+            skill = skill_path.read_text(encoding="utf-8")
+            body = skill.split("\n---\n", 1)[1]
+            headings = [
+                line for line in body.splitlines() if line.startswith("## ")
+            ]
+            self.assertEqual(
+                headings[0],
+                "## Skill 경로 확정 (필수 Preflight)",
+                f"{command}: 경로 확정 Preflight가 본문 첫 섹션이 아니다",
+            )
+            self.assertIn("이 SKILL.md가 들어 있는 디렉터리의 절대경로", skill)
+            self.assertIn("_git-atomic-core/scripts/guard.py", skill)
+            self.assertIn("fail-closed", skill)
+
+    def test_guard_launch_failures_are_fail_closed(self) -> None:
+        for command in ("cc", "cr", "cca", "cpr", "cp"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("exit code 126", skill, command)
+            self.assertIn("command not found", skill, command)
+            self.assertIn("stale_candidate", skill, command)
+            self.assertIn("--reclaim-stale", skill, command)
+            self.assertIn("git_external_lock", skill, command)
+            self.assertIn("recovery.remove_hint", skill, command)
+
+    def test_stale_lock_contract_is_documented(self) -> None:
+        safety = (
+            ROOT / ".claude/skills/_git-atomic-core/safety-and-concurrency.md"
+        ).read_text(encoding="utf-8")
+        recovery = (
+            ROOT / ".claude/skills/_git-atomic-core/recovery.md"
+        ).read_text(encoding="utf-8")
+        for text in (safety, recovery):
+            self.assertIn("--reclaim-stale", text)
+            self.assertIn("stale_candidate", text)
+        self.assertIn("different_host", safety)
+        self.assertIn("lock_not_stale", safety)
+        self.assertIn("snapshot은 보존", recovery)
+
     def test_all_commands_load_learned_profile(self) -> None:
         for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
             skill = (
@@ -132,8 +292,61 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("SOURCE_EDIT_ALLOWED=false", cr)
         self.assertIn("--source-read-only", cr)
         self.assertIn("cr_edit_gate.py", cr)
+        self.assertIn("fail-closed로 중단한다", cr)
+        self.assertIn("변경 스캔, reviewer, 테스트, fingerprint, `abort`", cr)
+        self.assertIn("reason=guard_lock_conflict", cr)
+        self.assertIn("현재 세션은 lock을 획득하지", cr)
+        self.assertIn("lock_owner_snapshots", cr)
+        self.assertIn("`abort` 성공 결과를", cr)
+        self.assertIn("Guard의 `lock_age_seconds`만", cr)
+        self.assertIn("`recovery.abort_argv`를 인자 단위 그대로", cr)
         self.assertIn("\n  - Edit\n", frontmatter)
         self.assertIn("\n  - Write\n", frontmatter)
+
+    def test_skill_frontmatter_has_no_runtime_path_variables(self) -> None:
+        for command in ("cc", "ccr", "cr", "cca", "cpr", "cp"):
+            skill = (
+                ROOT / f".claude/skills/{command}/SKILL.md"
+            ).read_text(encoding="utf-8")
+            frontmatter = skill.split("\n---\n", 1)[0]
+            self.assertNotIn("${", frontmatter)
+            self.assertIn(".claude/skills/_git-atomic-core", skill)
+        for path in (ROOT / ".claude/skills").rglob("*.md"):
+            self.assertNotIn("${", path.read_text(encoding="utf-8"))
+
+    def test_validation_permissions_avoid_speculative_failure_messages(self) -> None:
+        strategy = (
+            ROOT / ".claude/skills/_git-atomic-core/validation-strategy.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "package manager 전체를 wildcard 허용하지 않는다",
+            "추측성 진행 문구를 출력하지 않는다",
+            "내장 permission UI",
+            "실제 거절·도구 부재·환경 실패가 발생한 뒤에만",
+            "시도하지 않은 검증을 “시도함”으로 보고하지 않는다",
+        ):
+            self.assertIn(contract, strategy)
+
+    def test_all_result_reports_include_elapsed_minutes(self) -> None:
+        reporting = (
+            ROOT / ".claude/skills/_git-atomic-core/reporting.md"
+        ).read_text(encoding="utf-8")
+        formats = (
+            ROOT / ".claude/skills/_git-atomic-core/reporting-formats.md"
+        ).read_text(encoding="utf-8")
+        pr_workflow = (
+            ROOT / ".claude/skills/_git-atomic-core/pull-request-workflow.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "성공·실패·중단·부분 완료",
+            "소요 시간: N.N분",
+            "소요 시간: 0.1분 미만",
+            "소요 시간: 측정 불가 (사유)",
+            "lock_age_seconds",
+        ):
+            self.assertIn(contract, reporting)
+        self.assertIn('"elapsed_minutes": 1.2', formats)
+        self.assertIn("소요 시간(분)", pr_workflow)
 
         gates = (
             ROOT / ".claude/skills/_git-atomic-core/review-gates.md"

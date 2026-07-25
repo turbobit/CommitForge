@@ -14,6 +14,10 @@
 
 ## 1. 역할 경계
 
+명령 호출 직후 시작 시각을 기록하고 최종 보고 직전에 종료 시각을 기록한다.
+승인 대기·reviewer·검증·Guard 정리를 포함한 전체 경과 시간을 분으로 환산하며,
+6초 미만은 `0.1분 미만`, 측정값을 잃으면 임의 추정 없이 사유를 표시한다.
+
 | 명령 | 로컬 파일·Git | remote branch | Pull Request |
 |---|---|---|---|
 | `/cpr` | 읽기 전용 | 변경 안 함 | 생성·수정 안 함 |
@@ -55,7 +59,7 @@ base:
 Guard `begin` 후 다음 계산기를 실행한다.
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/pr_context.py" \
+python3 "<absolute-CF_CORE>/scripts/pr_context.py" \
   --base "<base>" --remote "<remote>"
 ```
 
@@ -162,6 +166,11 @@ Gate:
 
 `/cpr`은 다음을 완료한 뒤 Guard를 `verify-review --source-read-only`, `finish --review-only --source-read-only`로 종료한다.
 
+두 명령에는 현재 session을 전달하고, Guard가 같은 worktree의 owner token과
+유일한 snapshot을 자동 해석하게 한다. `snapshot-path` 같은 문서화되지 않은
+하위 명령, snapshot basename, 종료 단계의 `begin` 재호출을 사용하지 않는다.
+명시적 token/snapshot을 전달해야 한다면 `begin` 결과의 원본 값을 그대로 쓴다.
+
 - readiness: `READY`, `CONDITIONAL`, `BLOCKED`
 - base/head/merge-base와 commit 원장
 - review finding과 해결해야 할 blocker
@@ -233,4 +242,5 @@ base remote-tracking ref도 `ls-remote`의 실제 base SHA와 일치해야 한�
 - pushed remote branch와 SHA
 - 검증 결과와 남은 위험
 - snapshot/lock 상태
+- 소요 시간(분)
 - 수행하지 않은 source 수정·commit·force push·merge·deploy

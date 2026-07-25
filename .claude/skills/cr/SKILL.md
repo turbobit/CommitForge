@@ -1,7 +1,7 @@
 ---
 name: cr
 description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변경이나 기간·release·emergency·learn·branch·range·PR 범위를 기본 읽기 전용으로 심층 리뷰하며, 일반 리뷰에서 사용자가 --fix를 명시한 경우에만 확정적 working-tree 문제를 수정한다. release·emergency·learn은 항상 읽기 전용이고 Atomic Commit 계획, staging, commit, tag, push는 하지 않는다.
-argument-hint: "[today|3days|weekly|release|emergency|learn|pr] [추가 맥락] [--fix] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--from <ref>] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[clean|today|3days|weekly|release|emergency|learn|pr] [추가 맥락] [--fix] [--team|--no-team] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--from <ref>] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -12,6 +12,11 @@ allowed-tools:
   - Edit
   - Write
   - Agent
+  - SendMessage
+  - TaskCreate
+  - TaskGet
+  - TaskList
+  - TaskUpdate
   - Bash(git status *)
   - Bash(git diff *)
   - Bash(git log *)
@@ -30,18 +35,19 @@ allowed-tools:
   - Bash(git worktree list *)
   - Bash(gh pr view *)
   - Bash(cmp *)
-  - 'Bash(bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/report_validator.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/baseline.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/period_range.py" *)'
-  - 'Bash(python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/release_version.py" *)'
+  - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/report_validator.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/period_range.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/release_version.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py")'
 hooks:
   PreToolUse:
     - matcher: "Edit|Write|NotebookEdit"
       hooks:
         - type: command
-          command: 'python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/cr_edit_gate.py"'
+          command: 'python3 ".claude/skills/_git-atomic-core/scripts/cr_edit_gate.py"'
 ---
 
 # `/cr` — CommitForge Review
@@ -53,6 +59,28 @@ $ARGUMENTS
 ```
 
 **ultrathink.** `/cca`의 심층 품질 파이프라인 중 리뷰·수정·재리뷰·검증만 수행한다.
+
+## Skill 경로 확정 (필수 Preflight)
+
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
+`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
+치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
+
+다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
+
+1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
+2. 실패하면 `Glob`으로 `**/_git-atomic-core/scripts/guard.py`를 찾아 다시 정한다.
+3. 이후 모든 `.claude/skills/_git-atomic-core`를 확정된 `CF_CORE` 절대경로로 바꾼다.
+
+둘 다 실패하면 fail-closed다. core 미설치로 보고하고 즉시 종료하며, 경로 해석 실패를 이유로
+Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수행하지 않는다.
+
+## `clean` 조기 종료
+
+첫 번째 위치 인자가 정확히 `clean`이면
+`.claude/skills/_git-atomic-core/lock-cleanup.md`만 읽어 잠금 정리를
+실행하고 즉시 종료한다. 수정 권한 Gate, Guard `begin`, 리뷰와 검증은 실행하지
+않는다.
 
 ## 수정 권한 Gate
 
@@ -76,20 +104,20 @@ $ARGUMENTS
 
 작업 전에 다음 파일을 읽는다.
 
-1. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/safety-and-concurrency.md`
-2. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-gates.md`
-3. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/validation-strategy.md`
-4. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/project-profiles.md`
-5. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting.md`
-6. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/deep-review-protocol.md`
-7. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/conditional-reviewers.md`
-8. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-execution.md`
-9. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/review-policy.md`
-10. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/reporting-formats.md`
-11. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/baseline-and-suppressions.md`
-12. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/large-diff-review.md`
-13. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
-14. `${CLAUDE_SKILL_DIR}/../_git-atomic-core/extended-modes.md` — `release`·`emergency`·`learn`에서만 읽는다.
+1. `.claude/skills/_git-atomic-core/safety-and-concurrency.md`
+2. `.claude/skills/_git-atomic-core/review-gates.md`
+3. `.claude/skills/_git-atomic-core/validation-strategy.md`
+4. `.claude/skills/_git-atomic-core/project-profiles.md`
+5. `.claude/skills/_git-atomic-core/reporting.md`
+6. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
+7. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
+8. `.claude/skills/_git-atomic-core/review-execution.md`
+9. `.claude/skills/_git-atomic-core/review-policy.md`
+10. `.claude/skills/_git-atomic-core/reporting-formats.md`
+11. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
+12. `.claude/skills/_git-atomic-core/large-diff-review.md`
+13. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+14. `.claude/skills/_git-atomic-core/extended-modes.md` — `release`·`emergency`·`learn`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -105,6 +133,11 @@ $ARGUMENTS
 - `emergency`: incident·severity·base·scope 증거를 바탕으로 원인 후보, rollback/containment, 최소 수정·검증 계획만 제안한다. `--diagnose` 유무와 관계없이 소스를 고치지 않는다.
 - `learn`: `--since`, `--branches`, `--exclude-bots`, `--package`, `--commits` 범위에서 profile 후보와 근거·확신도만 보여주며 프로필 파일을 쓰지 않는다.
 - `--scope <경로...>`는 보고·수정 범위를 제한하지만 필수 의존성과 호출자는 분석한다.
+- `--team`은 Agent Team을 강제 선호하고 `--no-team`은 끈다. 둘을 함께 쓰면 오류다.
+  옵션이 없고 환경이 활성화되어 있으면 Agent Team이 기본이며, 명백히 사소한
+  단일 영역 변경만 `review-execution.md` 기준으로 축소한다.
+- Agent Team은 source-read-only 실행에서만 허용한다. 일반 리뷰의 `--fix`에서는
+  `--team`이 있어도 기존 subagent로 fallback하고 이유를 보고한다.
 - `--base <ref>`: `merge-base(<ref>, HEAD)..HEAD`와 현재 working change를 함께 리뷰한다.
 - `--range <A>..<B>`: 명시한 committed diff를 리뷰한다. `B`가 HEAD가 아니면 `--fix`를 허용하지 않는다.
 - 첫 인자가 `pr`이면 `gh pr view --json baseRefName,headRefName,number,url`로 현재 PR의 base를 읽어 `--base`처럼 처리한다. PR을 찾지 못하면 변경하지 말고 base를 요청한다.
@@ -123,15 +156,47 @@ $ARGUMENTS
 ## 1. Guard와 시작 불변식
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" begin \
-  --session "${CLAUDE_SESSION_ID}"
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
+  --session "<current-session-id>"
 ```
 
 `session`, `token`, `snapshot`, `fingerprint`, 시작 `HEAD`, staged fingerprint를 보관한다.
 
-- Guard 실패, 진행 중 Git operation, Git lock, 동일 worktree의 `/cc`·`/cr`·`/cca`가 있으면 중단한다.
+- Guard `begin`의 exit code가 0이 아니거나 결과의 `ok`가 `false`면 즉시
+  fail-closed로 중단한다. 변경 스캔, reviewer, 테스트, fingerprint, `abort`를
+  포함한 후속 명령을 실행하지 않는다. 이 경우 현재 세션은 lock을 획득하지
+  않았으므로 다른 owner의 lock을 해제하지 않는다.
+- Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
+  `No such file or directory`, `command not found`, Python 미탐지, permission
+  거부가 여기에 해당한다. “스크립트가 없으니 Guard를 생략한다”, “미설치라
+  건너뛴다”는 판단은 금지한다. Preflight로 `CF_CORE`를 다시 확정해 한 번만
+  재시도하고, 그래도 실패하면 리뷰를 시작하지 않고 종료한다.
+- `reason=guard_lock_conflict`이면 결과의 `project_root`, `git_dir`,
+  `lock_scope`, `lock_owner`, `lock_owner_snapshots`, `recovery`를 그대로
+  보고해 다른 저장소의 잠금과 혼동하지 않도록 한다. `abort` 성공 결과를
+  실제로 받기 전에는 잠금이 해제됐다고 보고하거나 `begin`을 재시도하지 않는다.
+  잠금 경과 시간은 Guard의 `lock_age_seconds`만 사용하고 직접 계산하지 않는다.
+  복구 명령을 안내하거나 사용자가 해제를 요청하면 `recovery.cwd`에서
+  `recovery.abort_argv`를 인자 단위 그대로 사용하며 명령을 재작성하지 않는다.
+- 잠금 충돌 보고에는 Guard가 준 `stale_candidate`, `lock_owner_same_host`,
+  `lock_owner_same_session`, `stale_after_seconds`도 포함한다. `stale_candidate`가
+  `true`여도 스스로 회수하지 않는다. 사용자에게 `/cr clean` 또는
+  `begin --reclaim-stale`을 선택지로 제시하고 명시적 승인을 받은 뒤에만 실행한다.
+  `lock_owner_same_host`가 `false`면 `--reclaim-stale`을 권하지 않는다.
+- `reason=git_external_lock`이면 Git 자체 lock 때문에 차단된 것이며 CommitForge
+  잠금 문제가 아니다. Guard가 준 `git_locks`의 `path`, `age_seconds`, `size`,
+  `writer_pids`, `stale_candidate`와 `recovery.remove_hint`를 그대로 보고하고
+  `/cr clean`을 안내한다. `clean`은 안전 조건을 모두 통과한 stale lock만 제거하며,
+  writer 판별 불능·활성 writer·진행 중 Git operation·변경된 lock은 보존한다.
+  `stale_candidate`가 `false`면 진행 중인 작업이 끝나기를 기다리게 한다.
+- Guard 실패, 진행 중 Git operation, Git lock, 동일 worktree의
+  `/cc`·`/cr`·`/cca`·`/cpr`·`/cp`가 있으면 중단한다.
+- Guard `begin`이 실패한 뒤 `git status`, `git diff`, `git log`를 대신 실행해
+  변경을 스캔하지 않는다. `git -C <경로>`로 다른 작업 디렉터리를 우회해 리뷰를
+  이어가는 것도 금지한다. 실패 원인을 보고하고 종료하는 것이 유일한 다음 동작이다.
 - 시작 staged diff는 사용자의 상태다. 수정하거나 비우지 않는다.
-- 실패·차단 시 `abort`로 자신의 lock만 해제하고 snapshot은 보존한다.
+- Guard를 성공적으로 획득한 뒤 실패·차단된 경우에만 `abort`로 자신의 lock만
+  해제하고 snapshot은 보존한다.
 
 ## 2. 변경 전체 스캔
 
@@ -151,13 +216,20 @@ git log -20 --pretty=format:'%h%x09%s'
 
 변경 파일뿐 아니라 관련 호출부, 타입·인터페이스, 테스트, 설정, migration, generated source, 프로젝트 규칙을 읽는다. 모든 hunk를 `deep-review-protocol.md`의 변경 원장에 배정하고 삭제 라인과 wrapper/proxy/adapter를 별도 추적한다.
 
-파일·hunk·changed line 수가 policy threshold를 넘으면 `large-diff-review.md`의 shard/aggregator 절차를 적용한다.
+파일·hunk·changed line 수가 policy threshold를 넘으면 `large-diff-review.md`의
+shard/aggregator 절차를 적용한다. 시작 공지에는 실제로 초과한 값과 적용
+threshold, `Agent Team core 3명 + 조건부 specialist` 구조를 함께 표시하며,
+shard 수를 teammate 수처럼 표현하거나 계산하지 않은 hunk 수를 추정하지 않는다.
 
 working change와 선택한 기간·commit range가 모두 비어 있을 때만 Guard `finish` 후 “검토 대상 없음”으로 종료한다.
 
 ## 3. 기본 10개 관점과 조건부 심층 리뷰
 
-가능하면 동일 fingerprint를 기준으로 병렬 실행한다.
+동일 fingerprint를 기준으로 `review-execution.md`의 구조 선택을 먼저 적용한다.
+Agent Team이면 core 3명이 domain/runtime shard, shared task와 peer messaging으로
+교차검증하고 Testing·Reliability·UX·Migration·Requirements·Release·Domain
+trigger에 따라 specialist를 추가한다. 그 밖에는 기존 custom subagent를 병렬
+실행한다.
 
 1. `cca-correctness-reviewer`
 2. `cca-line-reviewer`
@@ -177,7 +249,7 @@ Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실�
 변경 경로를 다음 도구에 전달해 조건부 reviewer의 최소 활성 집합을 얻는다.
 
 ```bash
-python3 "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/reviewer_triggers.py" <changed-path...>
+python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" <changed-path...>
 ```
 
 이 결과는 하한선이다. 실제 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단과 finding schema를 적용한다.
@@ -233,14 +305,17 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 종료 직전에 다음을 실행해 Guard가 시작 snapshot과 직접 비교하게 한다.
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" verify-review \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" verify-review \
   --session "<session>" \
-  --token "<token>" \
-  --snapshot "<snapshot>" \
   --source-read-only
 ```
 
 기본 `/cr`은 반드시 `--source-read-only`를 사용한다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 이 flag를 생략한다. `release`·`emergency`·`learn`은 `--fix`가 있어도 반드시 `--source-read-only`를 사용한다.
+Guard는 현재 worktree에서 session과 일치하는 owner token과 유일한 snapshot을
+직접 해석한다. `snapshot-path` 같은 문서화되지 않은 하위 명령을 만들거나,
+basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다시 호출하지
+않는다. 명시적 `--token`·`--snapshot`은 진단상 정확한 원본 값을 그대로 재사용할
+때만 전달한다.
 
 검증 항목:
 
@@ -252,10 +327,8 @@ bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" verify-review \
 정상 완료 시:
 
 ```bash
-bash "${CLAUDE_SKILL_DIR}/../_git-atomic-core/scripts/guard.sh" finish \
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
-  --token "<token>" \
-  --snapshot "<snapshot>" \
   --review-only \
   --source-read-only
 ```
