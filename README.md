@@ -637,6 +637,17 @@ type(scope): 한글 제목
 
 ## 동시 세션 안전성
 
+### 세션 종료 자동 정리
+
+설치기는 Claude Code의 실제 `session_id`를 Guard owner와 결합하는 lifecycle hook을
+등록합니다. 정상 응답 종료, API 실패, `/clear`, `/exit`, `/resume`, 로그아웃에서
+종료 세션이 소유한 현재 worktree 잠금만 자동 해제하고 Diff snapshot은 보존합니다.
+다른 세션이나 다른 저장소의 잠금은 해제하지 않습니다.
+
+`/compact`와 자동 context compaction은 같은 세션이 계속 실행되는 동작이므로 잠금을
+유지합니다. compaction 뒤 같은 session ID가 다시 전달됩니다. 강제 종료·전원 손실처럼
+Claude가 종료 hook을 전달할 수 없는 경우에는 아래의 stale 회수 또는 `clean`을 사용합니다.
+
 ### 현재 프로젝트 잠금 정리
 
 모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
@@ -684,7 +695,7 @@ writer 판별이 불가능하거나 상태가 바뀌면 삭제하지 않고 남�
 
 ```bash
 python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py begin \
-  --session "<현재-세션>" --reclaim-stale
+  --session "$COMMITFORGE_SESSION_ID" --reclaim-stale
 ```
 
 같은 호스트의 오래된 잠금이거나 동일 세션 재진입일 때만 해제 후 재획득하며,

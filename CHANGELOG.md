@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.13.0 — 2026-07-26
+
+- 설치 시 Claude Code `SessionStart`, `Stop`, `StopFailure`, `SessionEnd` lifecycle
+  hook을 사용자 설정에 병합해 Guard owner를 실제 Claude `session_id`와 결합
+- 정상 응답 종료, API 실패, `/clear`, `/exit`, `/resume`, 로그아웃에서 종료 세션과
+  owner가 정확히 일치하는 현재 worktree 잠금만 자동 해제하고 Diff snapshot은 보존
+- 수동·자동 `/compact`에서는 잠금을 유지하고 같은 session ID를 다시 바인딩해 진행 중
+  리뷰·검증의 동시 실행 보호가 끊기지 않도록 처리
+- 다른 세션의 잠금, 다른 저장소, 비정상 lock 내용은 자동 종료 정리가 건드리지 않는
+  fail-closed `guard.py session-end` 경로와 회귀 테스트 추가
+- 단기 Guard 프로세스 PID를 활성 세션으로 오인하지 않도록 owner 필드를
+  `guard_pid`에서 의미가 명확한 `begin_pid`로 변경
+- 프로젝트 설치는 `.claude/settings.local.json`, 전역 설치는
+  `~/.claude/settings.json`을 사용하며 기존 사용자 설정·hook을 보존하고 제거 시
+  CommitForge lifecycle hook만 제거
+- macOS·Linux·Windows에서 셸이 만든 임의 세션 문자열 대신 설치 hook이 전달한
+  `COMMITFORGE_SESSION_ID`만 사용하도록 모든 실행 계약과 복구 문서 갱신
+
 ## 1.12.1 — 2026-07-26
 
 - `/cr`의 `PreToolUse` Write/Edit 훅이 셸에 존재하지 않는

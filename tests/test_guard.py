@@ -202,7 +202,8 @@ class GuardIntegrationTest(unittest.TestCase):
         self.guard("begin", "--session", "identity-owner")
         owner = json.loads(self.owner_path().read_text(encoding="utf-8"))
         self.assertEqual(owner["hostname"], socket.gethostname())
-        self.assertIsInstance(owner["guard_pid"], int)
+        self.assertIsInstance(owner["begin_pid"], int)
+        self.assertNotIn("guard_pid", owner)
 
     def test_begin_conflict_reports_stale_candidate_and_clean_hint(self) -> None:
         self.guard("begin", "--session", "first-owner")
@@ -448,6 +449,17 @@ class GuardIntegrationTest(unittest.TestCase):
             proc = run([sys.executable, str(GUARD), *command], self.tmp, check=False)
             self.assertNotEqual(proc.returncode, 0)
             self.assertIn("1 이상", proc.stderr)
+
+    def test_empty_or_unsafe_session_id_is_rejected(self) -> None:
+        for session in ("", "made/up", "x" * 81):
+            proc = run(
+                [sys.executable, str(GUARD), "begin", "--session", session],
+                self.tmp,
+                check=False,
+            )
+            self.assertNotEqual(proc.returncode, 0)
+            self.assertIn("invalid_session_id", proc.stdout)
+        self.assertFalse(self.owner_path().exists())
 
     def test_clean_message_stays_quiet_without_git_locks(self) -> None:
         _, cleaned = self.guard("clean", "--request-session", "requester")

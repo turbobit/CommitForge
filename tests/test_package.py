@@ -220,6 +220,25 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn("_git-atomic-core/scripts/guard.py", skill)
             self.assertIn("fail-closed", skill)
 
+    def test_guard_uses_claude_lifecycle_session_identity(self) -> None:
+        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("COMMITFORGE_SESSION_ID", skill)
+            self.assertNotIn("<current-session-id>", skill)
+        safety = (
+            ROOT / ".claude/skills/_git-atomic-core/safety-and-concurrency.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "SessionStart",
+            "Stop`·`StopFailure",
+            "`SessionEnd`",
+            "수동·자동 `/compact`",
+            "Diff snapshot은 보존",
+        ):
+            self.assertIn(contract, safety)
+
     def test_guard_launch_failures_are_fail_closed(self) -> None:
         for command in ("cc", "cr", "cca", "cpr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(

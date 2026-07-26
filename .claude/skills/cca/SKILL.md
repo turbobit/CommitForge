@@ -57,10 +57,10 @@ $ARGUMENTS
 
 ## Skill 경로 확정 (필수 Preflight)
 
-`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**,
-`<current-session-id>`는 현재 세션 ID다. shell 환경변수가 아니므로 실행 전에 실제 값으로
-치환한다. 상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
-
+`SKILL_DIR`는 **이 SKILL.md가 들어 있는 디렉터리의 절대경로**다.
+설치된 `SessionStart` 훅이 실제 Claude 세션 ID를 `COMMITFORGE_SESSION_ID`에 설정한다.
+값이 비어 있으면 기존 세션이므로 Claude Code를 재시작하고, 임의 ID로 대체하지 않는다.
+상위 skills 루트로 치환하면 `/..` 때문에 core 밖을 가리켜 모든 명령이 실패한다.
 다른 어떤 명령보다 먼저 `CF_CORE`를 확정한다.
 
 1. `CF_CORE = <이 SKILL.md의 디렉터리>/../_git-atomic-core`로 두고 `Read`로 `CF_CORE/README.md`를 읽어 확인한다.
@@ -149,7 +149,7 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 
 ```bash
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
-  --session "<current-session-id>"
+  --session "$COMMITFORGE_SESSION_ID"
 ```
 
 `session`, `token`, `snapshot`, `fingerprint`, 시작 `head`를 보관한다.

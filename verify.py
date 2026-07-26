@@ -34,6 +34,7 @@ REQUIRED = [
     ".claude/skills/_git-atomic-core/lock-cleanup.md",
     ".claude/skills/_git-atomic-core/scripts/guard.py",
     ".claude/skills/_git-atomic-core/scripts/guard.sh",
+    ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py",
     ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
     ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
     ".claude/skills/_git-atomic-core/scripts/report_validator.py",

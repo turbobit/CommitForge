@@ -50,6 +50,13 @@ Git과 Python 3.9 이상이 필요합니다. `/cpr`, `/cp`에는 GitHub CLI(`gh`
 ```
 
 새 `.claude/agents` 디렉터리를 실행 중 세션에서 처음 만들었다면 한 번 재시작하십시오.
+설치기는 프로젝트 범위에서는 `.claude/settings.local.json`, 전역 범위에서는
+`~/.claude/settings.json`에 CommitForge lifecycle hook만 병합합니다. 기존 설정과
+다른 hook은 보존되며 제거 시에도 CommitForge hook만 제거됩니다.
+
+실제 Claude 세션 ID 전달과 `/clear`·`/exit` 자동 잠금 정리는 새 세션부터 적용됩니다.
+설치 또는 업데이트 뒤에는 실행 중인 Claude Code를 한 번 재시작하십시오. `/compact`는
+세션 종료가 아니므로 잠금을 유지합니다.
 
 ## 권장 최초 시험
 

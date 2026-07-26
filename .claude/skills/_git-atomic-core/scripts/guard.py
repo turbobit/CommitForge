@@ -410,8 +410,18 @@ def owned_snapshots(
 
 
 def safe_session(value: str) -> str:
-    value = value.strip() or "unknown-session"
-    return "".join(ch if ch.isalnum() or ch in "-_." else "_" for ch in value)[:80]
+    value = value.strip()
+    if (
+        not value
+        or len(value) > 80
+        or any(not (ch.isalnum() or ch in "-_.") for ch in value)
+    ):
+        raise GuardError(
+            "session ID가 비어 있거나 안전한 형식이 아닙니다. "
+            "설치된 SessionStart hook의 COMMITFORGE_SESSION_ID를 사용하십시오.",
+            reason="invalid_session_id",
+        )
+    return value
 
 
 def positive_seconds(value: str) -> int:
@@ -669,7 +679,7 @@ def acquire_lock(
         "worktree": str(ctx["root"]),
         "git_dir": str(ctx["git_dir"]),
         "hostname": socket.gethostname(),
-        "guard_pid": os.getpid(),
+        "begin_pid": os.getpid(),
     }
     reclaimed: dict[str, Any] | None = None
 
@@ -1294,6 +1304,94 @@ def cmd_abort(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_session_end(args: argparse.Namespace) -> None:
+    """Release only a lock owned by the ending Claude session."""
+    ctx = repo_context(Path.cwd().resolve())
+    session = safe_session(args.session)
+    lock_dir, owner_file = lock_paths(ctx)
+    if not lock_dir.exists():
+        emit(
+            {
+                "ok": True,
+                "reason": "lock_not_found",
+                "session": session,
+                "session_end_reason": args.reason,
+                "project_root": str(ctx["root"]),
+                "lock_found": False,
+                "lock_released": False,
+                "snapshot_removed": False,
+            }
+        )
+    if lock_dir.is_symlink() or not lock_dir.is_dir() or owner_file.is_symlink():
+        raise GuardError(
+            "SessionEnd 정리 대상 잠금 경로가 안전하지 않습니다.",
+            reason="session_end_lock_path_unsafe",
+            lock_path=str(lock_dir),
+        )
+
+    owner_bytes = owner_file.read_bytes()
+    owner = read_json(owner_file)
+    if not owner:
+        raise GuardError(
+            "SessionEnd 정리 대상 owner 정보가 없거나 손상되었습니다.",
+            reason="session_end_owner_unreadable",
+            lock_path=str(lock_dir),
+        )
+    if owner.get("session") != session:
+        emit(
+            {
+                "ok": True,
+                "reason": "session_end_owner_mismatch",
+                "session": session,
+                "session_end_reason": args.reason,
+                "project_root": str(ctx["root"]),
+                "lock_found": True,
+                "lock_released": False,
+                "snapshot_removed": False,
+                "lock_owner_session": owner.get("session"),
+            }
+        )
+    if (
+        Path(str(owner.get("worktree", ""))).resolve() != ctx["root"]
+        or Path(str(owner.get("git_dir", ""))).resolve() != ctx["git_dir"]
+    ):
+        raise GuardError(
+            "SessionEnd 정리 대상 owner의 worktree 범위가 일치하지 않습니다.",
+            reason="session_end_owner_scope_mismatch",
+            lock_path=str(lock_dir),
+        )
+    entries = sorted(path.name for path in lock_dir.iterdir())
+    if entries != [owner_file.name]:
+        raise GuardError(
+            "SessionEnd 잠금 디렉터리에 알 수 없는 항목이 있어 해제를 거부합니다.",
+            reason="session_end_lock_contents_unexpected",
+            lock_path=str(lock_dir),
+            unexpected_entries=[name for name in entries if name != owner_file.name],
+        )
+    if owner_file.read_bytes() != owner_bytes:
+        raise GuardError(
+            "SessionEnd 확인 중 잠금 owner가 바뀌어 해제를 거부합니다.",
+            reason="session_end_owner_changed",
+            lock_path=str(lock_dir),
+        )
+
+    owner_file.unlink()
+    lock_dir.rmdir()
+    emit(
+        {
+            "ok": True,
+            "reason": "session_end_owner_released",
+            "session": session,
+            "session_end_reason": args.reason,
+            "project_root": str(ctx["root"]),
+            "lock_found": True,
+            "lock_released": True,
+            "snapshot_removed": False,
+            "message": "종료된 Claude 세션의 잠금을 해제하고 Diff 스냅샷은 보존했습니다.",
+        }
+    )
+
+
 def cmd_clean(args: argparse.Namespace) -> None:
     """Explicitly release only the current worktree's CommitForge lock."""
     ctx = repo_context(Path.cwd().resolve())
@@ -1660,6 +1758,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Owned snapshot path; omitted when session/token identify exactly one snapshot",
     )
 
+    session_end = sub.add_parser(
+        "session-end",
+        help="Release a matching Claude session lock while preserving snapshots",
+    )
+    session_end.add_argument("--session", required=True)
+    session_end.add_argument(
+        "--reason",
+        required=True,
+    )
+
     clean = sub.add_parser(
         "clean",
         help="Explicitly release only the current worktree lock and preserve snapshots",
@@ -1699,6 +1807,7 @@ def main() -> None:
         "audit-snapshot": cmd_audit_snapshot,
         "finish": cmd_finish,
         "abort": cmd_abort,
+        "session-end": cmd_session_end,
         "clean": cmd_clean,
         "status": cmd_status,
     }

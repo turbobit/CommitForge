@@ -97,7 +97,7 @@ owner token을 그대로 쓸 수 있으면 위의 `abort`가 우선이다. token
 원래 실행이 끝났음을 확인했다면 회수를 요청할 수 있다.
 
 ```bash
-python3 .../guard.py begin --session "<현재-세션>" --reclaim-stale
+python3 .../guard.py begin --session "$COMMITFORGE_SESSION_ID" --reclaim-stale
 ```
 
 같은 호스트의 잠금이면서 `stale_candidate`이거나 owner session이 현재 session과

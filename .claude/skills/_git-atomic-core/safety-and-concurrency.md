@@ -65,6 +65,13 @@ cross-worktree 경로나 basename은 계속 fail-closed다.
 
 guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만든다.
 
+- 설치된 `SessionStart` 훅이 Claude가 제공한 실제 `session_id`를
+  `COMMITFORGE_SESSION_ID`로 전달하며, Guard owner에는 이 값만 사용한다.
+- 정상 응답 종료와 API 실패의 `Stop`·`StopFailure`, `/clear`·`/exit`·`/resume` 등의
+  `SessionEnd`에서 종료 세션과 owner가 정확히 일치할 때만 잠금을 자동 해제한다.
+  자동 해제에서도 Diff snapshot은 보존한다.
+- 수동·자동 `/compact`는 같은 세션의 연속 실행이므로 잠금을 해제하지 않는다.
+  compact 뒤 `SessionStart`가 같은 ID를 다시 바인딩한다.
 - 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`를 실행하면 두 번째 실행은 중단
 - 잠금 식별자는 명령 이름이나 부모 폴더가 아니라 `git rev-parse --git-dir`로 얻은 실제 worktree Git directory
 - 같은 부모 폴더 아래의 서로 다른 Git 저장소는 각자의 Git directory를 사용하므로 서로 차단하지 않음
@@ -76,7 +83,7 @@ guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만
 - 사용자가 모든 slash command의 첫 인자로 정확히 `clean`을 요청한 경우에만
   Guard의 `clean`이 현재 worktree의 CommitForge advisory lock을 명시적으로
   해제함. 다른 worktree와 snapshot은 건드리지 않음
-- 비정상 종료 후 stale lock은 해당 저장소에서 `guard.py status`로 `project_root`,
+- `SessionEnd`를 전달할 수 없는 강제 종료·전원 손실 후 stale lock은 해당 저장소에서 `guard.py status`로 `project_root`,
   `git_dir`, 소유자와 스냅샷을 확인한 뒤 소유 session/token으로 `abort` 처리
 - 생성 시각이 오래됐다는 이유만으로 stale이라고 단정하지 않으며, 원래 세션의 종료를 먼저 확인
 
@@ -95,7 +102,7 @@ Guard는 owner에 `hostname`을 기록하고 `status`·`begin` 결과에 다음�
 사용자가 원래 실행의 종료를 확인한 뒤에만 회수한다.
 
 ```bash
-python3 .../guard.py begin --session "<현재-세션>" --reclaim-stale
+python3 .../guard.py begin --session "$COMMITFORGE_SESSION_ID" --reclaim-stale
 ```
 
 `--reclaim-stale`은 다음을 모두 만족할 때만 기존 잠금을 해제하고 재획득한다.

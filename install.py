@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import json
 from pathlib import Path
 import shlex
 import shutil
@@ -115,6 +116,114 @@ def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
     skill_path.write_text("".join(lines), encoding="utf-8")
 
 
+def is_commitforge_lifecycle_handler(handler: object) -> bool:
+    if not isinstance(handler, dict):
+        return False
+    command = handler.get("command")
+    return (
+        handler.get("type") == "command"
+        and isinstance(command, str)
+        and "_git-atomic-core" in command
+        and "session_lifecycle.py" in command
+    )
+
+
+def remove_lifecycle_handlers(settings: dict) -> None:
+    hooks = settings.get("hooks")
+    if not isinstance(hooks, dict):
+        return
+    for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
+        groups = hooks.get(event)
+        if not isinstance(groups, list):
+            continue
+        kept_groups = []
+        for group in groups:
+            if not isinstance(group, dict):
+                kept_groups.append(group)
+                continue
+            handlers = group.get("hooks")
+            if not isinstance(handlers, list):
+                kept_groups.append(group)
+                continue
+            kept_handlers = [
+                handler
+                for handler in handlers
+                if not is_commitforge_lifecycle_handler(handler)
+            ]
+            if kept_handlers:
+                updated = dict(group)
+                updated["hooks"] = kept_handlers
+                kept_groups.append(updated)
+        if kept_groups:
+            hooks[event] = kept_groups
+        else:
+            hooks.pop(event, None)
+    if not hooks:
+        settings.pop("hooks", None)
+
+
+def configure_lifecycle_hooks(
+    claude_dir: Path,
+    backup_root: Path,
+    *,
+    global_scope: bool,
+    dry_run: bool,
+) -> None:
+    """Merge CommitForge session hooks without replacing user settings."""
+    settings_name = "settings.json" if global_scope else "settings.local.json"
+    settings_path = claude_dir / settings_name
+    lifecycle_path = (
+        claude_dir
+        / "skills"
+        / "_git-atomic-core"
+        / "scripts"
+        / "session_lifecycle.py"
+    )
+    command = shell_join(
+        [str(Path(sys.executable).resolve()), str(lifecycle_path.resolve())]
+    )
+    if dry_run:
+        print(f"[dry-run] merge CommitForge lifecycle hooks -> {settings_path}")
+        return
+    if settings_path.is_symlink():
+        raise RuntimeError(f"Claude 설정 심볼릭 링크는 자동 수정하지 않습니다: {settings_path}")
+
+    if settings_path.exists():
+        backup = backup_root / settings_name
+        backup.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(settings_path, backup)
+        try:
+            settings = json.loads(settings_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError(f"Claude 설정 JSON이 손상되었습니다: {settings_path}") from exc
+        if not isinstance(settings, dict):
+            raise RuntimeError(f"Claude 설정은 JSON object여야 합니다: {settings_path}")
+    else:
+        settings = {}
+
+    remove_lifecycle_handlers(settings)
+    hooks = settings.setdefault("hooks", {})
+    if not isinstance(hooks, dict):
+        raise RuntimeError(f"Claude hooks 설정은 JSON object여야 합니다: {settings_path}")
+    handler = {
+        "type": "command",
+        "command": command,
+        "timeout": 5,
+    }
+    for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
+        groups = hooks.setdefault(event, [])
+        if not isinstance(groups, list):
+            raise RuntimeError(
+                f"Claude {event} hook 설정은 JSON array여야 합니다: {settings_path}"
+            )
+        groups.append({"hooks": [handler]})
+    settings_path.parent.mkdir(parents=True, exist_ok=True)
+    settings_path.write_text(
+        json.dumps(settings, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def copy_with_backup(src: Path, dst: Path, backup: Path, dry_run: bool) -> None:
     if dst.is_symlink():
         raise RuntimeError(f"심볼릭 링크 대상은 자동 교체하지 않습니다: {dst}")
@@ -176,6 +285,12 @@ def main() -> None:
 
     configure_skill_core_paths(claude_dir, args.dry_run)
     configure_cr_edit_gate(claude_dir, args.dry_run)
+    configure_lifecycle_hooks(
+        claude_dir,
+        backup_root,
+        global_scope=args.scope == "global",
+        dry_run=args.dry_run,
+    )
 
     print()
     print(f"설치 범위: {args.scope}")
@@ -190,6 +305,7 @@ def main() -> None:
         "확장 모드: /cca today, /cca 3days, /cca weekly, /cca release, "
         "/cca emergency, /cca learn"
     )
+    print("세션 잠금 정리: 응답 종료, API 실패, /clear, /exit, /resume 시 자동 해제")
     print("새 .claude/agents 디렉터리를 처음 만든 실행 중 세션에서는 Claude Code 재시작을 권장합니다.")
 
 

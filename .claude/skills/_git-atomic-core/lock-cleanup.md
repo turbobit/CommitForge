@@ -5,7 +5,7 @@
 
 ```bash
 bash "<absolute-CF_CORE>/scripts/guard.sh" clean \
-  --request-session "<current-session-id>"
+  --request-session "$COMMITFORGE_SESSION_ID"
 ```
 
 `<absolute-CF_CORE>`는 각 SKILL.md의 Preflight에서 확정한 `_git-atomic-core` 절대경로다.

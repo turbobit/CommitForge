@@ -257,7 +257,7 @@ Guard 명령:
 
 ```bash
 bash "<absolute-CF_CORE>/scripts/guard.sh" begin \
-  --session "<current-session-id>"
+  --session "$COMMITFORGE_SESSION_ID"
 git diff --cached --binary --full-index -- . \
   ':(exclude).commitforge/profile.md' \
   ':(exclude).commitforge/profile.json' > "<snapshot>/learn-staged-before.diff"
