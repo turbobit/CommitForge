@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.13.0",
+  "version": "1.14.0",
   "reproducible": true,
-  "file_count": 87,
-  "total_bytes": 565161,
+  "file_count": 88,
+  "total_bytes": 575576,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -87,8 +87,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 2608,
-      "sha256": "682c86c380beddba8e6e9657d1d6cf90026d26dc65be841ee23a323348bc4407"
+      "size": 2695,
+      "sha256": "448d6694114da4373ad120b616438a980d36b177ef13ab98a4e709284088ca43"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -124,6 +124,11 @@
       "path": ".claude/skills/_git-atomic-core/extended-modes.md",
       "size": 15439,
       "sha256": "cb288e134fadc2fc523fcd9ccdcd2b964949dcebb31187df1584aadbb0d25b7a"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/graceful-stop.md",
+      "size": 3250,
+      "sha256": "7dc746b4bf992edf819129c9cc8263af96bbde0e966c5f3f9cb9263611f8a209"
     },
     {
       "path": ".claude/skills/_git-atomic-core/language-api-pitfalls.md",
@@ -172,8 +177,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 9739,
-      "sha256": "83a1a03f0169b4e696ca03087bd849c58002c69b22059a68bc7f7ffd6ae67aa9"
+      "size": 11191,
+      "sha256": "085e66168c97d38c4debac833bb6a42cbada9eb795b8a79ace559cc6782d852e"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -262,8 +267,8 @@
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 23693,
-      "sha256": "352dd63ef5b7c37b9707cb05f5d46045b1c069b7043eae08be61d31f0e4b7594"
+      "size": 24958,
+      "sha256": "06ce18599bbac706c54301b10dff289e3a534ac6340316156b647bad7c8ddb49"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
@@ -292,18 +297,18 @@
     },
     {
       "path": ".github/dependabot.yml",
-      "size": 181,
-      "sha256": "e5294ec6de7679cbce9dabb6a8f24958446c27e00be984eb9789ab59d5e429ea"
+      "size": 249,
+      "sha256": "bd83a87d94dfb254128b0fead533aab29c00449f23b1b61c91615e22f0e810ed"
     },
     {
       "path": ".github/workflows/verify.yml",
-      "size": 2607,
-      "sha256": "78f7d4fb9b1b26e1c1bc39679ecdaacaa2be9ded7cb7df024ba4729d440aeee9"
+      "size": 2423,
+      "sha256": "4eeae830ba7f0a160f5b44ca82621dfd22f35e4c9e52ce5ba6fe4f19f2aa0504"
     },
     {
       "path": "CHANGELOG.md",
-      "size": 18347,
-      "sha256": "0cc1d3058efe5e382807605423acc4b5471b85d01509cd69d2b8b56b0faa0d92"
+      "size": 19500,
+      "sha256": "bd7f21ccde55f78f5253a7d3c621220587d06c8a091a6791f45e93e099fa1ddc"
     },
     {
       "path": "INSTALL.md",
@@ -317,18 +322,18 @@
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 8157,
-      "sha256": "2dce8f8717ec3ce02da15e2b13bb8a225e2faab760640fecb1b7aa3b429b4a45"
+      "size": 8414,
+      "sha256": "514dbe839d370196aaf357c1ff4881d998685756fae44d27be609d880bd3181f"
     },
     {
       "path": "README.md",
-      "size": 44701,
-      "sha256": "4fad613179eac2fca55fac6e26cfbb989c74acbcac2e494db6e4a144d05688e7"
+      "size": 45590,
+      "sha256": "f6abafca062e15a0877cae71a3aa6a7f19363f1a6ca2225688641959c7c50dec"
     },
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "b4a9545a385e9701482be56a0efee678d467d9c586ec476f2c5986cfaa24e96c"
+      "sha256": "bb0df1bd902faba507c15975eb9973e695f2732f760d851b4f9c7ba17068f5ff"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
@@ -387,8 +392,8 @@
     },
     {
       "path": "tests/test_package.py",
-      "size": 21955,
-      "sha256": "f645725512c21a3471d3219c2c35d8e7be17d2d58238bde0a352e0f9eec3dd64"
+      "size": 23943,
+      "sha256": "e852827d78c8b042b17824816104db870cd55ec3f1073e12a859adeeafda21d1"
     },
     {
       "path": "tests/test_pr_context.py",
@@ -417,8 +422,8 @@
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 8256,
-      "sha256": "dc0bfe7d2a4533899fcb41e9ea1dda24c8eeb4f18791d74a1abcadecc36bc286"
+      "size": 8446,
+      "sha256": "43a39a68c6ea3e6080727f92311ff0ef74ea035b29fd907e0217a14356023e3e"
     },
     {
       "path": "uninstall.ps1",

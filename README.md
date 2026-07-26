@@ -241,7 +241,8 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 
 `/cr`은 기본적으로 소스를 수정하지 않는 읽기 전용 심층 리뷰입니다. Commit 계획 전용 Git/Atomicity reviewer를 제외한 기본 10개 관점과 조건부 전문 reviewer로 검토하고 테스트·검증합니다. 현재 미커밋 변경에서 발견한 확정적·국소적 문제를 수정하려면 `/cr --fix`처럼 명시해야 합니다. 어느 경우에도 Atomic Commit 계획, 메시지 초안, staging, commit, push는 만들지 않습니다.
 
-읽기 전용 `/cr`, `/cpr`, `/ccr`은 Claude Code Agent Teams 환경이 활성화돼
+읽기 전용 `/cr`, `/cpr`, `/ccr`과 `/cca`의 read-only 리뷰 단계는 Claude Code
+Agent Teams 환경이 활성화돼
 있으면 core 3명을 기본으로 사용합니다. 파일 2개 이하·80 changed lines 이하인
 단일 domain이며 고위험 trigger와 cross-file contract가 없는 경우에만 Team을
 생략할 수 있습니다. `--team`이면 사소한 변경도 core 3명으로
@@ -250,8 +251,16 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 fallback합니다. Team 생성은 Claude Code가 요구하는 승인을 거치며, 승인하지
 않아도 subagent 리뷰는 계속됩니다. CommitForge는
 `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS`를 설정하거나 변경하지 않습니다.
-`/cr --fix`, `/cc`, `/cca`, `/cp`는 항상 기존 subagent + lead 단독 변경
-구조를 유지합니다.
+`/cca`는 Team 결과를 모두 집계하고 종료한 뒤 lead만 수정하며, fingerprint가
+바뀌면 새 read-only Team으로 전체 diff를 재리뷰합니다. `/cr --fix`, `/cc`,
+`/cp`는 기존 subagent 구조를 유지합니다. 모든 실행형 단계에서 실제 변경은
+lead만 수행합니다.
+
+`/cca` 반복 중 “종료 예약” 또는 “현재 반복 후 종료”를 보내면 현재 read-only
+Team과 이미 시작한 국소 수정의 재리뷰까지만 안전하게 마칩니다. 새 반복·수정·
+commit은 시작하지 않고 Team을 종료한 뒤 Guard lock을 해제하며 snapshot을
+보존합니다. 최초 리뷰와 매 재리뷰 시작 시 현재 반복 횟수와 이 종료 방법을
+안내합니다.
 
 `/cr`·`/cpr`의 core 3명은 Correctness/State/Concurrency,
 Security/Privacy/Supply Chain/Integrity, Architecture/API/Compatibility를
@@ -295,11 +304,11 @@ specialist를 활성화합니다.
 ```text
 Guard + 원본 Diff 보존
 → 변경 전체 분석
-→ Git/정확성/line-by-line/보안/성능/테스트/architecture/API/UX·A11y/observability/품질 기본 리뷰
+→ read-only Agent Team core 3명으로 전체 diff 기본 리뷰
 → 변경 trigger에 맞는 데이터·공급망·복구·privacy·요구사항 전문 리뷰
-→ finding 근거 검증
+→ finding 근거 검증·Team 종료
 → 확정적 CRITICAL/MAJOR 문제의 안전한 국소 수정
-→ 재리뷰(최대 반복 횟수)
+→ fingerprint 갱신·새 read-only Team 재리뷰(최대 반복 횟수)
 → targeted 검증
 → Commit Dependency Graph
 → hunk/file 단위 staging
@@ -340,8 +349,10 @@ Guard + 원본 Diff 보존
 
 ### Reviewer 실행 신뢰성
 
-- 읽기 전용 `/cr`·`/cpr`·`/ccr`은 core 3명 Team이 기본이며, 명백히 사소한
-  단일 영역 변경만 생략
+- 읽기 전용 `/cr`·`/cpr`·`/ccr`과 `/cca`의 read-only 리뷰 단계는 core 3명
+  Team이 기본이며, 명백히 사소한 단일 영역 변경만 생략
+- `/cca`는 Team을 완전히 종료한 뒤 lead만 수정하고, 수정된 fingerprint마다
+  새 Team으로 전체 diff를 재리뷰
 - 대형 diff는 파일 수 균등 분할 대신 package/domain/runtime shard와 위험
   관점을 겹쳐 배정하고 lead aggregator가 contract graph와 hunk coverage 통합
 - Testing은 문서 전용 변경 외에는 필수 specialist로 활성화하고 Reliability·UX·
@@ -514,8 +525,8 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
 | `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
-| `--team` | `/cr`, `/ccr`, `/cpr` | 환경이 활성화된 경우 Agent Team 강제 선호 |
-| `--no-team` | `/cr`, `/ccr`, `/cpr` | Agent Team을 끄고 기존 subagent 사용 |
+| `--team` | `/cr`, `/ccr`, `/cpr`, `/cca` | 환경이 활성화된 경우 read-only 리뷰 단계에서 Agent Team 강제 선호 |
+| `--no-team` | `/cr`, `/ccr`, `/cpr`, `/cca` | Agent Team을 끄고 기존 subagent 사용 |
 | `--fix` | `/cr` 일반 리뷰 | 현재 working hunk의 확정적·국소 문제 수정 허용; `release`·`emergency`·`learn`에서는 거부 |
 | `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
 | `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |

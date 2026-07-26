@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.14.0 — 2026-07-26
+
+- `/cca` 최초 리뷰와 수정 후 재리뷰를 read-only Agent Team core 3명과 조건부
+  specialist로 실행하고, Team 종료 후에만 lead가 수정·검증·staging·commit
+- 수정할 때마다 이전 결과를 무효화하고 fingerprint·trigger를 갱신한 새 Team으로
+  전체 diff를 재리뷰하는 `--iterations` 반복 계약 유지
+- `/cca` 반복 중 “종료 예약”을 받으면 현재 안전 경계에서 teammate를 회수하고
+  Guard를 `abort`해 lock을 해제하며 snapshot을 보존하는 graceful stop 추가
+- 최초 리뷰와 매 재리뷰 시작 시 현재 반복 횟수와 graceful stop 사용법 안내
+- Windows에서 임시 경로의 표기·대소문자 정규화 차이로 lifecycle hook 보존 테스트가
+  잘못 실패하던 문제 수정
+- GitHub Actions의 중복 Ubuntu 검증 job과 중복 live eval step을 제거하고 기준
+  검증 통과 후에만 세 portability job을 실행하며, 같은 ref의 이전 run은 자동 취소
+- Dependabot GitHub Actions 갱신을 하나의 주간 그룹·PR로 제한해 중복 update
+  workflow와 PR 검증 run을 축소
+
 ## 1.13.0 — 2026-07-26
 
 - 설치 시 Claude Code `SessionStart`, `Stop`, `StopFailure`, `SessionEnd` lifecycle

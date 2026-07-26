@@ -22,6 +22,25 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertEqual(version, manifest["version"])
         self.assertTrue(readme.startswith("# CommitForge"))
 
+    def test_ci_matrix_has_no_duplicate_primary_environment(self) -> None:
+        workflow = (ROOT / ".github/workflows/verify.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertEqual(workflow.count("jobs:\n  verify:"), 1)
+        self.assertEqual(workflow.count("\n  portability:"), 1)
+        self.assertIn("needs: verify", workflow)
+        self.assertIn("cancel-in-progress: true", workflow)
+        self.assertEqual(workflow.count('python-version: "3.13"'), 1)
+        self.assertEqual(workflow.count("Check live eval contracts"), 0)
+        self.assertEqual(workflow.count("persist-credentials: false"), 2)
+        self.assertIn("python -m compileall", workflow)
+
+        dependabot = (ROOT / ".github/dependabot.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("open-pull-requests-limit: 5", dependabot)
+        self.assertIn("github-actions:", dependabot)
+
     def test_extended_modes_are_connected(self) -> None:
         cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
         modes = (
@@ -93,7 +112,7 @@ class PackageMetadataTest(unittest.TestCase):
         execution = (
             ROOT / ".claude/skills/_git-atomic-core/review-execution.md"
         ).read_text(encoding="utf-8")
-        for command in ("cr", "ccr", "cpr"):
+        for command in ("cr", "ccr", "cpr", "cca"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -101,14 +120,14 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn("--team|--no-team", frontmatter)
             self.assertIn("agent_team_mode.py", skill)
             self.assertIn("Agent", frontmatter)
-        for command in ("cc", "cca", "cp"):
+        for command in ("cc", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
             self.assertNotIn("--team|--no-team", skill.split("\n---\n", 1)[0])
         for contract in (
-            "source-read-only 실행, `/ccr`, `/cpr`",
-            "`/cr --fix`, `/cc`, `/cca`, `/cp`",
+            "source-read-only 실행, `/ccr`, `/cpr`와 `/cca`",
+            "`/cr --fix`, `/cc`, `/cp`",
             "implicit team",
             "core 3명을 기본",
             "Agent Team을 기본으로 선택",
@@ -128,8 +147,35 @@ class PackageMetadataTest(unittest.TestCase):
             "WCAG 2.2",
             "artifact provenance",
             "traces/metrics/logs",
+            "Team 리뷰 → 집계·종료 → lead 수정",
         ):
             self.assertIn(contract, execution)
+
+        cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
+        for contract in (
+            "종료한 뒤에만 Step 4의 lead 수정으로 넘어간다",
+            "이전 reviewer 상태를 모두 무효화한다",
+            "새 fingerprint의 전체 diff",
+            "재리뷰한다",
+            "새 read-only Team",
+            "lead 수정",
+            "graceful-stop.md",
+        ):
+            self.assertIn(contract, cca)
+
+        graceful = (
+            ROOT / ".claude/skills/_git-atomic-core/graceful-stop.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "GRACEFUL_STOP_REQUESTED=true",
+            "리뷰 반복 <현재>/<--iterations 상한> 시작",
+            "모든 재리뷰를 시작할 때",
+            "새 수정·Team·검증·commit을 시작하지 않는다",
+            "Guard `abort`",
+            "snapshot을 보존",
+            "`UNKNOWN`",
+        ):
+            self.assertIn(contract, graceful)
 
     def test_agent_team_environment_probe_is_exact_and_read_only(self) -> None:
         script = (

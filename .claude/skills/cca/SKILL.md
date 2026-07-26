@@ -1,7 +1,7 @@
 ---
 name: cca
 description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff hunk와 제거 동작을 검토하고 정확성·보안·성능·architecture·언어 API·UX·접근성·observability·품질을 다중 reviewer로 검증한 뒤 안전하게 보완·테스트하여 한글 Atomic Commit을 생성한다. today/3days/weekly/release/emergency/learn 확장 모드도 제공하며 사용자가 직접 /cca로 요청할 때만 실행한다.
-argument-hint: "[clean|today|3days|weekly|release|emergency|learn] [추가 맥락] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
+argument-hint: "[clean|today|3days|weekly|release|emergency|learn] [추가 맥락] [--team|--no-team] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
 effort: max
@@ -12,6 +12,11 @@ allowed-tools:
   - Edit
   - Write
   - Agent
+  - SendMessage
+  - TaskCreate
+  - TaskGet
+  - TaskList
+  - TaskUpdate
   - Bash(git status *)
   - Bash(git diff *)
   - Bash(git log *)
@@ -41,18 +46,14 @@ allowed-tools:
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/period_range.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/release_version.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py")'
 ---
 
 # `/cca` — CommitForge All
 
-사용자 참고 맥락:
-
-```text
-$ARGUMENTS
-```
+사용자 참고 맥락: `$ARGUMENTS`
 
 **ultrathink.** 변경사항 전체를 근거 중심으로 분석하고, 리뷰 → 확정적 수정 → 재리뷰 → 검증 → Atomic Commit 계획 → 순차 commit → 최종 검증까지 한 번에 수행한다.
-
 `/cca`는 push, amend, rebase, squash, force 작업을 하지 않는다.
 
 ## Skill 경로 확정 (필수 Preflight)
@@ -97,7 +98,8 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 14. `.claude/skills/_git-atomic-core/reporting-formats.md`
 15. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
 16. `.claude/skills/_git-atomic-core/large-diff-review.md`
-17. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+17. `.claude/skills/_git-atomic-core/graceful-stop.md`
+18. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `.claude/skills/_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -113,6 +115,9 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 - 일반 문장은 구현 의도, 사용자 요구, commit 메시지 맥락으로 사용한다.
 - `--scope <경로...>`: 지정 범위 중심으로 처리하되 필수 의존성은 분석한다.
 - `--no-fix`: 소스 파일을 수정하지 않는다. blocking finding이 있으면 commit 전에 중단한다.
+- `--team`: 환경이 활성화되면 사소한 변경도 read-only Agent Team을 강제 선호한다.
+- `--no-team`: 모든 반복에서 Team을 끈다. `--team`과 함께 쓰면 오류다.
+- 옵션이 없으면 활성 환경에서 Team이 기본이다. 실제 변경은 항상 lead만 수행한다.
 - 기본 모드: 근거가 확정적이고 국소적이며 원래 의도를 보존하는 CRITICAL/MAJOR 문제만 자동 수정한다.
 - `--no-verify`: 프로젝트 테스트/검증과 hook 우회를 허용하지만 Git/secret/safety 검사는 유지한다.
 - `--strict`: 확인된 MINOR도 가능한 범위에서 해소하거나 명시적으로 차단 판단한다.
@@ -212,29 +217,28 @@ policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 c
 
 변경이 없으면 기본 모드는 guard `finish`로 정리하고 종료한다. `release`는 `--prepare`가 있으면 version/CHANGELOG 준비가 새 변경을 만들 수 있으므로 종료하지 않으며, 그 외에는 source-read-only로 정리하고 사전 분석 보고를 완료한다. `today`·`3days`·`weekly`는 기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속한 뒤 Atomic 계획·commit 없이 `finish`하고 기간 보고를 반환한다. 기간 commit도 없을 때만 즉시 “검토 대상 없음”으로 종료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
 
-## 3. 병렬 전문 리뷰
+## 3. read-only Agent Team 전문 리뷰
 
-가능하면 다음 custom subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`·`3days`·`weekly`에서는 동일한 기간 commit 원장·net diff·working tree를 함께 제공하고 finding 원인을 `period-review-modes.md` 형식으로 귀속한다.
+동일 fingerprint에 `review-execution.md`의 구조 선택을 적용한다. Team이면 core
+3명과 활성 specialist가 read-only로 검토한다. 모든 task 결과를 집계하고 Team을
+종료한 뒤에만 Step 4의 lead 수정으로 넘어간다.
 
-1. `cca-git-reviewer`
-2. `cca-correctness-reviewer`
-3. `cca-line-reviewer`
-4. `cca-security-reviewer`
-5. `cca-performance-reviewer`
-6. `cca-testing-reviewer`
-7. `cca-architecture-reviewer`
-8. `cca-language-api-reviewer`
-9. `cca-ux-accessibility-reviewer`
-10. `cca-observability-reviewer`
-11. `cca-quality-reviewer`
+Team을 선택하지 않았거나 coordination이 실패해 fallback한 경우에는 다음 custom
+subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`·`3days`·`weekly`에서는
+동일한 기간 commit 원장·net diff·working tree를 함께 제공하고 finding 원인을
+`period-review-modes.md` 형식으로 귀속한다.
+
+기본 reviewer: `cca-git-reviewer`, `cca-correctness-reviewer`,
+`cca-line-reviewer`, `cca-security-reviewer`, `cca-performance-reviewer`,
+`cca-testing-reviewer`, `cca-architecture-reviewer`, `cca-language-api-reviewer`,
+`cca-ux-accessibility-reviewer`, `cca-observability-reviewer`,
+`cca-quality-reviewer`.
 
 `conditional-reviewers.md`의 trigger를 판정해 다음 reviewer를 필요한 경우에만 추가한다.
 
-- `cca-data-migration-reviewer`
-- `cca-dependency-supply-chain-reviewer`
-- `cca-reliability-recovery-reviewer`
-- `cca-privacy-governance-reviewer`
-- `cca-requirements-product-reviewer`
+조건부 reviewer: `cca-data-migration-reviewer`,
+`cca-dependency-supply-chain-reviewer`, `cca-reliability-recovery-reviewer`,
+`cca-privacy-governance-reviewer`, `cca-requirements-product-reviewer`.
 
 비활성 조건도 `N/A`와 근거를 coverage에 남긴다.
 
@@ -307,15 +311,22 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 
 ### 반복
 
+최초 리뷰와 매 재리뷰 시작 시 현재 횟수/상한과 `graceful-stop.md`의 종료 예약 문구를 먼저 안내한다.
 수정 후:
 
 1. 전체 diff를 다시 읽는다.
 2. guard fingerprint를 갱신한다.
 3. 이전 reviewer 상태를 모두 무효화한다.
-4. 조건부 trigger를 다시 판정하고 새 fingerprint의 전체 diff로 기본 11개와 활성 조건부 reviewer를 다시 실행한다. 적용 불가능한 관점도 새 상태 기준 `N/A`를 반환한다.
-5. 기존 계획과 finding을 폐기하고 새 상태로 판단한다.
+4. 이전 Team 종료를 확인한다. 살아 있는 teammate나 미완료 task가 있으면 중단한다.
+5. trigger를 다시 판정하고 새 fingerprint의 전체 diff를 새 read-only Team
+   core 3명+specialist로 재리뷰한다. fallback이면 기본 11개+조건부 subagent를 쓴다.
+6. 결과를 집계하고 Team을 종료한 뒤 새 상태로 판단한다.
 
-상한은 `--iterations`다. 상한까지 blocking finding이 남으면 commit하지 않고 snapshot을 보존한다.
+상한은 `--iterations`다. 각 반복은 `read-only 리뷰 → Team 종료 → lead 수정 →
+fingerprint 갱신 → 새 read-only 재리뷰` 순서를 지킨다.
+상한까지 blocking finding이 남으면 commit하지 않고 snapshot을 보존한다.
+진행 중 사용자가 종료를 예약하면 `graceful-stop.md`의 latch를 설정한다. 현재 안전
+경계와 Team 종료까지만 완료하고 새 반복·수정·commit 없이 Guard `abort`로 끝낸다.
 
 ## 5. 검증 전략 수립 및 실행
 
@@ -482,19 +493,8 @@ snapshot은 삭제하지 않는다.
 
 `.claude/skills/_git-atomic-core/reporting.md`의 `/cca` 형식으로 한글 보고한다.
 
-포함:
-
-- reviewer별 finding 수와 Gate 결과
-- 검증 후 채택/기각한 중요 finding
-- 자동 수정한 내용
-- 실행한/생략한 검증
-- 순서별 commit hash·제목·목적·통계
-- 시작 HEAD → 최종 HEAD
-- Breaking Change/migration/deployment 주의
-- 남은 변경과 clean 여부
-- snapshot 삭제 또는 보존 경로
-- lock 해제 여부
-- push하지 않았음
-- 실패 시 이미 만든 commit과 안전한 복구 방법
+포함: reviewer별 finding과 Gate, 채택/기각 finding, 자동 수정, 실행·생략 검증,
+commit hash·제목·목적·통계, 시작·최종 HEAD, breaking/migration/deployment,
+남은 변경·clean 여부, snapshot, lock 해제, push하지 않았음, 실패 복구 방법.
 
 완료되지 않은 작업을 성공으로 표현하지 않는다.

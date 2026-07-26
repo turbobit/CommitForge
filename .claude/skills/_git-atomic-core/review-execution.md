@@ -2,9 +2,11 @@
 
 ## 0. 실행 구조 선택
 
-Agent Team은 `/cr`의 source-read-only 실행, `/ccr`, `/cpr`에서만 사용할 수 있다.
-`/cr --fix`, `/cc`, `/cca`, `/cp`와 그 밖의 실행형 흐름은 기존 custom
-subagent 구조를 유지하고 lead만 파일·Git·remote 상태를 변경한다.
+Agent Team은 `/cr`의 source-read-only 실행, `/ccr`, `/cpr`와 `/cca`의
+**read-only 리뷰 단계**에서 사용할 수 있다. `/cca`가 이후 수정·검증·staging·
+commit으로 이어지더라도 teammate의 권한과 생명주기는 리뷰 단계에서 끝난다.
+`/cr --fix`, `/cc`, `/cp`와 그 밖의 실행형 흐름은 기존 custom subagent 구조를
+유지한다. 모든 명령에서 lead만 파일·Git·remote 상태를 변경한다.
 
 대상 명령은 reviewer를 시작하기 직전에 다음 도구로 환경 활성 상태를 확인한다.
 
@@ -54,12 +56,25 @@ Agent Team 선택 시:
 - 모든 task가 terminal 상태이고 필수 관점 결과가 lead에게 전달된 뒤 teammate를
   종료한다. resume 후 teammate가 복원되지 않으면 미완료 task를 subagent 또는
   lead가 다시 검증한다.
+- `/cca`에서는 최초 리뷰 결과가 모두 집계되고 Team이 종료된 것을 확인한 뒤에만
+  lead가 수정할 수 있다. teammate가 살아 있거나 미완료 task가 있으면 수정 단계로
+  넘어가지 않는다.
+- `/cca`에서 lead가 수정하면 이전 Team과 reviewer 상태를 재사용하지 않는다.
+  전체 diff fingerprint와 trigger를 다시 계산하고 새 read-only Team을 생성한다.
+  core 3명은 새 fingerprint의 전체 diff를 다시 검토하고 specialist만 새 trigger의
+  최소 활성 집합으로 다시 구성한다. 이 `Team 리뷰 → 집계·종료 → lead 수정 →
+  fingerprint 갱신 → 새 Team 재리뷰` 주기는 `--iterations` 상한까지 반복한다.
+- 반복 중 사용자의 종료 예약은 `graceful-stop.md`의 latch와 안전 경계를 적용한다.
+  종료 예약 뒤에는 허용된 현재 경계만 완료하고 새 수정·반복·commit을 시작하지 않는다.
+- `/cca --no-fix`와 source-read-only 확장 모드는 Team 리뷰·집계 후 수정 단계 없이
+  종료한다. staged diff 재리뷰는 lead가 수행하며, 고위험 unit의 관련 reviewer를
+  다시 실행하더라도 read-only 경계를 유지한다.
 - team 시작·messaging·task coordination이 실패하면 미완료 관점만 subagent로
   fallback한다. `UNKNOWN` 처리와 필수 관점 차단 규칙은 동일하다.
 
 기본 구성:
 
-- `/cr`·`/cpr`: 다음 3개 core를 기본으로 사용한다.
+- `/cr`·`/cpr`와 `/cca`의 read-only 리뷰 단계: 다음 3개 core를 기본으로 사용한다.
   1. **Correctness + Line + State/Concurrency**: 모든 hunk·삭제·예외 경로,
      race·idempotency·resource lifecycle과 fail-open/fail-closed 동작
   2. **Security + Privacy + Supply Chain + Integrity**: authn/authz·입력·암호화·

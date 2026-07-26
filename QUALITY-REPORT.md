@@ -3,8 +3,11 @@
 ## 완료한 자동 검증
 
 - `/cr` 기본 read-only와 명시적 `--fix` opt-in 수정 계약 검증
-- `/cr`·`/ccr`·`/cpr`의 환경·규모·위험 기반 Agent Team 선택과
-  `/cr --fix`·`/cc`·`/cca`·`/cp` subagent 유지 계약 검증
+- `/cr`·`/ccr`·`/cpr`과 `/cca` read-only 리뷰 단계의 환경·규모·위험 기반
+  Agent Team 선택 및 `/cca` 반복별 Team 종료·fingerprint 재리뷰 계약 검증
+- `/cr --fix`·`/cc`·`/cp` subagent 유지와 모든 실행형 변경의 lead 단독 수행 검증
+- `/cca` 반복 중 종료 예약 latch, Team 회수, 새 작업 금지, Guard abort와 snapshot
+  보존 경계 검증
 - Agent Team 환경변수의 정확한 `1` 판정과 환경 비변경 fallback 검증
 - OWASP Top 10:2025·ASVS 5.0, WCAG 2.2, NIST SSDF, OpenTelemetry 관점의
   공급망·무결성·예외 처리·접근성·관찰 가능성 역할 보강

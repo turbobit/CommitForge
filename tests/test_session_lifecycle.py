@@ -187,8 +187,14 @@ class LifecycleInstallerTest(unittest.TestCase):
                 if "session_lifecycle.py" in handler.get("command", "")
             ]
             self.assertEqual(len(lifecycle_commands), 4)
+            expected_claude_dir = os.path.normcase(
+                str((project / ".claude").resolve())
+            )
             self.assertTrue(
-                all(str(project / ".claude") in command for command in lifecycle_commands)
+                all(
+                    expected_claude_dir in os.path.normcase(command)
+                    for command in lifecycle_commands
+                )
             )
 
             reinstalled = run(

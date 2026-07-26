@@ -16,6 +16,7 @@
 - `language-api-pitfalls.md`: 언어·프레임워크별 타입·lifecycle·API 함정
 - `conditional-reviewers.md`: 데이터·공급망·복구·privacy·요구사항 reviewer trigger
 - `review-execution.md`: subagent/Agent Team 적응형 선택, 실행 budget, fallback, finding schema와 중복 제거
+- `graceful-stop.md`: `/cca` 반복 중 종료 예약, Team 회수, Guard abort 경계
 - `review-policy.md`: `.commitforge/review.yml` 프로젝트별 reviewer·출력·대형 diff 정책
 - `reporting-formats.md`: human·JSON·SARIF 보고서 계약과 검증
 - `baseline-and-suppressions.md`: 기한·소유자가 있는 제한적 finding 기준선
