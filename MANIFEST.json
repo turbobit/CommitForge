@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "reproducible": true,
   "file_count": 88,
-  "total_bytes": 580979,
+  "total_bytes": 588672,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -87,8 +87,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 2695,
-      "sha256": "448d6694114da4373ad120b616438a980d36b177ef13ab98a4e709284088ca43"
+      "size": 2718,
+      "sha256": "f4f61949bd2f4cb0d38b08302922115fce694ffe9f29065056622d2ce7ba9d55"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -192,8 +192,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 10812,
-      "sha256": "bee78e30770be4890922f488a6eb9121dd781ddbfe2db7f58c1a65dba2317af4"
+      "size": 10939,
+      "sha256": "20960ba8c585a395380cecba292acdda6fb63a6e647aa9330ccd9de2a8a0cf29"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
@@ -247,8 +247,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py",
-      "size": 3210,
-      "sha256": "2f962a8529ac2001e2104e3a32115308b746c6e4d8a5fbf46fd5b5c9036ad8d9"
+      "size": 3299,
+      "sha256": "cec3806038f6d03bc620e0d3dfd027b313d4429a75fa0c30bea9dc23ec8b9528"
     },
     {
       "path": ".claude/skills/_git-atomic-core/staging-strategy.md",
@@ -307,8 +307,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 19500,
-      "sha256": "bd7f21ccde55f78f5253a7d3c621220587d06c8a091a6791f45e93e099fa1ddc"
+      "size": 20413,
+      "sha256": "bae2365e6614271d8b9ede9870d0b1009823004ba349df94222817f77cc4ddc7"
     },
     {
       "path": "INSTALL.md",
@@ -322,18 +322,18 @@
     },
     {
       "path": "QUALITY-REPORT.md",
-      "size": 8414,
-      "sha256": "514dbe839d370196aaf357c1ff4881d998685756fae44d27be609d880bd3181f"
+      "size": 8764,
+      "sha256": "b2ca79b76d22805aceb015007208bc83d4fed1d88189c58c99170f2adaa7f744"
     },
     {
       "path": "README.md",
-      "size": 45590,
-      "sha256": "f6abafca062e15a0877cae71a3aa6a7f19363f1a6ca2225688641959c7c50dec"
+      "size": 45762,
+      "sha256": "2e22bd0e50bbc8f83dfe5e84e0b81ca01e33bd2ac61e6ca7964121cd6bda2247"
     },
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "bb0df1bd902faba507c15975eb9973e695f2732f760d851b4f9c7ba17068f5ff"
+      "sha256": "0ccd4990d8e0fa4731ff613065a24fe917f2dcfbb1ed921e8269ade695077115"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
@@ -367,8 +367,8 @@
     },
     {
       "path": "install.py",
-      "size": 11902,
-      "sha256": "6138006ea1e6204e4a22e5d11c5f9fd0a56c835f9db042be5ff6d6f0f71f0b5a"
+      "size": 13013,
+      "sha256": "31522db939278b2e9af9feb4c704506fe8e67a888f4cfb47a98382a13ee3106b"
     },
     {
       "path": "install.sh",
@@ -392,8 +392,8 @@
     },
     {
       "path": "tests/test_package.py",
-      "size": 23943,
-      "sha256": "e852827d78c8b042b17824816104db870cd55ec3f1073e12a859adeeafda21d1"
+      "size": 23970,
+      "sha256": "888af346d6921b664302b33fb59f3acdaef7d2b271a94c5b254a3011fd36129b"
     },
     {
       "path": "tests/test_pr_context.py",
@@ -422,8 +422,8 @@
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 11740,
-      "sha256": "83124cc2eb6c2e01a98e4ad79bf16a38b2d35970bd12d9d5d18d638e35b0902f"
+      "size": 15494,
+      "sha256": "5d20b46790b58dc1f3c72d99f37604d9f129e60d3c5cf90463bef70a221552ad"
     },
     {
       "path": "uninstall.ps1",
@@ -432,8 +432,8 @@
     },
     {
       "path": "uninstall.py",
-      "size": 5949,
-      "sha256": "166764b5ed60138c05ec047a202c229de7423a995bb74d72c18d87d999132f12"
+      "size": 7076,
+      "sha256": "512a75bd1889227be9f005e7fbf8957a88030dcb09a683fece2f270443257f04"
     },
     {
       "path": "uninstall.sh",

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.14.1 — 2026-07-31
+
+- Claude Code의 `Stop`을 세션 종료로 잘못 해석해 여러 turn에 걸친 `/cr`·`/cca`
+  도중 Guard lock이 조기 해제되던 lifecycle 버그 수정
+- `Stop`·`StopFailure`에서는 lock을 유지하고 `/clear`·`/exit`·`/resume`·로그아웃
+  등의 실제 `SessionEnd`에서만 소유 lock을 해제하도록 이벤트 경계 교정
+- 새 설치에는 `SessionStart`·`SessionEnd` hook만 등록하고 재설치 시 구버전의
+  `Stop`·`StopFailure` handler를 자동 제거
+- 구버전 설정이 새 스크립트를 먼저 호출하는 전환 구간에서도 turn 종료 이벤트를
+  no-op 처리해 lock을 보존하고, 다중 turn·업그레이드 회귀 테스트 추가
+- 설치·제거 시 lifecycle hook 소유권을 경로 부분 일치가 아닌 정확한 설치 스크립트
+  경로로 판정해 이름이 비슷한 사용자 정의 hook을 보존
+
 ## 1.14.0 — 2026-07-26
 
 - `/cca` 최초 리뷰와 수정 후 재리뷰를 read-only Agent Team core 3명과 조건부
