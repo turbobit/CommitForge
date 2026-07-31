@@ -28,7 +28,7 @@
 - `recovery.md`: 장애 복구
 - `examples.md`: 사례
 - `scripts/guard.py`: worktree별 lock, snapshot, 무결성 감사, fingerprint, cleanup
-- `scripts/session_lifecycle.py`: Claude 실제 session ID 바인딩과 Stop·SessionEnd 잠금 정리
+- `scripts/session_lifecycle.py`: Claude 실제 session ID 바인딩, turn 종료 시 잠금 유지, SessionEnd 잠금 정리
 - `scripts/agent_team_mode.py`: Agent Teams 환경 활성 상태의 read-only 판정
 - `scripts/guard.sh`: macOS/Linux/WSL/Git Bash용 Python 3 launcher
 - `scripts/reviewer_triggers.py`: 조건부 reviewer 최소 trigger 집합 계산

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bind CommitForge locks to Claude Code sessions and clean them on SessionEnd."""
+"""Bind Guard ownership to Claude sessions and clean up only on SessionEnd."""
 
 from __future__ import annotations
 
@@ -80,10 +80,11 @@ def main() -> int:
             persist_session(session)
         elif event == "SessionEnd":
             end_session(payload, session)
-        elif event == "Stop":
-            end_session({**payload, "reason": "stop"}, session)
-        elif event == "StopFailure":
-            end_session({**payload, "reason": "stop_failure"}, session)
+        elif event in {"Stop", "StopFailure"}:
+            # Stop ends one assistant response and StopFailure ends one failed
+            # turn. Neither event terminates the Claude session, so a legacy
+            # hook registration must never release a cross-turn Guard lock.
+            pass
         else:
             raise ValueError(f"지원하지 않는 hook event입니다: {event!r}")
     except (OSError, subprocess.SubprocessError, ValueError) as exc:

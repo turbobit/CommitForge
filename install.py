@@ -7,7 +7,9 @@ import argparse
 import base64
 import datetime as dt
 import json
+import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import sys
@@ -136,28 +138,55 @@ def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
     skill_path.write_text("".join(lines), encoding="utf-8")
 
 
-def is_commitforge_lifecycle_handler(handler: object) -> bool:
-    if not isinstance(handler, dict):
-        return False
-    command = handler.get("command")
-    if isinstance(command, str) and command.startswith(POWERSHELL_ENCODED_PREFIX):
+def lifecycle_script_from_command(command: str) -> Path | None:
+    """Return the script target only for a generated two-argument hook."""
+    if command.startswith(POWERSHELL_ENCODED_PREFIX):
         try:
             encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
             command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
         except (UnicodeError, ValueError):
-            return False
-    return (
-        handler.get("type") == "command"
-        and isinstance(command, str)
-        and "_git-atomic-core" in command
-        and "session_lifecycle.py" in command
+            return None
+        match = re.fullmatch(
+            r"& '((?:[^']|'')*)' '((?:[^']|'')*)'\r?\n"
+            r"exit \$LASTEXITCODE\r?\n?",
+            command,
+        )
+        if match is None:
+            return None
+        return Path(match.group(2).replace("''", "'")).expanduser().resolve()
+
+    try:
+        argv = shlex.split(command, posix=sys.platform != "win32")
+    except ValueError:
+        return None
+    if len(argv) != 2:
+        return None
+    script = argv[1]
+    if len(script) >= 2 and script[0] == script[-1] and script[0] in "'\"":
+        script = script[1:-1]
+    return Path(script).expanduser().resolve()
+
+
+def is_commitforge_lifecycle_handler(
+    handler: object,
+    lifecycle_path: Path,
+) -> bool:
+    if not isinstance(handler, dict) or handler.get("type") != "command":
+        return False
+    command = handler.get("command")
+    if not isinstance(command, str):
+        return False
+    target = lifecycle_script_from_command(command)
+    return target is not None and os.path.normcase(str(target)) == os.path.normcase(
+        str(lifecycle_path.resolve())
     )
 
 
-def remove_lifecycle_handlers(settings: dict) -> None:
+def remove_lifecycle_handlers(settings: dict, lifecycle_path: Path) -> None:
     hooks = settings.get("hooks")
     if not isinstance(hooks, dict):
         return
+    # Remove current hooks and legacy turn-end cleanup registrations.
     for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
         groups = hooks.get(event)
         if not isinstance(groups, list):
@@ -174,7 +203,7 @@ def remove_lifecycle_handlers(settings: dict) -> None:
             kept_handlers = [
                 handler
                 for handler in handlers
-                if not is_commitforge_lifecycle_handler(handler)
+                if not is_commitforge_lifecycle_handler(handler, lifecycle_path)
             ]
             if kept_handlers:
                 updated = dict(group)
@@ -228,7 +257,7 @@ def configure_lifecycle_hooks(
     else:
         settings = {}
 
-    remove_lifecycle_handlers(settings)
+    remove_lifecycle_handlers(settings, lifecycle_path)
     hooks = settings.setdefault("hooks", {})
     if not isinstance(hooks, dict):
         raise RuntimeError(f"Claude hooks 설정은 JSON object여야 합니다: {settings_path}")
@@ -237,7 +266,9 @@ def configure_lifecycle_hooks(
         "command": command,
         "timeout": 5,
     }
-    for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
+    # A completed or failed turn is not a session boundary. Register cleanup
+    # only for actual session lifecycle events.
+    for event in ("SessionStart", "SessionEnd"):
         groups = hooks.setdefault(event, [])
         if not isinstance(groups, list):
             raise RuntimeError(
@@ -332,7 +363,7 @@ def main() -> None:
         "확장 모드: /cca today, /cca 3days, /cca weekly, /cca release, "
         "/cca emergency, /cca learn"
     )
-    print("세션 잠금 정리: 응답 종료, API 실패, /clear, /exit, /resume 시 자동 해제")
+    print("세션 잠금 정리: /clear, /exit, /resume, 로그아웃 등 SessionEnd에서만 자동 해제")
     print("새 .claude/agents 디렉터리를 처음 만든 실행 중 세션에서는 Claude Code 재시작을 권장합니다.")
 
 

@@ -127,12 +127,20 @@ class SessionLifecycleTest(unittest.TestCase):
         self.assertFalse(self.tmp.joinpath(".git/claude-atomic.lock").exists())
         self.assertTrue(Path(started["snapshot"]).is_dir())
 
-    def test_stop_releases_unfinished_matching_lock(self) -> None:
+    def test_stop_preserves_cross_turn_lock(self) -> None:
         started = self.guard("begin", "--session", "claude-session-stop")
 
         self.lifecycle(self.event("Stop", "claude-session-stop"))
 
-        self.assertFalse(self.tmp.joinpath(".git/claude-atomic.lock").exists())
+        self.assertTrue(self.tmp.joinpath(".git/claude-atomic.lock").is_dir())
+        self.assertTrue(Path(started["snapshot"]).is_dir())
+
+    def test_stop_failure_preserves_cross_turn_lock(self) -> None:
+        started = self.guard("begin", "--session", "claude-session-failure")
+
+        self.lifecycle(self.event("StopFailure", "claude-session-failure"))
+
+        self.assertTrue(self.tmp.joinpath(".git/claude-atomic.lock").is_dir())
         self.assertTrue(Path(started["snapshot"]).is_dir())
 
     def test_session_end_never_releases_another_sessions_lock(self) -> None:
@@ -164,7 +172,34 @@ class LifecycleInstallerTest(unittest.TestCase):
                                 }
                             ],
                         }
-                    ]
+                    ],
+                    "Stop": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python user-stop.py",
+                                },
+                                {
+                                    "type": "command",
+                                    "command": (
+                                        "python /opt/custom/_git-atomic-core/"
+                                        "session_lifecycle.py --custom"
+                                    ),
+                                }
+                            ]
+                        }
+                    ],
+                    "StopFailure": [
+                        {
+                            "hooks": [
+                                {
+                                    "type": "command",
+                                    "command": "python user-stop-failure.py",
+                                }
+                            ]
+                        }
+                    ],
                 },
                 "permissions": {"allow": ["Read"]},
             }
@@ -188,17 +223,21 @@ class LifecycleInstallerTest(unittest.TestCase):
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(settings["permissions"], unrelated["permissions"])
             self.assertEqual(len(settings["hooks"]["SessionStart"]), 2)
-            for event in ("SessionEnd", "Stop", "StopFailure"):
-                self.assertEqual(len(settings["hooks"][event]), 1)
+            self.assertEqual(len(settings["hooks"]["SessionEnd"]), 1)
+            self.assertEqual(settings["hooks"]["Stop"], unrelated["hooks"]["Stop"])
+            self.assertEqual(
+                settings["hooks"]["StopFailure"],
+                unrelated["hooks"]["StopFailure"],
+            )
             lifecycle_commands = [
                 handler["command"]
-                for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure")
+                for event in ("SessionStart", "SessionEnd")
                 for group in settings["hooks"][event]
                 for handler in group["hooks"]
                 if "session_lifecycle.py"
                 in decoded_command(handler.get("command", ""))
             ]
-            self.assertEqual(len(lifecycle_commands), 4)
+            self.assertEqual(len(lifecycle_commands), 2)
             expected_claude_dir = (project / ".claude").resolve().as_posix()
             self.assertTrue(
                 all(
@@ -285,8 +324,12 @@ class LifecycleInstallerTest(unittest.TestCase):
             self.assertEqual(reinstalled.returncode, 0, reinstalled.stderr)
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(len(settings["hooks"]["SessionStart"]), 2)
-            for event in ("SessionEnd", "Stop", "StopFailure"):
-                self.assertEqual(len(settings["hooks"][event]), 1)
+            self.assertEqual(len(settings["hooks"]["SessionEnd"]), 1)
+            self.assertEqual(settings["hooks"]["Stop"], unrelated["hooks"]["Stop"])
+            self.assertEqual(
+                settings["hooks"]["StopFailure"],
+                unrelated["hooks"]["StopFailure"],
+            )
 
             removed = run(
                 [
@@ -302,6 +345,58 @@ class LifecycleInstallerTest(unittest.TestCase):
             self.assertEqual(removed.returncode, 0, removed.stderr)
             restored = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(restored, unrelated)
+
+    def test_install_removes_legacy_turn_end_cleanup_hooks(self) -> None:
+        with tempfile.TemporaryDirectory(prefix="commitforge-upgrade-hooks-") as temp:
+            project = Path(temp)
+            settings_path = project / ".claude/settings.local.json"
+            settings_path.parent.mkdir(parents=True)
+            lifecycle_path = (
+                project
+                / ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py"
+            ).resolve()
+            legacy_handler = {
+                "type": "command",
+                "command": subprocess.list2cmdline(
+                    [sys.executable, str(lifecycle_path)]
+                ),
+                "timeout": 5,
+            }
+            settings_path.write_text(
+                json.dumps(
+                    {
+                        "hooks": {
+                            event: [{"hooks": [legacy_handler]}]
+                            for event in (
+                                "SessionStart",
+                                "SessionEnd",
+                                "Stop",
+                                "StopFailure",
+                            )
+                        }
+                    },
+                    indent=2,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            installed = run(
+                [
+                    sys.executable,
+                    str(INSTALLER),
+                    "--scope",
+                    "project",
+                    "--target",
+                    str(project),
+                ],
+                ROOT,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            hooks = json.loads(settings_path.read_text(encoding="utf-8"))["hooks"]
+            self.assertEqual(set(hooks), {"SessionStart", "SessionEnd"})
+            self.assertEqual(len(hooks["SessionStart"]), 1)
+            self.assertEqual(len(hooks["SessionEnd"]), 1)
 
     @staticmethod
     def _session_start_payload(project: Path) -> dict[str, str]:

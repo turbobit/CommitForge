@@ -278,10 +278,10 @@ class PackageMetadataTest(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for contract in (
             "SessionStart",
-            "Stop`·`StopFailure",
-            "`SessionEnd`",
+            "`Stop`·`StopFailure`에서는 잠금을 유지",
+            "`SessionEnd`에서만",
             "수동·자동 `/compact`",
-            "Diff snapshot은 보존",
+            "Diff snapshot",
         ):
             self.assertIn(contract, safety)
 

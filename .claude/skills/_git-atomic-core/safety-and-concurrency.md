@@ -67,9 +67,11 @@ guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만
 
 - 설치된 `SessionStart` 훅이 Claude가 제공한 실제 `session_id`를
   `COMMITFORGE_SESSION_ID`로 전달하며, Guard owner에는 이 값만 사용한다.
-- 정상 응답 종료와 API 실패의 `Stop`·`StopFailure`, `/clear`·`/exit`·`/resume` 등의
-  `SessionEnd`에서 종료 세션과 owner가 정확히 일치할 때만 잠금을 자동 해제한다.
-  자동 해제에서도 Diff snapshot은 보존한다.
+- `Stop`·`StopFailure`에서는 잠금을 유지한다. 두 이벤트는 각각 한 응답과 실패한
+  한 turn의 종료이며 Claude 세션 종료가 아니다.
+- `/clear`·`/exit`·`/resume`·로그아웃 등의 실제 `SessionEnd`에서만 종료 세션과
+  owner가 정확히 일치할 때 잠금을 자동 해제한다. 자동 해제에서도 Diff snapshot은
+  보존한다.
 - 수동·자동 `/compact`는 같은 세션의 연속 실행이므로 잠금을 해제하지 않는다.
   compact 뒤 `SessionStart`가 같은 ID를 다시 바인딩한다.
 - 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`를 실행하면 두 번째 실행은 중단

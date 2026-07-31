@@ -7,7 +7,10 @@ import argparse
 import base64
 import datetime as dt
 import json
+import os
 from pathlib import Path
+import re
+import shlex
 import shutil
 import sys
 
@@ -36,21 +39,47 @@ POWERSHELL_ENCODED_PREFIX = (
 )
 
 
-def is_commitforge_lifecycle_handler(handler: object) -> bool:
-    if not isinstance(handler, dict):
-        return False
-    command = handler.get("command")
-    if isinstance(command, str) and command.startswith(POWERSHELL_ENCODED_PREFIX):
+def lifecycle_script_from_command(command: str) -> Path | None:
+    """Return the script target only for a generated two-argument hook."""
+    if command.startswith(POWERSHELL_ENCODED_PREFIX):
         try:
             encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
             command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
         except (UnicodeError, ValueError):
-            return False
-    return (
-        handler.get("type") == "command"
-        and isinstance(command, str)
-        and "_git-atomic-core" in command
-        and "session_lifecycle.py" in command
+            return None
+        match = re.fullmatch(
+            r"& '((?:[^']|'')*)' '((?:[^']|'')*)'\r?\n"
+            r"exit \$LASTEXITCODE\r?\n?",
+            command,
+        )
+        if match is None:
+            return None
+        return Path(match.group(2).replace("''", "'")).expanduser().resolve()
+
+    try:
+        argv = shlex.split(command, posix=sys.platform != "win32")
+    except ValueError:
+        return None
+    if len(argv) != 2:
+        return None
+    script = argv[1]
+    if len(script) >= 2 and script[0] == script[-1] and script[0] in "'\"":
+        script = script[1:-1]
+    return Path(script).expanduser().resolve()
+
+
+def is_commitforge_lifecycle_handler(
+    handler: object,
+    lifecycle_path: Path,
+) -> bool:
+    if not isinstance(handler, dict) or handler.get("type") != "command":
+        return False
+    command = handler.get("command")
+    if not isinstance(command, str):
+        return False
+    target = lifecycle_script_from_command(command)
+    return target is not None and os.path.normcase(str(target)) == os.path.normcase(
+        str(lifecycle_path.resolve())
     )
 
 
@@ -63,6 +92,13 @@ def remove_lifecycle_hooks(
 ) -> None:
     settings_name = "settings.json" if global_scope else "settings.local.json"
     settings_path = claude_dir / settings_name
+    lifecycle_path = (
+        claude_dir
+        / "skills"
+        / "_git-atomic-core"
+        / "scripts"
+        / "session_lifecycle.py"
+    )
     if not settings_path.exists():
         return
     if settings_path.is_symlink():
@@ -89,7 +125,10 @@ def remove_lifecycle_hooks(
                 kept_handlers = [
                     handler
                     for handler in handlers
-                    if not is_commitforge_lifecycle_handler(handler)
+                    if not is_commitforge_lifecycle_handler(
+                        handler,
+                        lifecycle_path,
+                    )
                 ]
                 changed = changed or len(kept_handlers) != len(handlers)
                 if kept_handlers:
