@@ -3,7 +3,7 @@
   "version": "1.14.0",
   "reproducible": true,
   "file_count": 88,
-  "total_bytes": 575576,
+  "total_bytes": 580979,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -367,8 +367,8 @@
     },
     {
       "path": "install.py",
-      "size": 10888,
-      "sha256": "954bb4238529439418e7ccac5ef9705f854524ccd5919fdf4eec2be2858ff9d3"
+      "size": 11902,
+      "sha256": "6138006ea1e6204e4a22e5d11c5f9fd0a56c835f9db042be5ff6d6f0f71f0b5a"
     },
     {
       "path": "install.sh",
@@ -382,8 +382,8 @@
     },
     {
       "path": "tests/test_cr_edit_gate.py",
-      "size": 6434,
-      "sha256": "4e94092a3dbde8facbb2d5a47517de8c83a3d418bd463bbeca22dd27011ac185"
+      "size": 7093,
+      "sha256": "a2943bb768b575c23a6a55c2f719f87fde42c364fa66f0f4fd4dacde2ced3f3c"
     },
     {
       "path": "tests/test_guard.py",
@@ -422,8 +422,8 @@
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 8446,
-      "sha256": "43a39a68c6ea3e6080727f92311ff0ef74ea035b29fd907e0217a14356023e3e"
+      "size": 11740,
+      "sha256": "83124cc2eb6c2e01a98e4ad79bf16a38b2d35970bd12d9d5d18d638e35b0902f"
     },
     {
       "path": "uninstall.ps1",
@@ -432,8 +432,8 @@
     },
     {
       "path": "uninstall.py",
-      "size": 5513,
-      "sha256": "b977cf8ebb38135b96d949ca401def29ec77a571f4309b1d809b4d5f15854d5c"
+      "size": 5949,
+      "sha256": "166764b5ed60138c05ec047a202c229de7423a995bb74d72c18d87d999132f12"
     },
     {
       "path": "uninstall.sh",

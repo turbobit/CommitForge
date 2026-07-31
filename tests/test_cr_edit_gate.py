@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,16 @@ GATE = (
     / ".claude/skills/_git-atomic-core/scripts/cr_edit_gate.py"
 )
 INSTALLER = ROOT / "install.py"
+POWERSHELL_ENCODED_PREFIX = (
+    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
+
+
+def decoded_command(command: str) -> str:
+    if not command.startswith(POWERSHELL_ENCODED_PREFIX):
+        return command
+    encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+    return base64.b64decode(encoded, validate=True).decode("utf-16-le")
 
 
 class CrEditGateTest(unittest.TestCase):
@@ -116,13 +127,19 @@ class CrEditGateTest(unittest.TestCase):
                 line.strip()
                 for line in skill.splitlines()
                 if line.strip().startswith("command:")
-                and "cr_edit_gate.py" in line
+                and (
+                    "cr_edit_gate.py" in line
+                    or POWERSHELL_ENCODED_PREFIX in line
+                )
             )
             scalar = hook_line.split("command:", 1)[1].strip()
             self.assertTrue(scalar.startswith("'") and scalar.endswith("'"))
             command = scalar[1:-1].replace("''", "'")
             self.assertNotIn("CLAUDE_SKILL_DIR", command)
-            self.assertIn("cr_edit_gate.py", command)
+            self.assertIn("cr_edit_gate.py", decoded_command(command))
+            if sys.platform == "win32":
+                self.assertTrue(command.startswith(POWERSHELL_ENCODED_PREFIX))
+                self.assertNotIn("\\", command)
             for name in ("cc", "ccr", "cr", "cca", "cp", "cpr"):
                 installed_skill = (
                     project / f".claude/skills/{name}/SKILL.md"

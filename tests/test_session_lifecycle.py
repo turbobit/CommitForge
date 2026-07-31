@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 from pathlib import Path
@@ -15,6 +16,16 @@ GUARD = ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
 LIFECYCLE = ROOT / ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py"
 INSTALLER = ROOT / "install.py"
 UNINSTALLER = ROOT / "uninstall.py"
+POWERSHELL_ENCODED_PREFIX = (
+    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
+
+
+def decoded_command(command: str) -> str:
+    if not command.startswith(POWERSHELL_ENCODED_PREFIX):
+        return command
+    encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+    return base64.b64decode(encoded, validate=True).decode("utf-16-le")
 
 
 def run(cmd: list[str], cwd: Path, **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -184,18 +195,81 @@ class LifecycleInstallerTest(unittest.TestCase):
                 for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure")
                 for group in settings["hooks"][event]
                 for handler in group["hooks"]
-                if "session_lifecycle.py" in handler.get("command", "")
+                if "session_lifecycle.py"
+                in decoded_command(handler.get("command", ""))
             ]
             self.assertEqual(len(lifecycle_commands), 4)
-            expected_claude_dir = os.path.normcase(
-                str((project / ".claude").resolve())
-            )
+            expected_claude_dir = (project / ".claude").resolve().as_posix()
             self.assertTrue(
                 all(
-                    expected_claude_dir in os.path.normcase(command)
+                    expected_claude_dir.replace("/", os.sep)
+                    in decoded_command(command)
                     for command in lifecycle_commands
                 )
             )
+            if sys.platform == "win32":
+                self.assertTrue(
+                    all(
+                        command.startswith(POWERSHELL_ENCODED_PREFIX)
+                        for command in lifecycle_commands
+                    )
+                )
+                self.assertNotIn("\\", lifecycle_commands[0])
+                payload = self._session_start_payload(project)
+                shell_commands = [
+                    (
+                        "cmd",
+                        ["cmd.exe", "/d", "/s", "/c", lifecycle_commands[0]],
+                    ),
+                    (
+                        "powershell",
+                        [
+                            "powershell.exe",
+                            "-NoProfile",
+                            "-NonInteractive",
+                            "-Command",
+                            lifecycle_commands[0],
+                        ],
+                    ),
+                ]
+                git_bash_candidates = [
+                    os.environ.get("CLAUDE_CODE_GIT_BASH_PATH"),
+                    str(
+                        Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+                        / "Git/bin/bash.exe"
+                    ),
+                ]
+                bash = next(
+                    (
+                        candidate
+                        for candidate in git_bash_candidates
+                        if candidate and Path(candidate).is_file()
+                    ),
+                    None,
+                )
+                if bash is not None:
+                    shell_commands.append(
+                        ("bash", [bash, "-lc", lifecycle_commands[0]])
+                    )
+                for shell_name, shell_argv in shell_commands:
+                    env_file = project / f"{shell_name}-claude-env"
+                    env = os.environ.copy()
+                    env["CLAUDE_ENV_FILE"] = str(env_file)
+                    result = run(
+                        shell_argv,
+                        project,
+                        input=json.dumps(payload),
+                        env=env,
+                    )
+                    self.assertEqual(
+                        result.returncode,
+                        0,
+                        f"{shell_name}: {result.stderr or result.stdout}",
+                    )
+                    self.assertIn(
+                        "COMMITFORGE_SESSION_ID=cross-shell-session",
+                        env_file.read_text(encoding="utf-8"),
+                    )
 
             reinstalled = run(
                 [
@@ -228,6 +302,16 @@ class LifecycleInstallerTest(unittest.TestCase):
             self.assertEqual(removed.returncode, 0, removed.stderr)
             restored = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(restored, unrelated)
+
+    @staticmethod
+    def _session_start_payload(project: Path) -> dict[str, str]:
+        return {
+            "session_id": "cross-shell-session",
+            "transcript_path": str(project / "transcript.jsonl"),
+            "cwd": str(project),
+            "hook_event_name": "SessionStart",
+            "source": "startup",
+        }
 
 
 if __name__ == "__main__":

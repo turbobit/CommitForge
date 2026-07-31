@@ -4,12 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 from pathlib import Path
 import shlex
 import shutil
-import subprocess
 import sys
 
 
@@ -35,13 +35,32 @@ AGENTS = (
     "cca-requirements-product-reviewer.md",
 )
 CORE_REFERENCE = ".claude/skills/_git-atomic-core"
+POWERSHELL_ENCODED_PREFIX = (
+    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
 
 
-def shell_join(argv: list[str]) -> str:
-    """Render a command for the shell used by Claude Code hooks."""
-    if sys.platform == "win32":
-        return subprocess.list2cmdline(argv)
-    return shlex.join(argv)
+def python_hook_command(
+    executable: Path,
+    script: Path,
+) -> str:
+    """Render a Python hook command without depending on the caller's shell."""
+    executable = executable.resolve()
+    script = script.resolve()
+    if sys.platform != "win32":
+        return shlex.join([str(executable), str(script)])
+
+    def powershell_literal(value: Path) -> str:
+        return "'" + str(value).replace("'", "''") + "'"
+
+    powershell = (
+        f"& {powershell_literal(executable)} {powershell_literal(script)}\n"
+        "exit $LASTEXITCODE\n"
+    )
+    encoded = base64.b64encode(powershell.encode("utf-16-le")).decode("ascii")
+    # The outer shell only sees a fixed executable, switches, and Base64. Paths
+    # therefore survive Git Bash, PowerShell, and cmd.exe without re-parsing.
+    return POWERSHELL_ENCODED_PREFIX + encoded
 
 
 def yaml_single_quoted(value: str) -> str:
@@ -88,8 +107,9 @@ def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
         / "scripts"
         / "cr_edit_gate.py"
     )
-    command = shell_join(
-        [str(Path(sys.executable).resolve()), str(gate_path.resolve())]
+    command = python_hook_command(
+        Path(sys.executable),
+        gate_path,
     )
     if dry_run:
         print(f"[dry-run] configure /cr edit hook -> {command}")
@@ -120,6 +140,12 @@ def is_commitforge_lifecycle_handler(handler: object) -> bool:
     if not isinstance(handler, dict):
         return False
     command = handler.get("command")
+    if isinstance(command, str) and command.startswith(POWERSHELL_ENCODED_PREFIX):
+        try:
+            encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+            command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
+        except (UnicodeError, ValueError):
+            return False
     return (
         handler.get("type") == "command"
         and isinstance(command, str)
@@ -179,8 +205,9 @@ def configure_lifecycle_hooks(
         / "scripts"
         / "session_lifecycle.py"
     )
-    command = shell_join(
-        [str(Path(sys.executable).resolve()), str(lifecycle_path.resolve())]
+    command = python_hook_command(
+        Path(sys.executable),
+        lifecycle_path,
     )
     if dry_run:
         print(f"[dry-run] merge CommitForge lifecycle hooks -> {settings_path}")

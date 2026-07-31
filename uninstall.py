@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import datetime as dt
 import json
 from pathlib import Path
@@ -30,12 +31,21 @@ AGENTS = (
     "cca-privacy-governance-reviewer.md",
     "cca-requirements-product-reviewer.md",
 )
+POWERSHELL_ENCODED_PREFIX = (
+    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
 
 
 def is_commitforge_lifecycle_handler(handler: object) -> bool:
     if not isinstance(handler, dict):
         return False
     command = handler.get("command")
+    if isinstance(command, str) and command.startswith(POWERSHELL_ENCODED_PREFIX):
+        try:
+            encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+            command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
+        except (UnicodeError, ValueError):
+            return False
     return (
         handler.get("type") == "command"
         and isinstance(command, str)
