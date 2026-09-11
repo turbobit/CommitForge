@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 121,
-  "total_bytes": 1111480,
+  "file_count": 125,
+  "total_bytes": 1127429,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 956,
-      "sha256": "6dbe612b3794cda5f368d2183b7edfafb89e2b6163e858b67dc8779f9b707ddd"
+      "size": 2161,
+      "sha256": "f656cbe67f0e3035e7f421ad101197a4d1a250b98d5646622a0d3bdd20ecf49d"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -422,8 +422,18 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 209,
-      "sha256": "96f5f2d5f1e5f09a4a82b8951b3df1c333fbba7c0aae5dba8da2486cd1990336"
+      "size": 801,
+      "sha256": "7d73693e1cc4832bc97d1c94ae396c77ff27e2f95ea02dde0997efd8c4d75ba4"
+    },
+    {
+      "path": "editor-extension/src/state.ts",
+      "size": 3907,
+      "sha256": "0d209166c9b8d79d086462a03169c731d0f6d03c8d1240be15c289ee19b10c2d"
+    },
+    {
+      "path": "editor-extension/src/vscode/statusBar.ts",
+      "size": 3729,
+      "sha256": "6e4add4765780d69500889adbef18431a09116826b0b21654acc0cee3e81fd0b"
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
@@ -481,6 +491,16 @@
       "sha256": "c43aa3fc3c4e055cbf13c757878a81c3a1bb43fa965b126781e12143d3d553ca"
     },
     {
+      "path": "editor-extension/test/statusText.test.ts",
+      "size": 4682,
+      "sha256": "2f97fd50d2fa4549e8f16fe3eba63c7f494607d9e4f74984d880350ffeda59f5"
+    },
+    {
+      "path": "editor-extension/test/stubs/vscode.ts",
+      "size": 1712,
+      "sha256": "4f3df14aaa6dc21de7072f10c167c104170a54e3a19482d3d41577c722591333"
+    },
+    {
       "path": "editor-extension/test/sync-payload.test.ts",
       "size": 3607,
       "sha256": "6c9b26c80e5c1c9d424bf264a8ae392d618eda20bd1209361abad82f862d604f"
@@ -492,8 +512,8 @@
     },
     {
       "path": "editor-extension/vitest.config.ts",
-      "size": 157,
-      "sha256": "d48f83720e2ca423171489fd31f5a66f68639d95444e61e8c41e30ce7b44ba57"
+      "size": 279,
+      "sha256": "eda9bd392a08261562973c8c86723891e16b7392d316c9bb506f245b9ef63f94"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
