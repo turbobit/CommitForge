@@ -1069,13 +1069,14 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
         )
 
     session = safe_session(args.session)
-    # The token is generated but never emitted, so no caller can pass it back to
-    # `finish`/`abort` and delete this snapshot. Removal goes through `clean` or
-    # an explicit manual delete.
+    # The token proves ownership of this snapshot alone. `finish`/`abort` verify
+    # the worktree lock, which this command never takes, so the only way to
+    # spend the token is `release-snapshot`.
+    token = secrets.token_hex(24)
     snapshot, warnings, fingerprint = capture_snapshot(
         ctx,
         session,
-        secrets.token_hex(24),
+        token,
         max_untracked_bytes=args.max_untracked_mib * 1024 * 1024,
     )
 
@@ -1084,6 +1085,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
             "ok": True,
             "session": session,
             "locked": False,
+            "token": token,
             "snapshot": str(snapshot),
             "project_root": str(ctx["root"]),
             "head": current_head(ctx["root"]),
@@ -1091,8 +1093,9 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
             "fingerprint": fingerprint["fingerprint"],
             "warnings": warnings,
             "cleanup_policy": (
-                "이 스냅샷은 lock 없이 만들어져 자동으로 삭제되지 않습니다. "
-                "확인 후 `clean` 또는 수동으로 제거하십시오."
+                "이 스냅샷은 lock 없이 만들어졌습니다. 작업이 전부 성공하면 "
+                "`release-snapshot`으로 제거하고, 실패하거나 중단하면 보존하십시오. "
+                "`clean`은 이 스냅샷을 삭제하지 않습니다."
             ),
         }
     )
@@ -1308,6 +1311,56 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "lock_released": True,
             "worktree_clean": not bool(dirty),
             "review_invariants": review_result,
+            "snapshot_audit": audit_result,
+        }
+    )
+
+
+def cmd_release_snapshot(args: argparse.Namespace) -> None:
+    """Delete a lock-free Diff snapshot after its owner succeeded completely.
+
+    `/ccf` takes no worktree lock, so `finish` cannot serve it: that path
+    verifies lock ownership before deleting anything. Ownership is checked
+    against the snapshot's own marker instead, and the lock is never read,
+    written or released. The caller is expected to skip this command whenever
+    it failed or stopped early, which is what preserves the snapshot.
+    """
+    ctx = repo_context(Path.cwd().resolve())
+    session = safe_session(args.session)
+    snapshot = Path(args.snapshot)
+    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+
+    audit_result = None
+    if isinstance(metadata.get("snapshot_files"), dict):
+        audit_result = audit_snapshot(snapshot, metadata)
+        if not audit_result["ok"]:
+            raise GuardError(
+                "snapshot 무결성 검증에 실패해 삭제하지 않습니다: "
+                f"missing={audit_result['missing']}, "
+                f"unexpected={audit_result['unexpected']}, "
+                f"corrupt={audit_result['corrupt']}",
+                reason="snapshot_audit_failed",
+            )
+
+    dirty = decode(
+        run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
+    )
+    if dirty and not args.allow_dirty:
+        raise GuardError(
+            "작업 트리가 깨끗하지 않아 스냅샷을 삭제하지 않습니다. "
+            "모든 의도된 변경이 커밋되었는지 확인하십시오.",
+            reason="worktree_dirty",
+        )
+
+    shutil.rmtree(snapshot.resolve())
+    emit(
+        {
+            "ok": True,
+            "session": session,
+            "snapshot": str(snapshot),
+            "snapshot_removed": True,
+            "lock_released": False,
+            "worktree_clean": not bool(dirty),
             "snapshot_audit": audit_result,
         }
     )
@@ -1747,6 +1800,19 @@ def build_parser() -> argparse.ArgumentParser:
     snapshot_only.add_argument("--session", required=True)
     snapshot_only.add_argument("--max-untracked-mib", type=int, default=256)
 
+    release_snapshot = sub.add_parser(
+        "release-snapshot",
+        help="Delete a lock-free Diff snapshot without touching the worktree lock",
+    )
+    release_snapshot.add_argument("--session", required=True)
+    release_snapshot.add_argument("--token", required=True)
+    release_snapshot.add_argument("--snapshot", required=True)
+    release_snapshot.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="Delete even when the worktree still has intended changes outside --scope",
+    )
+
     sub.add_parser("fingerprint", help="Compute a read-only repository fingerprint")
 
     finish = sub.add_parser("finish", help="Delete owned snapshot and release lock")
@@ -1856,6 +1922,7 @@ def main() -> None:
         "probe": cmd_probe,
         "begin": cmd_begin,
         "snapshot": cmd_snapshot,
+        "release-snapshot": cmd_release_snapshot,
         "fingerprint": cmd_fingerprint,
         "verify-review": cmd_verify_review,
         "audit-snapshot": cmd_audit_snapshot,

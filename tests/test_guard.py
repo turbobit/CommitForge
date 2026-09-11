@@ -135,7 +135,7 @@ class GuardIntegrationTest(unittest.TestCase):
         _, captured = self.guard("snapshot", "--session", "fast-session")
         self.assertTrue(captured["ok"])
         self.assertFalse(captured["locked"])
-        self.assertNotIn("token", captured)
+        self.assertTrue(captured["token"])
 
         snapshot = Path(captured["snapshot"])
         self.assertTrue((snapshot / "working.diff").is_file())
@@ -172,6 +172,116 @@ class GuardIntegrationTest(unittest.TestCase):
         proc, payload = self.guard("snapshot", "--session", "  ", check=False)
         self.assertNotEqual(proc.returncode, 0)
         self.assertFalse(payload["ok"])
+
+    def test_release_snapshot_removes_snapshot_without_a_lock(self) -> None:
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        snapshot = Path(captured["snapshot"])
+        self.assertTrue(snapshot.is_dir())
+
+        _, released = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", captured["snapshot"],
+        )
+        self.assertTrue(released["ok"])
+        self.assertTrue(released["snapshot_removed"])
+        self.assertFalse(released["lock_released"])
+        self.assertTrue(released["worktree_clean"])
+        self.assertFalse(snapshot.exists())
+
+    def test_release_snapshot_refuses_a_foreign_token(self) -> None:
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        snapshot = Path(captured["snapshot"])
+
+        proc, payload = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", "0" * 48,
+            "--snapshot", captured["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(snapshot.exists())
+
+    def test_release_snapshot_refuses_a_dirty_worktree(self) -> None:
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        snapshot = Path(captured["snapshot"])
+        (self.tmp / "tracked.txt").write_text("base\nuncommitted\n", encoding="utf-8")
+
+        proc, payload = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", captured["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(snapshot.exists())
+
+        _, allowed = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", captured["snapshot"],
+            "--allow-dirty",
+        )
+        self.assertTrue(allowed["snapshot_removed"])
+        self.assertFalse(allowed["worktree_clean"])
+        self.assertFalse(snapshot.exists())
+
+    def test_release_snapshot_refuses_a_corrupt_snapshot(self) -> None:
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        snapshot = Path(captured["snapshot"])
+        working_diff = snapshot / "working.diff"
+        working_diff.write_bytes(working_diff.read_bytes() + b"tampered")
+
+        proc, payload = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", captured["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+        self.assertIn("corrupt", payload["error"])
+        self.assertTrue(snapshot.exists())
+
+    def test_release_snapshot_leaves_another_sessions_lock_intact(self) -> None:
+        _, started = self.guard("begin", "--session", "owner-session")
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+
+        _, released = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", captured["snapshot"],
+        )
+        self.assertTrue(released["snapshot_removed"])
+        self.assertFalse(released["lock_released"])
+
+        _, status = self.guard("status")
+        self.assertEqual(status["claude_atomic_lock"]["session"], "owner-session")
+        self.assertTrue(Path(started["snapshot"]).exists())
+
+    def test_release_snapshot_refuses_a_snapshot_outside_the_worktree(self) -> None:
+        outside = Path(tempfile.mkdtemp(prefix="cca-guard-outside-"))
+        self.addCleanup(shutil.rmtree, outside, ignore_errors=True)
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+
+        proc, payload = self.guard(
+            "release-snapshot",
+            "--session", captured["session"],
+            "--token", captured["token"],
+            "--snapshot", str(outside),
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+        self.assertTrue(outside.is_dir())
 
     def test_git_operation_blocks_begin_without_lock(self) -> None:
         git_dir = Path(run(["git", "rev-parse", "--git-dir"], self.tmp).stdout.strip())
