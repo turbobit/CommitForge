@@ -1,0 +1,9 @@
+src/**
+test/**
+scripts/**
+node_modules/**
+.vscode-test/**
+tsconfig.json
+vitest.config.ts
+esbuild.mjs
+**/*.map

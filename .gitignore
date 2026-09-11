@@ -48,3 +48,10 @@ build/
 
 # Git worktrees
 .worktrees/
+
+# Editor extension
+node_modules/
+editor-extension/payload/
+editor-extension/dist/
+editor-extension/*.vsix
+editor-extension/.vscode-test/

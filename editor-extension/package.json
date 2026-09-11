@@ -1,0 +1,29 @@
+{
+  "name": "commitforge",
+  "displayName": "CommitForge",
+  "description": "Claude Code용 Atomic Git Assistant를 설치·관리하고 명령을 실행합니다",
+  "version": "0.0.0",
+  "publisher": "commitforge",
+  "license": "MIT",
+  "engines": { "vscode": "^1.94.0" },
+  "categories": ["SCM Providers", "Other"],
+  "main": "./dist/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {},
+  "scripts": {
+    "sync-payload": "node scripts/sync-payload.mjs",
+    "build": "npm run sync-payload && node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "package": "npm run build && vsce package --out commitforge.vsix"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.94.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
