@@ -128,6 +128,51 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertTrue(finished["snapshot_removed"])
         self.assertFalse(clean_snapshot.exists())
 
+    def test_snapshot_preserves_diff_without_acquiring_lock(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        (self.tmp / "untracked.txt").write_text("new\n", encoding="utf-8")
+
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        self.assertTrue(captured["ok"])
+        self.assertFalse(captured["locked"])
+        self.assertNotIn("token", captured)
+
+        snapshot = Path(captured["snapshot"])
+        self.assertTrue((snapshot / "working.diff").is_file())
+        self.assertTrue((snapshot / "staged.diff").is_file())
+        self.assertTrue((snapshot / "untracked.tar.gz").is_file())
+        self.assertTrue((snapshot / ".cca-snapshot.json").is_file())
+        self.assertIn("changed", (snapshot / "working.diff").read_text(encoding="utf-8"))
+
+        _, status = self.guard("status")
+        self.assertIsNone(status["claude_atomic_lock"])
+
+    def test_snapshot_does_not_conflict_with_an_existing_lock(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        _, started = self.guard("begin", "--session", "owner-session")
+
+        _, captured = self.guard("snapshot", "--session", "fast-session")
+        self.assertTrue(captured["ok"])
+        self.assertNotEqual(captured["snapshot"], started["snapshot"])
+
+        _, status = self.guard("status")
+        self.assertEqual(status["claude_atomic_lock"]["session"], "owner-session")
+
+    def test_snapshot_refuses_during_in_progress_git_operation(self) -> None:
+        git_dir = Path(run(["git", "rev-parse", "--git-dir"], self.tmp).stdout.strip())
+        if not git_dir.is_absolute():
+            git_dir = self.tmp / git_dir
+        (git_dir / "MERGE_HEAD").write_text("deadbeef\n", encoding="ascii")
+
+        proc, payload = self.guard("snapshot", "--session", "fast-session", check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+
+    def test_snapshot_rejects_unsafe_session_id(self) -> None:
+        proc, payload = self.guard("snapshot", "--session", "  ", check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(payload["ok"])
+
     def test_git_operation_blocks_begin_without_lock(self) -> None:
         git_dir = Path(run(["git", "rev-parse", "--git-dir"], self.tmp).stdout.strip())
         if not git_dir.is_absolute():

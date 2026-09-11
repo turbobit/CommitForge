@@ -1052,6 +1052,52 @@ def cmd_begin(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_snapshot(args: argparse.Namespace) -> None:
+    """Capture a Diff snapshot without acquiring the worktree lock.
+
+    `/ccf` uses this to keep a recoverable diff while intentionally skipping the
+    rest of the Guard contract. The snapshot is never owned by a lock, so it is
+    always preserved and only `clean` or manual deletion removes it.
+    """
+    cwd = Path.cwd().resolve()
+    ctx = repo_context(cwd)
+    operations = operation_state(ctx["git_dir"])
+    if operations:
+        raise GuardError(
+            f"진행 중인 Git 작업이 있어 중단합니다: {', '.join(operations)}",
+            reason="git_operation_in_progress",
+        )
+
+    session = safe_session(args.session)
+    # The token is generated but never emitted, so no caller can pass it back to
+    # `finish`/`abort` and delete this snapshot. Removal goes through `clean` or
+    # an explicit manual delete.
+    snapshot, warnings, fingerprint = capture_snapshot(
+        ctx,
+        session,
+        secrets.token_hex(24),
+        max_untracked_bytes=args.max_untracked_mib * 1024 * 1024,
+    )
+
+    emit(
+        {
+            "ok": True,
+            "session": session,
+            "locked": False,
+            "snapshot": str(snapshot),
+            "project_root": str(ctx["root"]),
+            "head": current_head(ctx["root"]),
+            "branch": branch_name(ctx["root"]),
+            "fingerprint": fingerprint["fingerprint"],
+            "warnings": warnings,
+            "cleanup_policy": (
+                "이 스냅샷은 lock 없이 만들어져 자동으로 삭제되지 않습니다. "
+                "확인 후 `clean` 또는 수동으로 제거하십시오."
+            ),
+        }
+    )
+
+
 def cmd_fingerprint(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     payload = repository_fingerprint(ctx["root"])
@@ -1694,6 +1740,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Seconds after which an empty, unheld Git lock file is reported as stale",
     )
 
+    snapshot_only = sub.add_parser(
+        "snapshot",
+        help="Capture a Diff snapshot without acquiring the worktree lock",
+    )
+    snapshot_only.add_argument("--session", required=True)
+    snapshot_only.add_argument("--max-untracked-mib", type=int, default=256)
+
     sub.add_parser("fingerprint", help="Compute a read-only repository fingerprint")
 
     finish = sub.add_parser("finish", help="Delete owned snapshot and release lock")
@@ -1802,6 +1855,7 @@ def main() -> None:
     handlers = {
         "probe": cmd_probe,
         "begin": cmd_begin,
+        "snapshot": cmd_snapshot,
         "fingerprint": cmd_fingerprint,
         "verify-review": cmd_verify_review,
         "audit-snapshot": cmd_audit_snapshot,
