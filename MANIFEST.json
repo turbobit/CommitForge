@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 118,
-  "total_bytes": 1087645,
+  "total_bytes": 1089252,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -418,7 +418,7 @@
     {
       "path": "editor-extension/src/core/python.ts",
       "size": 1326,
-      "sha256": "b4ece9f5cdb19b4f5c5e82043af0374ec1e2491d04186999a9567336d84574fe"
+      "sha256": "c789f28a715ae2a321f51dd9ed69aea8e350d445cc29e6670ba09471fbf26320"
     },
     {
       "path": "editor-extension/src/extension.ts",
@@ -427,8 +427,8 @@
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
-      "size": 7134,
-      "sha256": "78afaed30d3825383ac3310d9313be5dc3ecbd1cd00ee6fb717d87638692188f"
+      "size": 8071,
+      "sha256": "fefc8cea4ceab680e0046bd6a91f66162a8061f9b3c5f90a21803f75a3b62490"
     },
     {
       "path": "editor-extension/test/composer.test.ts",
@@ -462,8 +462,8 @@
     },
     {
       "path": "editor-extension/test/python.test.ts",
-      "size": 2058,
-      "sha256": "308136f896bb253826b2a7f2d31b2a8a4ad5b8e1f87baa91c98231dac45a62ed"
+      "size": 2728,
+      "sha256": "c43aa3fc3c4e055cbf13c757878a81c3a1bb43fa965b126781e12143d3d553ca"
     },
     {
       "path": "editor-extension/test/sync-payload.test.ts",
