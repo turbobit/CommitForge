@@ -43,6 +43,20 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - `untracked.z`: untracked 경로 목록
 - `*.stat`
 
+## Lock 없는 snapshot (`/ccf`)
+
+`/ccf`는 `guard.py snapshot`으로 lock 없이 Diff snapshot만 만든다. 이 snapshot은
+어떤 세션도 소유 token을 알지 못하므로 `finish`·`abort`로 삭제되지 않고 항상
+보존된다. 구성은 위와 동일하며 `audit-snapshot`으로 무결성을 확인할 수 있다.
+
+`/ccf`는 커밋을 여러 개 만들 수 있으므로 보고에 기록된 시작 HEAD로 되돌린다.
+
+```bash
+git reset --soft <시작 HEAD>
+```
+
+이후 불필요한 snapshot은 `status`로 경로를 확인한 뒤 수동으로 제거한다.
+
 ## 수동 복구 원칙
 
 복구 전에 현재 작업을 별도로 보존하고, 원래 snapshot의 `head`와 동일한 기준인지 확인한다. 자동으로 기존 작업 위에 덮어쓰지 않는다.

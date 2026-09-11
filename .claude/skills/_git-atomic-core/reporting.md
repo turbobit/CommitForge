@@ -97,6 +97,107 @@
 - 생략/실패한 검증
 - push하지 않았음
 
+## `/cf`
+
+```text
+## 상태
+- 브랜치 / 시작 HEAD → 최종 HEAD
+- 대상 범위와 사용자 인자
+
+## 생성 커밋
+<short-hash> type(scope): 한글 제목
+- 묶인 의도: feat ..., fix ..., docs ...
+- 파일 수 / +추가 / -삭제
+
+## 검증
+- 수행한 검증 또는 "기본 모드로 프로젝트 검증 생략"
+- commit hook 존중 / 우회 여부
+
+## 종료
+- 남은 변경과 clean 여부
+- snapshot 삭제/보존 위치
+- lock 해제 여부
+- push하지 않았음
+```
+
+마지막에 반드시 다음을 명시한다.
+
+- 이 커밋은 Atomic Commit이 아니며 여러 의도가 묶여 있다
+- 공유 branch·release 히스토리에는 `/cc` 또는 `/cca`를 권장한다
+
+차단 스캔에 걸려 중단했으면 `## 오류/중단` 형식을 따르고, 현재 index 상태와
+`git restore --staged` 복구 방법을 함께 제시한다.
+
+## `/cfr`
+
+```text
+## 상태
+- 브랜치 / HEAD
+- staged / unstaged / untracked 요약
+- 대상 범위와 사용자 인자
+
+## 예상 단일 커밋
+type(scope): 한글 제목
+대표 type 근거:
+scope 근거:
+대상 파일 / 예상 통계:
+묶이는 의도:
+메시지 초안:
+
+## 차단 사유
+- secret / 자격 파일 / 산출물 유입 / conflict marker / 진행 중 Git 작업
+- 각 항목의 해결 방법
+
+## 교차 검토
+- `/cf`보다 `/cc`가 적합한 근거가 있는가
+- Breaking Change·migration 위험
+- `--scope` 축소 권장 여부
+
+## 요약
+- 권장 후속 명령 (`/cf`, `/cc`, `/ccr`)
+- `--verify` 시 실행될 검증 명령 (식별만)
+- lock 해제 여부
+```
+
+이 커밋이 Atomic Commit이 아니라는 점과 실제 Git 상태를 변경하지 않았음을
+마지막에 명시한다.
+
+## `/ccf`
+
+```text
+## 상태
+- 브랜치 / 시작 HEAD → 최종 HEAD
+- 대상 범위와 사용자 인자
+
+## 생성 커밋
+1. <short-hash> type(scope): 한글 제목
+   - 목적
+   - 파일 수 / +추가 / -삭제
+2. ...
+
+## 섞인 의도
+- 파일 단위 그룹핑 때문에 두 개 이상의 의도가 함께 들어간 커밋과 그 내용
+- 없으면 "없음"
+
+## 포기한 보호
+- worktree lock 미획득 (동시 실행 시 작업 유실 위험)
+- fingerprint 재검사 없음
+- hunk 단위 분리 없음
+- 프로젝트 검증 실행하지 않음
+- commit hook 존중 / 우회 여부
+
+## 종료
+- 보관된 snapshot 경로 (자동 삭제되지 않음)
+- 되돌리기: git reset --soft <시작 HEAD>
+- 남은 변경과 clean 여부
+- push하지 않았음
+```
+
+마지막에 반드시 다음을 명시한다.
+
+- 파일 단위 그룹핑이므로 결과가 완전한 Atomic Commit이 아닐 수 있다
+- 공유 branch·release 히스토리에는 `/cc` 또는 `/cca`를 권장한다
+
 ## `/cca`
 
 추가로 포함:

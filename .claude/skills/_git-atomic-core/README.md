@@ -1,10 +1,11 @@
 # Shared Git Atomic Core
 
-이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cr`, `/cca`, `/cpr`, `/cp`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다.
+이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다. `/ccf`는 속도를 위해 `fast-commit-rules.md`와 `reporting.md`만 읽습니다.
 
 `SKILL.md`가 없으므로 독립 slash command로 등록되지 않습니다.
 
 - `atomic-commit-rules.md`: 분리·그룹화·순서
+- `fast-commit-rules.md`: `/cf`·`/cfr`의 단일 묶음 커밋과 대표 type, `/ccf`의 빠른 의미 분리, 공통 차단 스캔
 - `staging-strategy.md`: hunk/index 구성
 - `commit-message-guide.md`: 한글 메시지
 - `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
@@ -27,7 +28,7 @@
 - `reporting.md`: 결과 형식
 - `recovery.md`: 장애 복구
 - `examples.md`: 사례
-- `scripts/guard.py`: worktree별 lock, snapshot, 무결성 감사, fingerprint, cleanup
+- `scripts/guard.py`: worktree별 lock, snapshot, 무결성 감사, fingerprint, cleanup (`snapshot` 서브커맨드는 lock 없이 Diff snapshot만 생성)
 - `scripts/session_lifecycle.py`: Claude 실제 session ID 바인딩, turn 종료 시 잠금 유지, SessionEnd 잠금 정리
 - `scripts/agent_team_mode.py`: Agent Teams 환경 활성 상태의 read-only 판정
 - `scripts/guard.sh`: macOS/Linux/WSL/Git Bash용 Python 3 launcher
