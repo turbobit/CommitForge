@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 118,
-  "total_bytes": 1081919,
+  "total_bytes": 1087645,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -402,8 +402,8 @@
     },
     {
       "path": "editor-extension/src/core/detect.ts",
-      "size": 5951,
-      "sha256": "012812fb84cb359aaa6d15b5b10e4eab6b50d73555e95965b3131ffaf7aba3ce"
+      "size": 7474,
+      "sha256": "878c997d4598b33f5f337521d35fecaab63fda1680aa8d46e05d6f2e7db62f9d"
     },
     {
       "path": "editor-extension/src/core/guard.ts",
@@ -437,8 +437,8 @@
     },
     {
       "path": "editor-extension/test/detect.test.ts",
-      "size": 7987,
-      "sha256": "b71e33ad9326d2fd7471914700bb0b418732b95d9133429c0e6fb53bb5069631"
+      "size": 10668,
+      "sha256": "f291ca58e8e5a0d524bd904da7115932803c5e8f5b97736ea4fcbdd76489559c"
     },
     {
       "path": "editor-extension/test/fixtures/skill-cc.md",
@@ -512,8 +512,8 @@
     },
     {
       "path": "install.py",
-      "size": 14261,
-      "sha256": "7841f5d137570abedf24597d0246c01e225a92e97b6b78bc637df4c97331ae0c"
+      "size": 14889,
+      "sha256": "5c74adf23164a7b06afcfb164fdd0766ce74e76cdb9fa0a52c689829decf8824"
     },
     {
       "path": "install.sh",
@@ -537,8 +537,8 @@
     },
     {
       "path": "tests/test_install_marker.py",
-      "size": 3092,
-      "sha256": "38e968ad7fbad8da0b54b86d5f70acf5045a500da6b5f97726d2344d7088fd61"
+      "size": 3986,
+      "sha256": "6e14835e950cf2483a3f316d9b873d3a84c035cb11ea5287e56bd5ff294c0c27"
     },
     {
       "path": "tests/test_package.py",

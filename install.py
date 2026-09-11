@@ -300,25 +300,37 @@ def package_version() -> str:
 
 
 def write_install_marker(claude_dir: Path, *, scope: str, dry_run: bool) -> None:
-    """Record what this installation placed, for upgrade and tooling checks."""
+    """Record what this installation placed, for upgrade and tooling checks.
+
+    마커는 표시용 메타데이터일 뿐이다 (확장은 "마커 없음 + 해시 일치"도 ok로
+    본다). 이 함수가 호출되는 시점에는 이미 skills·agents 복사와 hook 설정이
+    전부 끝난 상태이므로, 마커 기록이 실패해도 설치 전체를 실패로 만들지
+    않는다 — 경고만 남기고 넘어간다.
+    """
     marker_path = claude_dir / MARKER_NAME
     if dry_run:
         print(f"[dry-run] write install marker -> {marker_path}")
         return
 
-    payload = {
-        "schema": MARKER_SCHEMA,
-        "version": package_version(),
-        "scope": scope,
-        "installed_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "python": str(Path(sys.executable)),
-        "core_path": str((claude_dir / "skills" / "_git-atomic-core").resolve()),
-    }
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    marker_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        payload = {
+            "schema": MARKER_SCHEMA,
+            "version": package_version(),
+            "scope": scope,
+            "installed_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "python": str(Path(sys.executable)),
+            "core_path": str((claude_dir / "skills" / "_git-atomic-core").resolve()),
+        }
+        marker_path.parent.mkdir(parents=True, exist_ok=True)
+        marker_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+    except Exception as exc:
+        print(
+            f"경고: 설치 마커를 기록하지 못했습니다: {exc} (설치 자체는 계속 진행합니다)",
+            file=sys.stderr,
+        )
 
 
 def copy_with_backup(src: Path, dst: Path, backup: Path, dry_run: bool) -> None:

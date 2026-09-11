@@ -67,6 +67,26 @@ class InstallMarkerTest(unittest.TestCase):
 
         self.assertFalse(self.marker.exists(), "제거 후에도 마커가 남았습니다")
 
+    def test_marker_write_failure_does_not_fail_install(self) -> None:
+        """마커 기록이 실패해도 설치 자체는 성공해야 한다.
+
+        마커는 표시용 메타데이터일 뿐이고, 이 시점에는 이미 skills·agents
+        복사와 hook 설정이 전부 끝난 상태다. 마커 경로에 디렉터리를 미리
+        만들어 write_text가 실패하도록 강제한다.
+        """
+        claude_dir = self.tmp / ".claude"
+        claude_dir.mkdir(parents=True)
+        (claude_dir / MARKER_NAME).mkdir()
+
+        proc = run(INSTALL, "--scope", "project", "--target", str(self.tmp))
+
+        self.assertEqual(proc.returncode, 0)
+        self.assertTrue(
+            (claude_dir / "skills" / "cr" / "SKILL.md").is_file(),
+            "마커 기록 실패로 skills 설치까지 중단됐습니다",
+        )
+        self.assertIn("경고", proc.stderr)
+
     def test_reinstall_refreshes_marker_timestamp(self) -> None:
         run(INSTALL, "--scope", "project", "--target", str(self.tmp))
         first = json.loads(self.marker.read_text(encoding="utf-8"))
