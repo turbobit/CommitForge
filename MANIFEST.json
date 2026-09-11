@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 92,
-  "total_bytes": 660262,
+  "file_count": 94,
+  "total_bytes": 821115,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -354,6 +354,16 @@
       "path": "VERSION",
       "size": 7,
       "sha256": "46081fd90571a274160408ebc81fc91b78ffca4049d477998e3b6909ac245e05"
+    },
+    {
+      "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
+      "size": 140521,
+      "sha256": "4aeb1d28a4c140c118aa4492478e774f32e9145fb531eedfed24b788c1a30775"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-11-vscode-extension-design.md",
+      "size": 20332,
+      "sha256": "9eff9eba7f9edf400a0bd7308709894dae086cf82ff9fc225c3970bd007d222b"
     },
     {
       "path": "evals/conditional-reviewer-triggers.json",
