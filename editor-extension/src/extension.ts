@@ -7,6 +7,20 @@ import type { Scope } from "./core/detect";
 
 const FOLDER_KEY = "commitforge.activeFolder";
 
+/**
+ * commitforge.install/upgrade/reinstall이 공유하는 실제 동작. 트리에서
+ * 호출되면 그 행의 scope로 바로 실행하고, 인자 없이(팔레트에서) 호출되면
+ * QuickPick으로 묻는다.
+ */
+async function handleInstall(
+  store: StateStore,
+  output: vscode.OutputChannel,
+  node?: Node,
+): Promise<void> {
+  const scope = node?.scope ?? (await pickScope());
+  if (scope) await runInstaller(store, "install", scope, output);
+}
+
 async function pickScope(): Promise<Scope | undefined> {
   const picked = await vscode.window.showQuickPick(
     [
@@ -63,10 +77,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // 트리의 project/global 행에서 호출되면 VS Code가 그 TreeItem(Node)을
     // 첫 인자로 넘긴다. 이미 범위를 아는 상태이므로 QuickPick으로 다시
     // 묻지 않는다. 명령 팔레트에서 인자 없이 호출됐을 때만 묻는다.
-    vscode.commands.registerCommand("commitforge.install", async (node?: Node) => {
-      const scope = node?.scope ?? (await pickScope());
-      if (scope) await runInstaller(store, "install", scope, output);
-    }),
+    //
+    // commitforge.install/upgrade/reinstall은 셋 다 이 핸들러 하나에
+    // 위임한다(install.py가 항상 같은 백업 후 덮어쓰기를 한다). 명령을
+    // 나눈 것은 오직 VS Code 메뉴 title이 명령별로 고정되기 때문이며,
+    // 팔레트에는 별칭 두 개를 숨겨(package.json commandPalette when:false)
+    // "설치" 하나만 남긴다.
+    vscode.commands.registerCommand("commitforge.install", (node?: Node) =>
+      handleInstall(store, output, node),
+    ),
+    vscode.commands.registerCommand("commitforge.upgrade", (node?: Node) =>
+      handleInstall(store, output, node),
+    ),
+    vscode.commands.registerCommand("commitforge.reinstall", (node?: Node) =>
+      handleInstall(store, output, node),
+    ),
     vscode.commands.registerCommand("commitforge.uninstall", async (node?: Node) => {
       const scope = node?.scope ?? (await pickScope());
       if (scope) await runInstaller(store, "uninstall", scope, output);

@@ -24,12 +24,13 @@ const STATE_LABEL: Record<InstallReport["state"], string> = {
  * `view/item/context` 메뉴가 이 값으로 어떤 버튼을 보여줄지 고른다
  * (spec §5.3 "제안 행동" ↔ §7.4 "버튼별 동작"의 다리 역할).
  *
- * `[업그레이드]`·`[재설치]`는 `commitforge.install`과 같은 명령이다
- * (install.py가 백업 후 덮어쓴다). VS Code 메뉴 기여는 명령별 title을
- * 하나만 가지므로(같은 명령을 여러 자리에 걸어도 표시 문구는 항상
- * `commitforge.install`의 등록 title을 따른다), 상태별로 다른 문구를
- * 보여주려고 별도 명령 3개를 새로 만들지는 않는다 — contextValue로
- * "이 버튼을 보여줄지"만 가른다.
+ * `[업그레이드]`·`[재설치]`는 `commitforge.upgrade`·`commitforge.reinstall`
+ * 별칭 명령이다 — 셋 다 `extension.ts`의 같은 핸들러(`runInstaller`
+ * 호출부)에 위임하므로 로직은 한 벌만 유지된다. 명령을 나눈 이유는 오직
+ * VS Code 메뉴 기여가 명령별 title을 하나만 가지기 때문이다(버튼 tooltip이
+ * "설치/업그레이드/재설치"로 자리마다 다르게 뜨려면 각각 등록된 명령이어야
+ * 한다). 별칭 두 개는 `commandPalette`에서 `when: false`로 숨겨 팔레트에는
+ * "설치" 하나만 보인다.
  */
 const INSTALL_CONTEXT: Record<InstallReport["state"], string> = {
   missing: "commitforge.node.install",
@@ -180,7 +181,10 @@ export function buildTree(state: WorkspaceState | null): Node[] {
       icon: "archive",
       description: `${guard.snapshots.length}개`,
       color: staleColor,
-      contextValue: SNAPSHOTS_CONTEXT,
+      // 스냅샷이 없으면 열 폴더도 없다 — contextValue를 아예 붙이지 않아
+      // view/item/context의 when 절이 "[스냅샷 폴더 열기]" 버튼 자체를
+      // 감추게 한다(존재 확인 없이 revealFileInOS를 부르는 상황을 방지).
+      contextValue: guard.snapshots.length > 0 ? SNAPSHOTS_CONTEXT : undefined,
       resourcePath: join(guard.gitDir, SNAPSHOT_DIR_NAME),
     }),
   );

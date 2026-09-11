@@ -249,11 +249,19 @@ describe("buildTree - 잠금·스냅샷 contextValue", () => {
     expect(findChild(nodes, "잠금")?.contextValue).toBe("commitforge.node.lock");
   });
 
-  it("스냅샷 노드는 commitforge.node.snapshots와 절대 경로(resourcePath)를 받는다", () => {
-    const nodes = buildTree(state());
+  it("스냅샷이 있으면 commitforge.node.snapshots와 절대 경로(resourcePath)를 받는다", () => {
+    const nodes = buildTree(
+      state({ guard: { ...idleGuard, snapshots: ["/repo/.git/claude-atomic-snapshots/abc"] } }),
+    );
     const snapshotsNode = findChild(nodes, "스냅샷");
     expect(snapshotsNode?.contextValue).toBe("commitforge.node.snapshots");
     expect(snapshotsNode?.resourcePath).toBe("/repo/.git/claude-atomic-snapshots");
+  });
+
+  it("스냅샷이 없으면 폴더 열기 버튼용 contextValue가 없다 (열 폴더가 없다)", () => {
+    const nodes = buildTree(state({ guard: { ...idleGuard, snapshots: [] } }));
+    const snapshotsNode = findChild(nodes, "스냅샷");
+    expect(snapshotsNode?.contextValue).toBeUndefined();
   });
 
   it("git 저장소가 아니면 잠금·스냅샷 contextValue 자체가 존재하지 않는다", () => {
