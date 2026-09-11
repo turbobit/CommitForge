@@ -1,65 +1,70 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { parseGuardStatus, runGuardStatus, type GuardRunner } from "../src/core/guard";
 
-const idle = JSON.stringify({
-  ok: true,
-  project_root: "/repo",
-  git_dir: "/repo/.git",
-  common_dir: "/repo/.git",
-  lock_scope: "worktree_git_dir",
-  lock_path: "/repo/.git/claude-atomic.lock",
-  claude_atomic_lock: null,
-  lock_created_at: null,
-  lock_age_seconds: null,
-  lock_owner_hostname: null,
-  lock_owner_same_host: null,
-  current_hostname: "mac.local",
-  stale_after_seconds: 3600,
-  stale_candidate: false,
-  lock_owner_snapshots: [],
-  recovery: null,
-  snapshots: [],
-  operations: [],
-  git_lock_files: [],
-  git_locks: [],
-  git_lock_recovery: null,
-});
-
-const held = JSON.stringify({
-  ok: true,
-  project_root: "/repo",
-  git_dir: "/repo/.git",
-  claude_atomic_lock: { session: "abc123", token: "t", created_at: "2026-09-11T08:00:00Z" },
-  lock_age_seconds: 742,
-  lock_owner_hostname: "other.local",
-  lock_owner_same_host: false,
-  current_hostname: "mac.local",
-  stale_candidate: false,
-  snapshots: ["/repo/.git/claude-atomic-snapshots/abc123"],
-  operations: ["rebase-merge"],
-  git_lock_files: ["/repo/.git/index.lock"],
-});
+/**
+ * spec §10: "guard.ts: guard.py status 실제 출력 샘플 파싱". 두 픽스처는
+ * `.claude/skills/_git-atomic-core/scripts/guard.py status`를 임시 git 저장소에서
+ * 직접 실행해 얻은 실제 출력이다 (경로·호스트명만 재현 가능하도록 다듬었다).
+ */
+const idle = readFileSync(join(__dirname, "fixtures", "guard-status-idle.json"), "utf8");
+const held = readFileSync(join(__dirname, "fixtures", "guard-status-held.json"), "utf8");
 
 describe("parseGuardStatus", () => {
   it("유휴 상태를 읽는다", () => {
     const status = parseGuardStatus(idle);
 
     expect(status.ok).toBe(true);
-    expect(status.projectRoot).toBe("/repo");
+    expect(status.projectRoot).toBe("/private/tmp/guard-fixture-repo");
     expect(status.lockOwner).toBeNull();
-    expect(status.snapshots).toEqual([]);
-    expect(status.currentHostname).toBe("mac.local");
+    expect(status.snapshots).toHaveLength(1);
+    expect(status.currentHostname).toBe("dev-mac.local");
+    expect(status.recovery).toBeNull();
+    expect(status.gitLocks).toEqual([]);
   });
 
   it("lock 보유 상태를 읽는다", () => {
     const status = parseGuardStatus(held);
 
-    expect(status.lockOwner).toEqual({ session: "abc123", created_at: "2026-09-11T08:00:00Z" });
-    expect(status.lockAgeSeconds).toBe(742);
-    expect(status.lockOwnerSameHost).toBe(false);
-    expect(status.operations).toEqual(["rebase-merge"]);
-    expect(status.gitLockFiles).toEqual(["/repo/.git/index.lock"]);
+    expect(status.lockOwner).toEqual({
+      session: "fixture-session-abc123",
+      created_at: "2026-09-11T22:47:27.902164+00:00",
+    });
+    expect(status.lockAgeSeconds).toBe(240);
+    expect(status.lockOwnerSameHost).toBe(true);
+    expect(status.operations).toEqual([]);
+    expect(status.gitLockFiles).toEqual(["/private/tmp/guard-fixture-repo/.git/index.lock"]);
   });
+
+  it("spec §7.3 트리의 복구 제안에 필요한 recovery를 구조적으로 노출한다", () => {
+    // spec §4 표의 "복구 제안"과 §7.3 트리 데이터 매핑 목록(recovery 포함)이 요구하는
+    // 필드다. 지금까지 GuardStatus는 이를 아예 노출하지 않았다.
+    const idleStatus = parseGuardStatus(idle);
+    expect(idleStatus.recovery).toBeNull();
+
+    const heldStatus = parseGuardStatus(held);
+    expect(heldStatus.recovery).not.toBeNull();
+    expect(heldStatus.recovery?.cleanHint).toContain("clean");
+    expect(heldStatus.recovery?.abortArgv).toContain("abort");
+    expect(heldStatus.recovery?.snapshot).toContain("claude-atomic-snapshots");
+  });
+
+  it(
+    "spec §7.3 트리 예시 'git index.lock 존재 (4분)'을 렌더링할 수 있도록 " +
+      "git_locks의 path/age_seconds/stale_candidate를 구조적으로 노출한다",
+    () => {
+      // git_lock_files는 경로 문자열만 담아 "4분"을 렌더링할 수 없다. git_locks의
+      // age_seconds가 있어야 트리 예시를 그대로 그릴 수 있다.
+      const status = parseGuardStatus(held);
+
+      expect(status.gitLocks).toHaveLength(1);
+      const [lock] = status.gitLocks;
+      expect(lock?.path).toContain("index.lock");
+      expect(lock?.ageSeconds).toBe(240);
+      expect(lock?.staleCandidate).toBe(false);
+    },
+  );
 
   it("JSON이 아니면 실패한다", () => {
     expect(() => parseGuardStatus("보통 에러 메시지")).toThrow(/guard/);
@@ -71,6 +76,8 @@ describe("parseGuardStatus", () => {
     expect(status.snapshots).toEqual([]);
     expect(status.operations).toEqual([]);
     expect(status.staleCandidate).toBe(false);
+    expect(status.recovery).toBeNull();
+    expect(status.gitLocks).toEqual([]);
   });
 });
 

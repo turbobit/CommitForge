@@ -1,0 +1,25 @@
+{
+  "ok": true,
+  "project_root": "/private/tmp/guard-fixture-repo",
+  "git_dir": "/private/tmp/guard-fixture-repo/.git",
+  "common_dir": "/private/tmp/guard-fixture-repo/.git",
+  "lock_scope": "worktree_git_dir",
+  "lock_path": "/private/tmp/guard-fixture-repo/.git/claude-atomic.lock",
+  "claude_atomic_lock": null,
+  "lock_created_at": null,
+  "lock_age_seconds": null,
+  "lock_owner_hostname": null,
+  "lock_owner_same_host": null,
+  "current_hostname": "dev-mac.local",
+  "stale_after_seconds": 3600,
+  "stale_candidate": false,
+  "lock_owner_snapshots": [],
+  "recovery": null,
+  "snapshots": [
+    "/private/tmp/guard-fixture-repo/.git/claude-atomic-snapshots/20260912-074727-fixture-session-abc123-faeb522a"
+  ],
+  "operations": [],
+  "git_lock_files": [],
+  "git_locks": [],
+  "git_lock_recovery": null
+}
