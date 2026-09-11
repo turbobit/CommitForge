@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 104,
-  "total_bytes": 1031296,
+  "file_count": 118,
+  "total_bytes": 1081919,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -391,9 +391,79 @@
       "sha256": "609a24111de1c4c49d51332009d2ea19a94773c6ed245bcce13ed6a1ecd4646c"
     },
     {
+      "path": "editor-extension/src/core/catalog.ts",
+      "size": 6010,
+      "sha256": "7c58a33c19cd79fb747656cd30b92c4a7b20cbbd789b679189276cf6c7b837cd"
+    },
+    {
+      "path": "editor-extension/src/core/composer.ts",
+      "size": 3392,
+      "sha256": "c8349b2e773c40be9d398cd71b669c661ee6acf814e4a007e73208e11a3c3a90"
+    },
+    {
+      "path": "editor-extension/src/core/detect.ts",
+      "size": 5951,
+      "sha256": "012812fb84cb359aaa6d15b5b10e4eab6b50d73555e95965b3131ffaf7aba3ce"
+    },
+    {
+      "path": "editor-extension/src/core/guard.ts",
+      "size": 2812,
+      "sha256": "4cd70eb5e905a7c67c0e94e82dc3e8fdba8c38f8f1100a6c85a35863c3deac24"
+    },
+    {
+      "path": "editor-extension/src/core/payload.ts",
+      "size": 1566,
+      "sha256": "75e7e502a5c673cce53b856ccadeaf09bd756a0ee352a4aa180876c1231c5c16"
+    },
+    {
+      "path": "editor-extension/src/core/python.ts",
+      "size": 1326,
+      "sha256": "b4ece9f5cdb19b4f5c5e82043af0374ec1e2491d04186999a9567336d84574fe"
+    },
+    {
       "path": "editor-extension/src/extension.ts",
       "size": 209,
       "sha256": "96f5f2d5f1e5f09a4a82b8951b3df1c333fbba7c0aae5dba8da2486cd1990336"
+    },
+    {
+      "path": "editor-extension/test/catalog.test.ts",
+      "size": 7134,
+      "sha256": "78afaed30d3825383ac3310d9313be5dc3ecbd1cd00ee6fb717d87638692188f"
+    },
+    {
+      "path": "editor-extension/test/composer.test.ts",
+      "size": 4821,
+      "sha256": "a07d01c7e953349c80ab01e0c0763c39a958ca23990d0da8e4f56791982761ce"
+    },
+    {
+      "path": "editor-extension/test/detect.test.ts",
+      "size": 7987,
+      "sha256": "b71e33ad9326d2fd7471914700bb0b418732b95d9133429c0e6fb53bb5069631"
+    },
+    {
+      "path": "editor-extension/test/fixtures/skill-cc.md",
+      "size": 374,
+      "sha256": "3cdb2ec8e44c19952060b5a10b1182eb5df9ef82878157b63f5fe558266a83f2"
+    },
+    {
+      "path": "editor-extension/test/fixtures/skill-cca.md",
+      "size": 1153,
+      "sha256": "029159c26fd4e2695e612a3bf3ce3710add627c64fd565d2c86044edb2362e26"
+    },
+    {
+      "path": "editor-extension/test/guard.test.ts",
+      "size": 3330,
+      "sha256": "2de1ec99bd628e162d43ca7d07a112f799cb268df1c4e411dd5581708097e102"
+    },
+    {
+      "path": "editor-extension/test/payload.test.ts",
+      "size": 2709,
+      "sha256": "88f9383eec1d74a4f80e742808deaa6c74d6544ef83038cbe1c4f061766b403e"
+    },
+    {
+      "path": "editor-extension/test/python.test.ts",
+      "size": 2058,
+      "sha256": "308136f896bb253826b2a7f2d31b2a8a4ad5b8e1f87baa91c98231dac45a62ed"
     },
     {
       "path": "editor-extension/test/sync-payload.test.ts",
