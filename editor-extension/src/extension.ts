@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { StateStore } from "./state";
 import { createStatusBar } from "./vscode/statusBar";
-import { createTreeView } from "./vscode/treeView";
+import { createTreeView, type Node } from "./vscode/treeView";
 import { runInstaller } from "./vscode/installer";
 import type { Scope } from "./core/detect";
 
@@ -60,13 +60,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("commitforge.focusView", () =>
       vscode.commands.executeCommand("commitforge.view.focus"),
     ),
-    vscode.commands.registerCommand("commitforge.install", async () => {
-      const scope = await pickScope();
+    // 트리의 project/global 행에서 호출되면 VS Code가 그 TreeItem(Node)을
+    // 첫 인자로 넘긴다. 이미 범위를 아는 상태이므로 QuickPick으로 다시
+    // 묻지 않는다. 명령 팔레트에서 인자 없이 호출됐을 때만 묻는다.
+    vscode.commands.registerCommand("commitforge.install", async (node?: Node) => {
+      const scope = node?.scope ?? (await pickScope());
       if (scope) await runInstaller(store, "install", scope, output);
     }),
-    vscode.commands.registerCommand("commitforge.uninstall", async () => {
-      const scope = await pickScope();
+    vscode.commands.registerCommand("commitforge.uninstall", async (node?: Node) => {
+      const scope = node?.scope ?? (await pickScope());
       if (scope) await runInstaller(store, "uninstall", scope, output);
+    }),
+    // spec §7.3 "[Finder에서 열기]": revealFileInOS는 Uri를 받지만
+    // view/item/context 메뉴는 TreeItem(Node)을 넘기므로, 얇은 래퍼로
+    // resourcePath를 Uri로 바꿔 표준 명령에 위임한다.
+    vscode.commands.registerCommand("commitforge.revealSnapshots", async (node?: Node) => {
+      if (!node?.resourcePath) return;
+      await vscode.commands.executeCommand(
+        "revealFileInOS",
+        vscode.Uri.file(node.resourcePath),
+      );
     }),
     vscode.commands.registerCommand("commitforge.verify", async () => {
       // spec §7.4: 검증은 verify.py(소스 패키지 검사)가 아니라 §5.1 판정을

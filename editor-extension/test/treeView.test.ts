@@ -208,6 +208,62 @@ describe("buildTree - gitLocks 경과 시간", () => {
   });
 });
 
+describe("buildTree - 설치 상태별 contextValue와 scope", () => {
+  it("missing → commitforge.node.install", () => {
+    const report: InstallReport = { ...baseReport, state: "missing", installedVersion: null };
+    expect(findInstallNodeFor(report).contextValue).toBe("commitforge.node.install");
+  });
+
+  it("ok → commitforge.node.installed", () => {
+    expect(findInstallNodeFor(baseReport).contextValue).toBe("commitforge.node.installed");
+  });
+
+  it("version-mismatch → commitforge.node.upgrade", () => {
+    const report: InstallReport = { ...baseReport, state: "version-mismatch" };
+    expect(findInstallNodeFor(report).contextValue).toBe("commitforge.node.upgrade");
+  });
+
+  it("misconfigured → commitforge.node.reinstall", () => {
+    const report: InstallReport = { ...baseReport, state: "misconfigured" };
+    expect(findInstallNodeFor(report).contextValue).toBe("commitforge.node.reinstall");
+  });
+
+  it("corrupt → commitforge.node.reinstall", () => {
+    const report: InstallReport = { ...baseReport, state: "corrupt" };
+    expect(findInstallNodeFor(report).contextValue).toBe("commitforge.node.reinstall");
+  });
+
+  it("project/global 각 노드는 자신의 scope를 담아, 트리에서 호출 시 다시 묻지 않게 한다", () => {
+    const nodes = buildTree(state());
+    const installGroup = findChild(nodes, "설치")!;
+    const project = installGroup.children.find((n) => n.label === "project");
+    const global = installGroup.children.find((n) => n.label === "global");
+    expect(project?.scope).toBe("project");
+    expect(global?.scope).toBe("global");
+  });
+});
+
+describe("buildTree - 잠금·스냅샷 contextValue", () => {
+  it("잠금 노드는 commitforge.node.lock을 받는다 (버튼은 아직 없음, Task 12 대비)", () => {
+    const nodes = buildTree(state());
+    expect(findChild(nodes, "잠금")?.contextValue).toBe("commitforge.node.lock");
+  });
+
+  it("스냅샷 노드는 commitforge.node.snapshots와 절대 경로(resourcePath)를 받는다", () => {
+    const nodes = buildTree(state());
+    const snapshotsNode = findChild(nodes, "스냅샷");
+    expect(snapshotsNode?.contextValue).toBe("commitforge.node.snapshots");
+    expect(snapshotsNode?.resourcePath).toBe("/repo/.git/claude-atomic-snapshots");
+  });
+
+  it("git 저장소가 아니면 잠금·스냅샷 contextValue 자체가 존재하지 않는다", () => {
+    const nodes = buildTree(state({ isGitRepo: false, guard: null }));
+    const allContextValues = nodes.flatMap((n) => [n.contextValue, ...n.children.map((c) => c.contextValue)]);
+    expect(allContextValues).not.toContain("commitforge.node.lock");
+    expect(allContextValues).not.toContain("commitforge.node.snapshots");
+  });
+});
+
 describe("buildTree - 잠금 보유 중", () => {
   it("세션·경과 시간·호스트 정보를 자식으로 보여준다", () => {
     const nodes = buildTree(

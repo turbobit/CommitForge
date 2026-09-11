@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { basename } from "node:path";
-import type { InstallReport } from "../core/detect";
+import { basename, join } from "node:path";
+import type { InstallReport, Scope } from "../core/detect";
 import type { StateStore, WorkspaceState } from "../state";
 
 const STATE_ICON: Record<InstallReport["state"], string> = {
@@ -19,6 +19,32 @@ const STATE_LABEL: Record<InstallReport["state"], string> = {
   corrupt: "손상",
 };
 
+/**
+ * 설치 상태별로 트리 항목에 붙는 contextValue. package.json의
+ * `view/item/context` 메뉴가 이 값으로 어떤 버튼을 보여줄지 고른다
+ * (spec §5.3 "제안 행동" ↔ §7.4 "버튼별 동작"의 다리 역할).
+ *
+ * `[업그레이드]`·`[재설치]`는 `commitforge.install`과 같은 명령이다
+ * (install.py가 백업 후 덮어쓴다). VS Code 메뉴 기여는 명령별 title을
+ * 하나만 가지므로(같은 명령을 여러 자리에 걸어도 표시 문구는 항상
+ * `commitforge.install`의 등록 title을 따른다), 상태별로 다른 문구를
+ * 보여주려고 별도 명령 3개를 새로 만들지는 않는다 — contextValue로
+ * "이 버튼을 보여줄지"만 가른다.
+ */
+const INSTALL_CONTEXT: Record<InstallReport["state"], string> = {
+  missing: "commitforge.node.install",
+  ok: "commitforge.node.installed",
+  "version-mismatch": "commitforge.node.upgrade",
+  misconfigured: "commitforge.node.reinstall",
+  corrupt: "commitforge.node.reinstall",
+};
+
+const LOCK_CONTEXT = "commitforge.node.lock";
+const SNAPSHOTS_CONTEXT = "commitforge.node.snapshots";
+
+/** guard.py의 SNAPSHOT_DIR_NAME 상수와 같다 (scripts/guard.py:33). */
+const SNAPSHOT_DIR_NAME = "claude-atomic-snapshots";
+
 /** spec §7.3 예시 "git index.lock 존재 (4분)", "session abc123 · 12분"의 경과 시간 표기. */
 export function humanAge(seconds: number): string {
   if (seconds < 60) return `${seconds}초`;
@@ -26,22 +52,38 @@ export function humanAge(seconds: number): string {
   return `${Math.floor(seconds / 3600)}시간`;
 }
 
+interface NodeOptions {
+  children?: Node[];
+  icon?: string;
+  description?: string;
+  color?: vscode.ThemeColor;
+  /** package.json view/item/context 메뉴가 매칭하는 값. */
+  contextValue?: string;
+  /** 설치·제거 명령을 트리에서 바로 호출할 때 다시 묻지 않도록 담아 두는 범위. */
+  scope?: Scope;
+  /** "[Finder에서 열기]" 등 OS 파일 탐색기로 열 때 쓰는 절대 경로. */
+  resourcePath?: string;
+}
+
 export class Node extends vscode.TreeItem {
-  constructor(
-    label: string,
-    public readonly children: Node[] = [],
-    icon?: string,
-    description?: string,
-    color?: vscode.ThemeColor,
-  ) {
+  readonly children: Node[];
+  readonly scope?: Scope;
+  readonly resourcePath?: string;
+
+  constructor(label: string, options: NodeOptions = {}) {
+    const children = options.children ?? [];
     super(
       label,
       children.length > 0
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.None,
     );
-    if (icon) this.iconPath = new vscode.ThemeIcon(icon, color);
-    if (description) this.description = description;
+    this.children = children;
+    this.scope = options.scope;
+    this.resourcePath = options.resourcePath;
+    if (options.icon) this.iconPath = new vscode.ThemeIcon(options.icon, options.color);
+    if (options.description) this.description = options.description;
+    if (options.contextValue) this.contextValue = options.contextValue;
   }
 }
 
@@ -66,19 +108,23 @@ function installNode(report: InstallReport): Node {
   for (const path of report.missingFiles.slice(0, 5)) details.push(`누락: ${path}`);
   for (const path of report.mismatchedFiles.slice(0, 5)) details.push(`불일치: ${path}`);
 
-  return new Node(
-    report.scope,
-    details.map((detail) => new Node(detail)),
-    STATE_ICON[report.state],
-    `${version} ${STATE_LABEL[report.state]}`.trim(),
-  );
+  return new Node(report.scope, {
+    children: details.map((detail) => new Node(detail)),
+    icon: STATE_ICON[report.state],
+    description: `${version} ${STATE_LABEL[report.state]}`.trim(),
+    contextValue: INSTALL_CONTEXT[report.state],
+    scope: report.scope,
+  });
 }
 
 export function buildTree(state: WorkspaceState | null): Node[] {
-  if (!state) return [new Node("상태를 읽는 중입니다", [], "sync~spin")];
+  if (!state) return [new Node("상태를 읽는 중입니다", { icon: "sync~spin" })];
 
   const nodes: Node[] = [
-    new Node("설치", [installNode(state.project), installNode(state.global)], "package"),
+    new Node("설치", {
+      children: [installNode(state.project), installNode(state.global)],
+      icon: "package",
+    }),
   ];
 
   if (!state.isGitRepo) return nodes;
@@ -93,7 +139,13 @@ export function buildTree(state: WorkspaceState | null): Node[] {
   if (!guard) {
     if (stale) {
       nodes.push(
-        new Node("잠금", [new Node(state.guardError ?? "")], "error", "읽기 실패", staleColor),
+        new Node("잠금", {
+          children: [new Node(state.guardError ?? "")],
+          icon: "error",
+          description: "읽기 실패",
+          color: staleColor,
+          contextValue: LOCK_CONTEXT,
+        }),
       );
     }
     return nodes;
@@ -111,23 +163,26 @@ export function buildTree(state: WorkspaceState | null): Node[] {
     : [];
   const lockLabel = lock ? "보유 중" : "보유자 없음";
   nodes.push(
-    new Node(
-      "잠금",
-      lockChildren,
-      lock ? "lock" : "unlock",
-      stale ? `${lockLabel} (오래된 값)` : lockLabel,
-      staleColor,
-    ),
+    new Node("잠금", {
+      children: lockChildren,
+      icon: lock ? "lock" : "unlock",
+      description: stale ? `${lockLabel} (오래된 값)` : lockLabel,
+      color: staleColor,
+      // [해제(clean)] 메뉴·명령은 아직 붙이지 않는다 — guard.py clean 직접
+      // 호출은 spec §4.2가 금지하고, 실제 동작(§6.3 터미널 전송)은 Task 12다.
+      contextValue: LOCK_CONTEXT,
+    }),
   );
 
   nodes.push(
-    new Node(
-      "스냅샷",
-      guard.snapshots.map((path) => new Node(path)),
-      "archive",
-      `${guard.snapshots.length}개`,
-      staleColor,
-    ),
+    new Node("스냅샷", {
+      children: guard.snapshots.map((path) => new Node(path)),
+      icon: "archive",
+      description: `${guard.snapshots.length}개`,
+      color: staleColor,
+      contextValue: SNAPSHOTS_CONTEXT,
+      resourcePath: join(guard.gitDir, SNAPSHOT_DIR_NAME),
+    }),
   );
 
   // gitLockFiles는 경로 문자열뿐이라 나이를 못 나타낸다(§7.3 "(4분)"에는
@@ -145,13 +200,12 @@ export function buildTree(state: WorkspaceState | null): Node[] {
   ];
   if (warnings.length > 0) {
     nodes.push(
-      new Node(
-        "경고",
-        warnings.map((w) => new Node(w)),
-        "warning",
-        `${warnings.length}건`,
-        staleColor,
-      ),
+      new Node("경고", {
+        children: warnings.map((w) => new Node(w)),
+        icon: "warning",
+        description: `${warnings.length}건`,
+        color: staleColor,
+      }),
     );
   }
 
