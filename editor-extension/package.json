@@ -9,7 +9,42 @@
   "categories": ["SCM Providers", "Other"],
   "main": "./dist/extension.js",
   "activationEvents": ["onStartupFinished"],
-  "contributes": {},
+  "contributes": {
+    "commands": [
+      { "command": "commitforge.refresh", "title": "CommitForge: 상태 새로고침" },
+      { "command": "commitforge.focusView", "title": "CommitForge: 뷰 열기" }
+    ],
+    "configuration": {
+      "title": "CommitForge",
+      "properties": {
+        "commitforge.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Python 인터프리터 경로. 비우면 python3, python 순으로 찾습니다."
+        },
+        "commitforge.terminal.name": {
+          "type": "string",
+          "default": "CommitForge",
+          "description": "확장이 만드는 터미널 이름"
+        },
+        "commitforge.terminal.launchCommand": {
+          "type": "string",
+          "default": "claude",
+          "description": "새 터미널에서 실행할 명령"
+        },
+        "commitforge.statusBar.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "상태바 표시 여부"
+        },
+        "commitforge.confirmBeforeSend": {
+          "type": "boolean",
+          "default": true,
+          "description": "터미널로 보내기 전 명령을 확인합니다"
+        }
+      }
+    }
+  },
   "scripts": {
     "sync-payload": "node scripts/sync-payload.mjs",
     "build": "npm run sync-payload && node esbuild.mjs",
