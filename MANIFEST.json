@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 129,
-  "total_bytes": 1156878,
+  "total_bytes": 1159111,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 4985,
-      "sha256": "3be473c88f58d4bd4ef4023bf88d002b60aa62ffd9f3e80fc6ee229a3b704ee0"
+      "size": 5357,
+      "sha256": "d13611b710147fb0ea6bcb111d750b4df918bd0d16554f3b48fc24921ed67276"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -422,8 +422,8 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 4872,
-      "sha256": "f53adf06341fc71370926e2c9f5334149b151d5e52c7f8cf6bad198cb3e3e0e2"
+      "size": 5891,
+      "sha256": "0d5858858025e6018e6f6c85672d912e82b998db29b5b733fe3c6ae44136d11c"
     },
     {
       "path": "editor-extension/src/state.ts",
@@ -442,8 +442,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 8351,
-      "sha256": "bb5517f5fc9a369c6559e6e05e45e3b02bfe3ad18f759806ec6e78bb2c0de398"
+      "size": 8785,
+      "sha256": "92d5484e1e8a41328bcae582edb2d584c16493c2e3d7c772f4baea798c026cd1"
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
@@ -522,8 +522,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 10353,
-      "sha256": "26065b54cdd41be92f0f3b020fbf87d3287ab1e55edebb543b7005db971eb281"
+      "size": 10761,
+      "sha256": "c4d735bbb38e7418655bbb72088f441461cc8e7f5ef833be1dd5d07824344f06"
     },
     {
       "path": "editor-extension/tsconfig.json",
