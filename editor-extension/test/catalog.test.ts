@@ -207,4 +207,23 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
       }
     }
   });
+
+  it("exclusiveWith가 가리키는 옵션은 같은 명령의 options 안에 실제로 존재한다", async () => {
+    // "[--base <ref>|--range <A..B>]"에서 --range가 통째로 사라지는 것처럼,
+    // 옵션이 오염 없이 조용히 사라지는 회귀는 placeholder 오염 검사로는 못
+    // 잡는다. exclusiveWith 상호 참조가 끊기지 않았는지를 직접 확인한다.
+    const specs = await loadCatalog(skillsDir);
+
+    for (const spec of specs) {
+      const names = new Set(spec.options.map((option) => option.name));
+      for (const option of spec.options) {
+        if (option.exclusiveWith === undefined) continue;
+        expect(
+          names.has(option.exclusiveWith),
+          `${spec.name} ${option.name}.exclusiveWith === ${option.exclusiveWith} 인데 ` +
+            `${spec.name}의 options 안에 ${option.exclusiveWith}가 없습니다`,
+        ).toBe(true);
+      }
+    }
+  });
 });
