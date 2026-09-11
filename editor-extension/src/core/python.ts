@@ -1,3 +1,6 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 export interface PythonProbe {
   (executable: string): Promise<boolean>;
 }
@@ -26,9 +29,6 @@ export async function resolvePython(
   }
   return null;
 }
-
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 
 const run = promisify(execFile);
 
