@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 125,
-  "total_bytes": 1127429,
+  "file_count": 129,
+  "total_bytes": 1148513,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 2161,
-      "sha256": "f656cbe67f0e3035e7f421ad101197a4d1a250b98d5646622a0d3bdd20ecf49d"
+      "size": 2865,
+      "sha256": "52c21d63fc4750776b47c7ea387d96e8e7ef64d94460f8dbe761150317a651c5"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -422,8 +422,8 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 801,
-      "sha256": "7d73693e1cc4832bc97d1c94ae396c77ff27e2f95ea02dde0997efd8c4d75ba4"
+      "size": 4037,
+      "sha256": "ca17ba2830e74d2ba2850c186f9048437225241ffa3df7cb5e8f82ba16f8a613"
     },
     {
       "path": "editor-extension/src/state.ts",
@@ -431,9 +431,19 @@
       "sha256": "0d209166c9b8d79d086462a03169c731d0f6d03c8d1240be15c289ee19b10c2d"
     },
     {
+      "path": "editor-extension/src/vscode/installer.ts",
+      "size": 2709,
+      "sha256": "0d60ed71c804e3b0ab6076b0999d867fb425f5739c153611f01500c68d3057b6"
+    },
+    {
       "path": "editor-extension/src/vscode/statusBar.ts",
       "size": 3729,
       "sha256": "6e4add4765780d69500889adbef18431a09116826b0b21654acc0cee3e81fd0b"
+    },
+    {
+      "path": "editor-extension/src/vscode/treeView.ts",
+      "size": 5672,
+      "sha256": "29a4b958a3042ad95ab3f814065b048445bd5563a28f1c188888b05a3734fe01"
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
@@ -481,6 +491,11 @@
       "sha256": "d6c77793f384a69790e487cf83155c5dac534a2d574c1f897f9c1a1dbd3fd7ce"
     },
     {
+      "path": "editor-extension/test/installerArgs.test.ts",
+      "size": 1036,
+      "sha256": "c3c3e442ecbc3f82c88af04dd00eb7260b43f44d0e782414f3bba5c8854a46d2"
+    },
+    {
       "path": "editor-extension/test/payload.test.ts",
       "size": 4036,
       "sha256": "94a845ae456b4726f11c9b9fddf98e14cf75dc15d753a6e69843255f5def64b6"
@@ -497,13 +512,18 @@
     },
     {
       "path": "editor-extension/test/stubs/vscode.ts",
-      "size": 1712,
-      "sha256": "4f3df14aaa6dc21de7072f10c167c104170a54e3a19482d3d41577c722591333"
+      "size": 1817,
+      "sha256": "c691495000b57c5032d0df7a747840c6da5a751c1408b740b63902ee0b27afee"
     },
     {
       "path": "editor-extension/test/sync-payload.test.ts",
       "size": 3607,
       "sha256": "6c9b26c80e5c1c9d424bf264a8ae392d618eda20bd1209361abad82f862d604f"
+    },
+    {
+      "path": "editor-extension/test/treeView.test.ts",
+      "size": 7622,
+      "sha256": "278e2f21761c31783e744705d175f11c077b4191de4ba1a4e3ce17b46347cb4b"
     },
     {
       "path": "editor-extension/tsconfig.json",
