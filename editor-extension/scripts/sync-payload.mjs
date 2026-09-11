@@ -1,9 +1,20 @@
-import { cp, mkdir, rm, access, readdir } from "node:fs/promises";
-import { dirname, join, relative } from "node:path";
+import { cp, mkdir, rm, access, readdir, readFile } from "node:fs/promises";
+import { basename, dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const FILES = ["install.py", "uninstall.py", "MANIFEST.json", "VERSION"];
 const DIRS = [join(".claude", "skills"), join(".claude", "agents")];
+
+const EXCLUDED_DIR_NAMES = new Set(["__pycache__"]);
+const EXCLUDED_FILE_NAMES = new Set([".DS_Store"]);
+
+function shouldExclude(path) {
+  const name = basename(path);
+  if (EXCLUDED_DIR_NAMES.has(name)) return true;
+  if (EXCLUDED_FILE_NAMES.has(name)) return true;
+  if (name.endsWith(".pyc")) return true;
+  return false;
+}
 
 async function listFiles(root, dir) {
   const out = [];
@@ -13,6 +24,39 @@ async function listFiles(root, dir) {
     else out.push(rel);
   }
   return out;
+}
+
+function toPosixPath(path) {
+  return path.split(sep).join("/");
+}
+
+async function verifyClaudeMatchesManifest(payloadDir) {
+  const manifestRaw = await readFile(join(payloadDir, "MANIFEST.json"), "utf8");
+  const manifest = JSON.parse(manifestRaw);
+  const manifestFiles = Array.isArray(manifest.files) ? manifest.files : [];
+  const manifestClaudePaths = new Set(
+    manifestFiles
+      .map((entry) => (typeof entry === "string" ? entry : entry.path))
+      .filter((path) => typeof path === "string" && path.startsWith(".claude/"))
+  );
+
+  const actualClaudePaths = new Set(
+    (await listFiles(payloadDir, ".claude")).map(toPosixPath)
+  );
+
+  const onlyInPayload = [...actualClaudePaths].filter((path) => !manifestClaudePaths.has(path)).sort();
+  const onlyInManifest = [...manifestClaudePaths].filter((path) => !actualClaudePaths.has(path)).sort();
+
+  if (onlyInPayload.length > 0 || onlyInManifest.length > 0) {
+    const details = [];
+    if (onlyInPayload.length > 0) {
+      details.push(`payload에만 있음: ${onlyInPayload.join(", ")}`);
+    }
+    if (onlyInManifest.length > 0) {
+      details.push(`MANIFEST에만 있음: ${onlyInManifest.join(", ")}`);
+    }
+    throw new Error(`payload/.claude가 MANIFEST.json과 일치하지 않습니다 (${details.join(" / ")})`);
+  }
 }
 
 export async function syncPayload(repoRoot, payloadDir) {
@@ -33,9 +77,15 @@ export async function syncPayload(repoRoot, payloadDir) {
     copied.push(file);
   }
   for (const dir of DIRS) {
-    await cp(join(repoRoot, dir), join(payloadDir, dir), { recursive: true });
+    await cp(join(repoRoot, dir), join(payloadDir, dir), {
+      recursive: true,
+      filter: (src) => !shouldExclude(src),
+    });
     copied.push(...(await listFiles(payloadDir, dir)));
   }
+
+  await verifyClaudeMatchesManifest(payloadDir);
+
   return copied;
 }
 

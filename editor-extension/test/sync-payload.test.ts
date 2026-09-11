@@ -12,7 +12,20 @@ async function makeRepo(): Promise<string> {
   await writeFile(join(root, ".claude", "agents", "cca-git-reviewer.md"), "agent\n");
   await writeFile(join(root, "install.py"), "# install\n");
   await writeFile(join(root, "uninstall.py"), "# uninstall\n");
-  await writeFile(join(root, "MANIFEST.json"), '{"version":"1.15.0","files":[]}\n');
+  await writeFile(
+    join(root, "MANIFEST.json"),
+    JSON.stringify({
+      version: "1.15.0",
+      files: [
+        ".claude/skills/cr/SKILL.md",
+        ".claude/agents/cca-git-reviewer.md",
+        "install.py",
+        "uninstall.py",
+        "MANIFEST.json",
+        "VERSION",
+      ],
+    }) + "\n"
+  );
   await writeFile(join(root, "VERSION"), "1.15.0\n");
   return root;
 }
@@ -61,5 +74,27 @@ describe("syncPayload", () => {
     await rm(join(root, "install.py"));
 
     await expect(syncPayload(root, payload)).rejects.toThrow(/install\.py/);
+  });
+
+  it("__pycache__와 .pyc 파일을 payload에서 제외한다", async () => {
+    await mkdir(join(root, ".claude", "skills", "cr", "__pycache__"), { recursive: true });
+    await writeFile(
+      join(root, ".claude", "skills", "cr", "__pycache__", "mod.cpython-313.pyc"),
+      "binary\n"
+    );
+
+    const copied = await syncPayload(root, payload);
+
+    expect(copied.some((p) => p.includes("__pycache__"))).toBe(false);
+    expect(copied.some((p) => p.endsWith(".pyc"))).toBe(false);
+    await expect(
+      access(join(payload, ".claude", "skills", "cr", "__pycache__", "mod.cpython-313.pyc"))
+    ).rejects.toThrow();
+  });
+
+  it("payload가 MANIFEST.json과 어긋나면 실패하고 어긋난 경로를 알려준다", async () => {
+    await writeFile(join(root, ".claude", "skills", "cr", "extra.md"), "extra\n");
+
+    await expect(syncPayload(root, payload)).rejects.toThrow(/extra\.md/);
   });
 });
