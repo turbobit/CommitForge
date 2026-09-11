@@ -44,6 +44,7 @@ build/
 # CommitForge runtime files
 .claude-atomic.lock
 .claude-atomic-snapshots/
+.claude/.commitforge-install.json
 
 # Git worktrees
 .worktrees/

@@ -45,6 +45,7 @@ AGENTS = (
     "cca-privacy-governance-reviewer.md",
     "cca-requirements-product-reviewer.md",
 )
+MARKER_NAME = ".commitforge-install.json"
 POWERSHELL_ENCODED_PREFIX = (
     "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
@@ -217,6 +218,12 @@ def main() -> None:
             backup_root / "agents" / name,
             args.dry_run,
         )
+
+    backup_and_remove(
+        claude_dir / MARKER_NAME,
+        backup_root / MARKER_NAME,
+        args.dry_run,
+    )
 
     print(f"제거 범위: {args.scope}")
     print(f"대상: {claude_dir}")

@@ -48,6 +48,8 @@ AGENTS = (
     "cca-requirements-product-reviewer.md",
 )
 CORE_REFERENCE = ".claude/skills/_git-atomic-core"
+MARKER_NAME = ".commitforge-install.json"
+MARKER_SCHEMA = "commitforge-install/v1"
 POWERSHELL_ENCODED_PREFIX = (
     "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
@@ -293,6 +295,32 @@ def configure_lifecycle_hooks(
     )
 
 
+def package_version() -> str:
+    return (PACKAGE_ROOT / "VERSION").read_text(encoding="utf-8").strip()
+
+
+def write_install_marker(claude_dir: Path, *, scope: str, dry_run: bool) -> None:
+    """Record what this installation placed, for upgrade and tooling checks."""
+    marker_path = claude_dir / MARKER_NAME
+    if dry_run:
+        print(f"[dry-run] write install marker -> {marker_path}")
+        return
+
+    payload = {
+        "schema": MARKER_SCHEMA,
+        "version": package_version(),
+        "scope": scope,
+        "installed_at": dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "python": str(Path(sys.executable)),
+        "core_path": str((claude_dir / "skills" / "_git-atomic-core").resolve()),
+    }
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    marker_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
 def copy_with_backup(src: Path, dst: Path, backup: Path, dry_run: bool) -> None:
     if dst.is_symlink():
         raise RuntimeError(f"심볼릭 링크 대상은 자동 교체하지 않습니다: {dst}")
@@ -360,6 +388,7 @@ def main() -> None:
         global_scope=args.scope == "global",
         dry_run=args.dry_run,
     )
+    write_install_marker(claude_dir, scope=args.scope, dry_run=args.dry_run)
 
     print()
     print(f"설치 범위: {args.scope}")
