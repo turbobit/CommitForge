@@ -65,6 +65,31 @@ describe("parseArgumentHint", () => {
       { name: "--no-team", kind: "flag", exclusiveWith: "--team" },
     ]);
   });
+
+  it("배타 값 옵션 쌍을 잃지 않고 서로 연결한다 (/cr --base|--range)", () => {
+    const parsed = parseArgumentHint("[--base <ref>|--range <A..B>]");
+
+    expect(parsed.options).toEqual([
+      { name: "--base", kind: "value", placeholder: "<ref>", exclusiveWith: "--range" },
+      { name: "--range", kind: "value", placeholder: "<A..B>", exclusiveWith: "--base" },
+    ]);
+  });
+
+  it("자리표시자 안의 파이프는 분할하지 않는다", () => {
+    const parsed = parseArgumentHint("[--timezone <IANA|±HH:MM>]");
+
+    expect(parsed.options).toEqual([
+      { name: "--timezone", kind: "value", placeholder: "<IANA|±HH:MM>" },
+    ]);
+  });
+
+  it("여전히 열거형은 배타 그룹으로 오인하지 않는다", () => {
+    const parsed = parseArgumentHint("[--format human|json|sarif]");
+
+    expect(parsed.options).toEqual([
+      { name: "--format", kind: "enum", values: ["human", "json", "sarif"] },
+    ]);
+  });
 });
 
 describe("parseSkillFile", () => {
@@ -147,6 +172,38 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
     for (const spec of specs) {
       for (const option of spec.options) {
         expect(option.name, `${spec.name} ${option.name}`).toMatch(/^--[a-z-]+$/);
+      }
+    }
+  });
+
+  it("/cr 스펙에 --base와 --range가 둘 다 있다 (배타 값 옵션 소실 회귀)", async () => {
+    const specs = await loadCatalog(skillsDir);
+    const cr = specs.find((s) => s.name === "cr");
+
+    expect(findOption(cr!, "--base")).toEqual({
+      name: "--base",
+      kind: "value",
+      placeholder: "<ref>",
+      exclusiveWith: "--range",
+    });
+    expect(findOption(cr!, "--range")).toEqual({
+      name: "--range",
+      kind: "value",
+      placeholder: "<A..B>",
+      exclusiveWith: "--base",
+    });
+  });
+
+  it("어떤 옵션의 placeholder에도 다른 옵션 이름이 섞여 들어가지 않는다", async () => {
+    // "<ref>|--range <A..B>"처럼 배타 옵션이 깨져 하나로 뭉치면 placeholder에
+    // "--"가 남는다. "<IANA|±HH:MM>"처럼 자리표시자 안의 파이프 자체는 정상이므로
+    // "|" 유무가 아니라 "--" 유무로 오염 여부를 가른다.
+    const specs = await loadCatalog(skillsDir);
+
+    for (const spec of specs) {
+      for (const option of spec.options) {
+        if (option.placeholder === undefined) continue;
+        expect(option.placeholder, `${spec.name} ${option.name}`).not.toContain("--");
       }
     }
   });

@@ -24,7 +24,10 @@ export function sanitizeFreeText(input: string): string {
 }
 
 function quote(value: string): string {
-  return /\s/.test(value) ? `"${value}"` : value;
+  if (!/[\s"]/.test(value)) return value;
+  // 감쌀 때는 백슬래시와 큰따옴표를 이스케이프해 따옴표 구조가 깨지지 않게 한다.
+  const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
 }
 
 function validateValue(option: CommandOption, selected: SelectedOption): void {

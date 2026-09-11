@@ -29,6 +29,55 @@ function bracketGroups(hint: string): string[] {
   return Array.from(hint.matchAll(/\[([^\]]*)\]/g), (m) => (m[1] ?? "").trim());
 }
 
+/**
+ * `sep` 기준으로 쪼개되 `<...>` 안의 `sep`는 무시한다.
+ * "--timezone <IANA|±HH:MM>" 같은 자리표시자 내부 파이프가 분할되지 않게 한다.
+ */
+function splitTopLevel(text: string, sep: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let insidePlaceholder = false;
+
+  for (const ch of text) {
+    if (ch === "<") insidePlaceholder = true;
+    else if (ch === ">") insidePlaceholder = false;
+
+    if (ch === sep && !insidePlaceholder) {
+      parts.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+  parts.push(current);
+  return parts;
+}
+
+/** "--name", "--name <ph>", "--name 20-500", "--name a|b|c" 형태의 옵션 하나를 읽는다. */
+function parseSingleOption(segment: string): CommandOption {
+  const parts = segment.split(/\s+/);
+  const head = parts[0] ?? "";
+
+  // "--strict" — 불리언
+  if (parts.length === 1) return { name: head, kind: "flag" };
+
+  const rest = parts.slice(1).join(" ");
+
+  // "--base <ref>" — 자유 입력 값
+  if (rest.startsWith("<")) return { name: head, kind: "value", placeholder: rest };
+
+  // "--commits 20-500" — 수치 범위
+  const range = RANGE_PATTERN.exec(rest);
+  if (range) {
+    const min = range[1] ?? "0";
+    const max = range[2] ?? "0";
+    return { name: head, kind: "range", range: [Number(min), Number(max)] };
+  }
+
+  // "--format human|json|sarif" — 열거형
+  return { name: head, kind: "enum", values: rest.split("|").map((s) => s.trim()).filter(Boolean) };
+}
+
 function parseGroup(group: string): CommandOption[] | { mode: string[] } | null {
   if (group === FREE_TEXT_TOKEN) return null;
 
@@ -37,39 +86,25 @@ function parseGroup(group: string): CommandOption[] | { mode: string[] } | null 
     return { mode: group.split("|").map((s) => s.trim()).filter(Boolean) };
   }
 
-  const parts = group.split(/\s+/);
-  const head = parts[0] ?? "";
-
-  // "[--team|--no-team]" — 배타 플래그 쌍
-  if (parts.length === 1 && head.includes("|")) {
-    const names = head.split("|").map((s) => s.trim());
-    return names.map((name, index) => ({
-      name,
-      kind: "flag" as const,
-      exclusiveWith: names[index === 0 ? 1 : 0] ?? "",
-    }));
+  // 꺾쇠 밖의 "|"로 나눈다. 조각이 둘 이상이고 전부 "--"로 시작하면 배타 옵션 그룹이다.
+  // ("--base <ref>|--range <A..B>", "--team|--no-team"). 그렇지 않으면
+  // ("--format human|json|sarif" 처럼) 열거형 등 기존 문법으로 내려간다.
+  const segments = splitTopLevel(group, "|");
+  if (segments.length >= 2 && segments.every((seg) => seg.trim().startsWith("--"))) {
+    const options = segments.map((seg) => parseSingleOption(seg.trim()));
+    if (options.length === 2) {
+      const [first, second] = options;
+      if (first && second) {
+        first.exclusiveWith = second.name;
+        second.exclusiveWith = first.name;
+      }
+    }
+    // 조각이 3개 이상이면 옵션은 모두 만들되 배타 관계는 표시하지 않는다.
+    // (배타 힌트 없음이 옵션 소실보다 낫다.)
+    return options;
   }
 
-  // "[--strict]" — 불리언
-  if (parts.length === 1) return [{ name: head, kind: "flag" }];
-
-  const rest = parts.slice(1).join(" ");
-
-  // "[--base <ref>]" — 자유 입력 값
-  if (rest.startsWith("<")) return [{ name: head, kind: "value", placeholder: rest }];
-
-  // "[--commits 20-500]" — 수치 범위
-  const range = RANGE_PATTERN.exec(rest);
-  if (range) {
-    const min = range[1] ?? "0";
-    const max = range[2] ?? "0";
-    return [{ name: head, kind: "range", range: [Number(min), Number(max)] }];
-  }
-
-  // "[--format human|json|sarif]" — 열거형
-  return [
-    { name: head, kind: "enum", values: rest.split("|").map((s) => s.trim()).filter(Boolean) },
-  ];
+  return [parseSingleOption(group)];
 }
 
 export function parseArgumentHint(hint: string): Omit<CommandSpec, "name" | "description"> {

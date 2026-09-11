@@ -45,6 +45,24 @@ describe("compose", () => {
     );
   });
 
+  it("공백 없이 따옴표만 있는 값도 감싸고 이스케이프한다", () => {
+    expect(compose(cca, { options: [{ name: "--base", value: '"weird"' }] })).toBe(
+      '/cca --base "\\"weird\\""',
+    );
+  });
+
+  it("공백과 따옴표가 함께 있는 값을 올바르게 이스케이프한다", () => {
+    expect(compose(cca, { options: [{ name: "--base", value: 'my "branch"' }] })).toBe(
+      '/cca --base "my \\"branch\\""',
+    );
+  });
+
+  it("백슬래시가 든 값을 이스케이프한다", () => {
+    expect(compose(cca, { options: [{ name: "--base", value: "a\\b c" }] })).toBe(
+      '/cca --base "a\\\\b c"',
+    );
+  });
+
   it("옵션 순서는 spec 정의 순서를 따른다", () => {
     const result = compose(cca, {
       options: [{ name: "--strict" }, { name: "--team" }],
