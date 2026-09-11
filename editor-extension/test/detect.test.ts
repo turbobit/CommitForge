@@ -234,4 +234,51 @@ describe("detectInstall", () => {
     expect(report.hooksRegistered).toBe(false);
     expect(report.warnings.join(" ")).toMatch(/settings\.local\.json/);
   });
+
+  it("잘못된 UTF-8 바이트가 있어도 raw bytes 해시가 일치하면 ok다 (문자열 디코딩 손상 방지)", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+
+    // 유효하지 않은 UTF-8 바이트열 (lone continuation / overlong 조합).
+    const invalidUtf8 = Buffer.from([0x68, 0x69, 0xff, 0xfe, 0x0a]);
+    const relPath = ".claude/skills/_git-atomic-core/binary.md";
+    await writeFile(join(claudeDir, "skills", "_git-atomic-core", "binary.md"), invalidUtf8);
+
+    const rawHash = createHash("sha256").update(invalidUtf8).digest("hex");
+
+    const manifest = parseManifest(
+      JSON.stringify({
+        name: "CommitForge",
+        version: "1.15.0",
+        file_count: 4,
+        files: [
+          {
+            path: ".claude/agents/cca-git-reviewer.md",
+            size: AGENT_BODY.length,
+            sha256: sha(AGENT_BODY),
+          },
+          {
+            path: ".claude/skills/_git-atomic-core/guard.md",
+            size: CORE_BODY.length,
+            sha256: sha(CORE_BODY),
+          },
+          {
+            path: relPath,
+            size: invalidUtf8.length,
+            sha256: rawHash,
+          },
+          {
+            path: ".claude/skills/cr/SKILL.md",
+            size: corePath.length,
+            sha256: sha(corePath),
+          },
+        ],
+      }),
+    );
+
+    const report = await detectInstall(claudeDir, manifest, "project");
+
+    expect(report.mismatchedFiles).toEqual([]);
+    expect(report.state).toBe("ok");
+  });
 });

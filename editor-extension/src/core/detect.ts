@@ -50,6 +50,20 @@ async function readIfPresent(path: string): Promise<string | null> {
   }
 }
 
+/**
+ * 해시 대조 전용. release.py의 sha256()은 파일의 raw bytes를 해시하므로,
+ * 여기서도 UTF-8 디코딩 없이 Buffer 그대로 해시해야 한다. `readIfPresent`
+ * (문자열)로 읽으면 잘못된 UTF-8 바이트가 U+FFFD로 치환되어 해시가 달라지고,
+ * 멀쩡한 설치가 손상으로 오판된다.
+ */
+async function readBytesIfPresent(path: string): Promise<Buffer | null> {
+  try {
+    return await readFile(path);
+  } catch {
+    return null;
+  }
+}
+
 async function readMarker(
   claudeDir: string,
   warnings: string[],
@@ -145,12 +159,12 @@ export async function detectInstall(
 
   for (const entry of exactEntries(manifest)) {
     const absolute = join(claudeDir, entry.path.replace(/^\.claude\//, ""));
-    const text = await readIfPresent(absolute);
-    if (text === null) {
+    const bytes = await readBytesIfPresent(absolute);
+    if (bytes === null) {
       missingFiles.push(entry.path);
       continue;
     }
-    const digest = createHash("sha256").update(text, "utf8").digest("hex");
+    const digest = createHash("sha256").update(bytes).digest("hex");
     if (digest !== entry.sha256) mismatchedFiles.push(entry.path);
   }
 
