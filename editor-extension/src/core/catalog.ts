@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { COMMAND_NAMES } from "./payload";
 
 export type OptionKind = "flag" | "value" | "enum" | "range";
 
@@ -166,9 +165,16 @@ export function parseSkillFile(text: string, name: string): CommandSpec {
   };
 }
 
-export async function loadCatalog(skillsDir: string): Promise<CommandSpec[]> {
+/**
+ * 명령 목록은 호출자가 매니페스트에서 파생해(`commandNames(manifest)`) 넘긴다.
+ * 이 함수 자체는 하드코딩된 목록을 갖지 않는다 (spec §4.2(2)).
+ */
+export async function loadCatalog(
+  skillsDir: string,
+  commandNames: readonly string[],
+): Promise<CommandSpec[]> {
   const specs: CommandSpec[] = [];
-  for (const name of COMMAND_NAMES) {
+  for (const name of commandNames) {
     try {
       const text = await readFile(join(skillsDir, name, "SKILL.md"), "utf8");
       specs.push(parseSkillFile(text, name));

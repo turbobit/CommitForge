@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findOption, loadCatalog, parseArgumentHint, parseSkillFile } from "../src/core/catalog";
+import { commandNames, loadManifest } from "../src/core/payload";
 
 describe("parseArgumentHint", () => {
   it("모드 목록을 읽는다", () => {
@@ -152,11 +153,39 @@ describe("parseSkillFile", () => {
   });
 });
 
-const skillsDir = join(__dirname, "..", "payload", ".claude", "skills");
+describe("loadCatalog (명령 목록 파라미터)", () => {
+  it("호출자가 넘긴 이름만 읽는다 (하드코딩된 목록에 의존하지 않는다)", async () => {
+    const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const dir = await mkdtemp(join(tmpdir(), "cf-catalog-"));
+    try {
+      await mkdir(join(dir, "aa"), { recursive: true });
+      await mkdir(join(dir, "bb"), { recursive: true });
+      await writeFile(join(dir, "aa", "SKILL.md"), "---\nname: aa\ndescription: A다\n---\n본문\n");
+      await writeFile(join(dir, "bb", "SKILL.md"), "---\nname: bb\ndescription: B다\n---\n본문\n");
+
+      // "bb"는 디렉터리에 실제로 존재하지만 호출자가 넘긴 목록에 없으므로 읽지 않는다.
+      const specs = await loadCatalog(dir, ["aa"]);
+
+      expect(specs.map((s) => s.name)).toEqual(["aa"]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+const payloadRoot = join(__dirname, "..", "payload");
+const skillsDir = join(payloadRoot, ".claude", "skills");
+
+/** 실제 페이로드 매니페스트에서 명령 목록을 파생해 loadCatalog에 넘긴다 (하드코딩 금지). */
+async function loadRealCatalog() {
+  const manifest = await loadManifest(payloadRoot);
+  return loadCatalog(skillsDir, commandNames(manifest));
+}
 
 describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
   it("실제 페이로드에서 명령 9개를 모두 읽는다", async () => {
-    const specs = await loadCatalog(skillsDir);
+    const specs = await loadRealCatalog();
 
     expect(specs.map((s) => s.name).sort()).toEqual(
       ["cc", "cca", "ccf", "ccr", "cf", "cfr", "cp", "cpr", "cr"],
@@ -167,7 +196,7 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
   });
 
   it("모든 옵션 이름이 -- 로 시작한다", async () => {
-    const specs = await loadCatalog(skillsDir);
+    const specs = await loadRealCatalog();
 
     for (const spec of specs) {
       for (const option of spec.options) {
@@ -177,7 +206,7 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
   });
 
   it("/cr 스펙에 --base와 --range가 둘 다 있다 (배타 값 옵션 소실 회귀)", async () => {
-    const specs = await loadCatalog(skillsDir);
+    const specs = await loadRealCatalog();
     const cr = specs.find((s) => s.name === "cr");
 
     expect(findOption(cr!, "--base")).toEqual({
@@ -198,7 +227,7 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
     // "<ref>|--range <A..B>"처럼 배타 옵션이 깨져 하나로 뭉치면 placeholder에
     // "--"가 남는다. "<IANA|±HH:MM>"처럼 자리표시자 안의 파이프 자체는 정상이므로
     // "|" 유무가 아니라 "--" 유무로 오염 여부를 가른다.
-    const specs = await loadCatalog(skillsDir);
+    const specs = await loadRealCatalog();
 
     for (const spec of specs) {
       for (const option of spec.options) {
@@ -212,7 +241,7 @@ describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
     // "[--base <ref>|--range <A..B>]"에서 --range가 통째로 사라지는 것처럼,
     // 옵션이 오염 없이 조용히 사라지는 회귀는 placeholder 오염 검사로는 못
     // 잡는다. exclusiveWith 상호 참조가 끊기지 않았는지를 직접 확인한다.
-    const specs = await loadCatalog(skillsDir);
+    const specs = await loadRealCatalog();
 
     for (const spec of specs) {
       const names = new Set(spec.options.map((option) => option.name));

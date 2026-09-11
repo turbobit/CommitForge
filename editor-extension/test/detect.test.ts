@@ -337,4 +337,102 @@ describe("detectInstall", () => {
     expect(report.mismatchedFiles).toEqual([]);
     expect(report.state).toBe("ok");
   });
+
+  it(
+    "매니페스트에 10번째 명령이 있어도 corrupt가 아니라 ok로 판정한다 " +
+      "(COMMAND_NAMES 정적 목록 드리프트 회귀 방지)",
+    async () => {
+      // install.py의 SKILLS 목록에만 명령이 추가되고(예: 이번 릴리스의 /cf, /cfr, /ccf처럼)
+      // detect.ts 쪽이 여전히 정적 COMMAND_NAMES 9개만 "치환되는 SKILL.md"로 알고 있으면,
+      // 새 명령의 SKILL.md가 exactEntries에 잘못 포함되어 해시 대조 대상이 된다. install.py는
+      // 그 SKILL.md의 core 경로도 똑같이 치환하므로 해시가 달라지고, 정상 설치가 corrupt로
+      // 오판된다.
+      const claudeDir = join(root, ".claude");
+      const corePath = join(claudeDir, "skills", "_git-atomic-core");
+
+      await mkdir(join(claudeDir, "agents"), { recursive: true });
+      await mkdir(join(claudeDir, "skills", "_git-atomic-core"), { recursive: true });
+      await mkdir(join(claudeDir, "skills", "cr"), { recursive: true });
+      await mkdir(join(claudeDir, "skills", "cx"), { recursive: true });
+
+      await writeFile(join(claudeDir, "agents", "cca-git-reviewer.md"), AGENT_BODY);
+      await writeFile(join(claudeDir, "skills", "_git-atomic-core", "guard.md"), CORE_BODY);
+      await writeFile(
+        join(claudeDir, "skills", "cr", "SKILL.md"),
+        `---\nname: cr\n---\n\n${corePath}/deep-review-protocol.md 를 읽는다\n`,
+      );
+      // cx는 아직 어떤 목록에도 하드코딩되지 않은, 새로 추가된 10번째 명령을 흉내낸다.
+      // install.py라면 이 SKILL.md의 core 경로도 cr과 똑같이 치환했을 것이다.
+      await writeFile(
+        join(claudeDir, "skills", "cx", "SKILL.md"),
+        `---\nname: cx\n---\n\n${corePath}/x-protocol.md 를 읽는다\n`,
+      );
+      await writeFile(
+        join(claudeDir, ".commitforge-install.json"),
+        JSON.stringify({
+          schema: "commitforge-install/v1",
+          version: "1.15.0",
+          scope: "project",
+          installed_at: "2026-09-11T08:12:03Z",
+          python: "/usr/bin/python3",
+          core_path: corePath,
+        }),
+      );
+      await writeFile(
+        join(claudeDir, "settings.local.json"),
+        JSON.stringify({
+          hooks: {
+            SessionEnd: [
+              {
+                hooks: [
+                  {
+                    type: "command",
+                    command: `/usr/bin/python3 ${corePath}/scripts/session_lifecycle.py`,
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      );
+
+      // 매니페스트의 SKILL.md sha256은 치환 전 원본(소스) 내용의 해시다. 설치본은 core
+      // 경로가 치환돼 있으므로, 이 값과 그대로 비교하면 항상 불일치한다 — 그래서 SKILL.md는
+      // 해시가 아니라 checkCorePaths의 의미 검증 대상이어야 한다.
+      const manifest = parseManifest(
+        JSON.stringify({
+          name: "CommitForge",
+          version: "1.15.0",
+          file_count: 4,
+          files: [
+            {
+              path: ".claude/agents/cca-git-reviewer.md",
+              size: AGENT_BODY.length,
+              sha256: sha(AGENT_BODY),
+            },
+            {
+              path: ".claude/skills/_git-atomic-core/guard.md",
+              size: CORE_BODY.length,
+              sha256: sha(CORE_BODY),
+            },
+            {
+              path: ".claude/skills/cr/SKILL.md",
+              size: 1,
+              sha256: sha("---\nname: cr\n---\n\n.claude/skills/_git-atomic-core/deep-review-protocol.md 를 읽는다\n"),
+            },
+            {
+              path: ".claude/skills/cx/SKILL.md",
+              size: 1,
+              sha256: sha("---\nname: cx\n---\n\n.claude/skills/_git-atomic-core/x-protocol.md 를 읽는다\n"),
+            },
+          ],
+        }),
+      );
+
+      const report = await detectInstall(claudeDir, manifest, "project");
+
+      expect(report.mismatchedFiles).toEqual([]);
+      expect(report.state).toBe("ok");
+    },
+  );
 });

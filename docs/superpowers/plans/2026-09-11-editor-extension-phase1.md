@@ -2700,7 +2700,7 @@ import { join } from "node:path";
 import { loadCatalog, type CommandSpec } from "./core/catalog";
 import { detectInstall, type InstallReport } from "./core/detect";
 import { nodeRunner, runGuardStatus, type GuardStatus } from "./core/guard";
-import { loadManifest, type Manifest } from "./core/payload";
+import { commandNames, loadManifest, type Manifest } from "./core/payload";
 import { resolvePython, spawnProbe, type PythonResolution } from "./core/python";
 
 export interface WorkspaceState {
@@ -2808,7 +2808,10 @@ export class StateStore implements vscode.Disposable {
         global: globalReport,
         guard,
         guardError,
-        catalog: await loadCatalog(catalogSource(project, globalReport, this.payloadRoot)),
+        catalog: await loadCatalog(
+          catalogSource(project, globalReport, this.payloadRoot),
+          commandNames(manifest),
+        ),
       };
       this.emitter.fire(this.state);
     } finally {

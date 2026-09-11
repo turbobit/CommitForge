@@ -3,7 +3,8 @@ import {
   parseManifest,
   claudeEntries,
   exactEntries,
-  REWRITTEN_SKILL_PATHS,
+  commandNames,
+  rewrittenSkillPaths,
 } from "../src/core/payload";
 import { loadManifest } from "../src/core/payload";
 import { join } from "node:path";
@@ -61,11 +62,29 @@ describe("exactEntries", () => {
   });
 });
 
-describe("REWRITTEN_SKILL_PATHS", () => {
-  it("명령 9개를 모두 담는다", () => {
-    expect(REWRITTEN_SKILL_PATHS).toHaveLength(9);
-    expect(REWRITTEN_SKILL_PATHS).toContain(".claude/skills/cca/SKILL.md");
-    expect(REWRITTEN_SKILL_PATHS).not.toContain(".claude/skills/_git-atomic-core/SKILL.md");
+describe("commandNames", () => {
+  it("매니페스트의 SKILL.md에서 명령 이름을 파생한다 (_ 로 시작하는 항목은 제외)", () => {
+    const names = commandNames(parseManifest(manifestText));
+
+    expect(names).toEqual(["cr"]);
+  });
+
+  it("매니페스트에 없는 명령은 만들어내지 않는다 (정적 하드코딩 목록 드리프트 방지)", () => {
+    // manifestText에는 명령이 cr 하나뿐이다. 정적 COMMAND_NAMES 배열을 쓰던 예전
+    // 구현이라면 매니페스트에 없는 나머지 8개 이름까지 그대로 반환했을 것이다.
+    const names = commandNames(parseManifest(manifestText));
+
+    expect(names).not.toContain("cca");
+    expect(names).toHaveLength(1);
+  });
+});
+
+describe("rewrittenSkillPaths", () => {
+  it("commandNames가 파생한 이름으로 SKILL.md 경로를 만든다", () => {
+    const paths = rewrittenSkillPaths(parseManifest(manifestText));
+
+    expect(paths).toEqual([".claude/skills/cr/SKILL.md"]);
+    expect(paths).not.toContain(".claude/skills/_git-atomic-core/SKILL.md");
   });
 });
 
@@ -77,5 +96,14 @@ describe.skipIf(!existsSync(join(payloadRoot, "MANIFEST.json")))("실제 payload
 
     expect(claudeEntries(manifest)).toHaveLength(61);
     expect(exactEntries(manifest)).toHaveLength(52);
+  });
+
+  it("실제 페이로드에서 명령 9개를 파생한다", async () => {
+    const manifest = await loadManifest(payloadRoot);
+
+    expect(commandNames(manifest).sort()).toEqual(
+      ["cc", "cca", "ccf", "ccr", "cf", "cfr", "cp", "cpr", "cr"],
+    );
+    expect(rewrittenSkillPaths(manifest)).toHaveLength(9);
   });
 });

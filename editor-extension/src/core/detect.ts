@@ -1,12 +1,7 @@
 import { createHash } from "node:crypto";
 import { access, readFile, realpath as fsRealpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import {
-  claudeEntries,
-  exactEntries,
-  REWRITTEN_SKILL_PATHS,
-  type Manifest,
-} from "./payload";
+import { exactEntries, rewrittenSkillPaths, type Manifest } from "./payload";
 
 export type InstallState =
   | "missing"
@@ -85,19 +80,6 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/**
- * 매니페스트에 실제로 포함된 rewritten SKILL.md 경로만 추린다. install.py가
- * core 경로를 치환하는 9개 명령 중, 이 매니페스트에 실려온 것만 검사 대상이다
- * (테스트처럼 축소된 매니페스트를 넘기는 경우를 포함해 COMMAND_NAMES 전체를
- * 고정으로 검사하면 실제로 없는 항목까지 "누락"으로 오판하게 된다).
- */
-function rewrittenSkillPaths(manifest: Manifest): string[] {
-  const rewritten = new Set(REWRITTEN_SKILL_PATHS);
-  return claudeEntries(manifest)
-    .map((entry) => entry.path)
-    .filter((path) => rewritten.has(path));
 }
 
 /**
