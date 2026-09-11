@@ -120,7 +120,7 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn("--team|--no-team", frontmatter)
             self.assertIn("agent_team_mode.py", skill)
             self.assertIn("Agent", frontmatter)
-        for command in ("cc", "cp"):
+        for command in ("cc", "cf", "cfr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -236,7 +236,7 @@ class PackageMetadataTest(unittest.TestCase):
             )
 
     def test_every_command_supports_current_project_lock_clean(self) -> None:
-        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+        for command in ("ccr", "cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -250,7 +250,7 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("Diff snapshot은 삭제하지 않는다", cleanup)
 
     def test_every_command_resolves_core_path_before_running_anything(self) -> None:
-        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+        for command in ("ccr", "cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill_path = ROOT / f".claude/skills/{command}/SKILL.md"
             skill = skill_path.read_text(encoding="utf-8")
             body = skill.split("\n---\n", 1)[1]
@@ -267,7 +267,7 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn("fail-closed", skill)
 
     def test_guard_uses_claude_lifecycle_session_identity(self) -> None:
-        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+        for command in ("ccr", "cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -286,7 +286,7 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertIn(contract, safety)
 
     def test_guard_launch_failures_are_fail_closed(self) -> None:
-        for command in ("cc", "cr", "cca", "cpr", "cp"):
+        for command in ("cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -312,7 +312,7 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("snapshot은 보존", recovery)
 
     def test_all_commands_load_learned_profile(self) -> None:
-        for command in ("ccr", "cc", "cr", "cca", "cpr", "cp"):
+        for command in ("ccr", "cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (
                 ROOT / f".claude/skills/{command}/SKILL.md"
             ).read_text(encoding="utf-8")
@@ -369,7 +369,7 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("\n  - Write\n", frontmatter)
 
     def test_skill_frontmatter_has_no_runtime_path_variables(self) -> None:
-        for command in ("cc", "ccr", "cr", "cca", "cpr", "cp"):
+        for command in ("cc", "ccr", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (
                 ROOT / f".claude/skills/{command}/SKILL.md"
             ).read_text(encoding="utf-8")
@@ -474,6 +474,149 @@ class PackageMetadataTest(unittest.TestCase):
             "source/index/HEAD",
         ):
             self.assertIn(contract, workflow)
+
+    def test_fast_commit_commands_enforce_execution_boundary(self) -> None:
+        cf = (ROOT / ".claude/skills/cf/SKILL.md").read_text(encoding="utf-8")
+        cfr = (ROOT / ".claude/skills/cfr/SKILL.md").read_text(encoding="utf-8")
+        rules = (
+            ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"
+        ).read_text(encoding="utf-8")
+        cf_frontmatter = cf.split("\n---\n", 1)[0]
+        cfr_frontmatter = cfr.split("\n---\n", 1)[0]
+
+        for skill in (cf, cfr):
+            self.assertIn("fast-commit-rules.md", skill)
+            self.assertIn("disable-model-invocation: true", skill)
+
+        self.assertIn("Bash(git add *)", cf_frontmatter)
+        self.assertIn("Bash(git commit *)", cf_frontmatter)
+        for forbidden in (
+            "\n  - Edit\n",
+            "\n  - Write\n",
+            "Bash(git push ",
+            "Bash(git commit --amend",
+        ):
+            self.assertNotIn(forbidden, cf_frontmatter)
+
+        for forbidden in (
+            "\n  - Edit\n",
+            "\n  - Write\n",
+            "Bash(git add ",
+            "Bash(git commit ",
+            "Bash(git apply ",
+            "Bash(git restore ",
+            "Bash(git push ",
+        ):
+            self.assertNotIn(forbidden, cfr_frontmatter)
+        self.assertIn("실제 staging과 commit은 수행하지 않는다", cfr)
+
+    def test_fast_commit_is_documented_as_non_atomic(self) -> None:
+        rules = (
+            ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"
+        ).read_text(encoding="utf-8")
+        reporting = (
+            ROOT / ".claude/skills/_git-atomic-core/reporting.md"
+        ).read_text(encoding="utf-8")
+        cf = (ROOT / ".claude/skills/cf/SKILL.md").read_text(encoding="utf-8")
+        cfr = (ROOT / ".claude/skills/cfr/SKILL.md").read_text(encoding="utf-8")
+
+        for contract in (
+            "Atomic Commit이 아니다",
+            "대표 type",
+            "feat > fix > perf > refactor > test > docs > build/ci > style > chore",
+            "차단 스캔",
+            "merge conflict marker",
+        ):
+            self.assertIn(contract, rules)
+        for text in (cf, cfr):
+            self.assertIn("이 커밋은 Atomic Commit이 아니다", text)
+            self.assertIn("`/cc`", text)
+        self.assertIn("## `/cf`", reporting)
+        self.assertIn("## `/cfr`", reporting)
+
+    def test_ccf_splits_by_intent_and_trades_the_lock_for_speed(self) -> None:
+        ccf = (ROOT / ".claude/skills/ccf/SKILL.md").read_text(encoding="utf-8")
+        ccf_frontmatter = ccf.split("\n---\n", 1)[0]
+
+        self.assertIn("disable-model-invocation: true", ccf)
+        self.assertIn("fast-commit-rules.md", ccf)
+        self.assertIn("Bash(git add *)", ccf_frontmatter)
+        self.assertIn("Bash(git commit *)", ccf_frontmatter)
+        self.assertIn('guard.sh" snapshot', ccf)
+        for forbidden in (
+            "\n  - Edit\n",
+            "\n  - Write\n",
+            "Bash(git push ",
+            "Bash(git rebase ",
+            "Bash(git reset ",
+        ):
+            self.assertNotIn(forbidden, ccf_frontmatter)
+
+        # `/ccf` keeps meaning-based separation; it is not the single-bundle path.
+        for contract in (
+            "의미별로 분리",
+            "여러 개의 commit",
+            "파일 단위로만 분리한다",
+            "hunk 단위로 분리하지 않는다",
+        ):
+            self.assertIn(contract, ccf, contract)
+
+        # It trades the Guard lock for speed, so the accepted risk must be stated.
+        for contract in (
+            "worktree lock을 획득하지 않는다",
+            "Diff snapshot은 남긴다",
+            "동시에 실행하지 않는다",
+            "완전한 Atomic Commit이 아닐 수 있다",
+        ):
+            self.assertIn(contract, ccf, contract)
+
+        # Even the fastest path must not commit secrets or conflict markers.
+        for contract in ("secret", "merge conflict marker", "중단"):
+            self.assertIn(contract, ccf, contract)
+
+    def test_ccf_snapshot_and_grouping_contract_is_documented(self) -> None:
+        rules = (
+            ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"
+        ).read_text(encoding="utf-8")
+        core_readme = (
+            ROOT / ".claude/skills/_git-atomic-core/README.md"
+        ).read_text(encoding="utf-8")
+        reporting = (
+            ROOT / ".claude/skills/_git-atomic-core/reporting.md"
+        ).read_text(encoding="utf-8")
+        recovery = (
+            ROOT / ".claude/skills/_git-atomic-core/recovery.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("## `/ccf`", reporting)
+        self.assertIn("fast-commit-rules.md", core_readme)
+        self.assertIn("`/ccf`", core_readme)
+        for contract in (
+            "guard.sh snapshot",
+            "lock을 획득하지 않",
+            "빠른 의미 분리",
+            "파일 단위 그룹",
+        ):
+            self.assertIn(contract, rules, contract)
+        self.assertIn("`/ccf`", recovery)
+
+    def test_fast_commit_verification_policy_is_explicit(self) -> None:
+        cf = (ROOT / ".claude/skills/cf/SKILL.md").read_text(encoding="utf-8")
+        cf_frontmatter = cf.split("\n---\n", 1)[0]
+        rules = (
+            ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("--verify", cf_frontmatter)
+        self.assertIn("--no-verify", cf_frontmatter)
+        for contract in (
+            "기본적으로 프로젝트 검증을 실행하지 않는다",
+            "commit hook은 기본적으로 존중한다",
+            "`--verify`",
+            "`--no-verify`",
+        ):
+            self.assertIn(contract, cf)
+        self.assertIn("어떤 인자로도 생략할 수 없다", rules)
 
     def test_review_agents_are_read_only(self) -> None:
         for path in (ROOT / ".claude/agents").glob("cca-*.md"):

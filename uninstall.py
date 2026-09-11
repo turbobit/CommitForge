@@ -15,7 +15,18 @@ import shutil
 import sys
 
 
-SKILLS = ("cc", "ccr", "cr", "cca", "cp", "cpr", "_git-atomic-core")
+SKILLS = (
+    "cc",
+    "ccr",
+    "cf",
+    "cfr",
+    "ccf",
+    "cr",
+    "cca",
+    "cp",
+    "cpr",
+    "_git-atomic-core",
+)
 AGENTS = (
     "cca-git-reviewer.md",
     "cca-correctness-reviewer.md",

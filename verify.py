@@ -84,7 +84,7 @@ def main() -> None:
         if not path.is_file():
             errors.append(f"필수 파일 누락: {rel}")
 
-    for command in ("cc", "ccr", "cr", "cca", "cp", "cpr"):
+    for command in ("cc", "ccr", "cf", "cfr", "ccf", "cr", "cca", "cp", "cpr"):
         path = ROOT / f".claude/skills/{command}/SKILL.md"
         if not path.exists():
             continue
