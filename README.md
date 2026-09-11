@@ -10,6 +10,9 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 |---|---|---:|---:|
 | `/ccr` | Atomic Commit 계획·순서·메시지 초안 | 안 함 | 안 함 |
 | `/cc` | 현재 변경을 의미 단위별로 순차 commit | 안 함 | staging·commit |
+| `/cfr` | `/cf`가 만들 단일 묶음 커밋 미리보기 | 안 함 | 안 함 |
+| `/cf` | 미커밋 변경 전부를 단일 commit으로 묶음 | 안 함 | staging·commit |
+| `/ccf` | 파일 단위로 빠르게 의미 분리해 다중 commit | 안 함 | staging·commit |
 | `/cr` | line-by-line 심층 코드 리뷰 | 기본 안 함, 일반 모드의 `--fix`만 허용 | 안 함 |
 | `/cca` | 리뷰·국소 수정·검증·Atomic Commit 전체 실행 | 필요 시 | staging·commit |
 | `/cpr` | committed branch의 PR 리뷰·제목·본문 미리보기 | 안 함 | 안 함 |
@@ -21,6 +24,9 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 |---|---|
 | 계획만 먼저 확인 | `/ccr` |
 | 변경된 소스를 건드리지 않고 commit | `/cc` |
+| 미커밋 변경을 한 덩어리로 빠르게 commit | `/cf` |
+| `/cf`가 만들 커밋을 먼저 확인 | `/cfr` |
+| 의미 분리는 유지하되 최대한 빠르게 commit | `/ccf` |
 | 현재 변경·branch·PR을 읽기 전용으로 심층 리뷰 | `/cr` |
 | 리뷰에서 확인한 현재 문제만 고치고 commit하지 않음 | `/cr --fix` |
 | 리뷰부터 수정·검증·commit까지 한 번에 실행 | `/cca` |
@@ -31,7 +37,7 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | release 준비·hotfix·프로필 저장을 실제 실행 | `/cca release`, `/cca emergency`, `/cca learn` |
 | PR 생성 전 결과와 blocker만 확인 | `/cpr --base main` |
 | 검증된 현재 branch로 GitHub PR 생성 | `/cp --base main` |
-| 현재 프로젝트에 남은 CommitForge 잠금 해제 | `/cr clean` 등 모든 명령의 `clean` |
+| 현재 프로젝트에 남은 CommitForge 잠금 해제 | `/cr clean` 등 `/ccf`를 제외한 모든 명령의 `clean` |
 
 > [!IMPORTANT]
 > **Release tag 실행 경계**
@@ -61,6 +67,8 @@ Claude Code를 열고 목적에 맞는 명령을 실행합니다.
 /cr    # 읽기 전용 심층 리뷰
 /ccr   # Atomic Commit 계획
 /cc    # 계획·staging·commit
+/cf    # 미커밋 변경 전부를 단일 commit (fast)
+/ccf   # 파일 단위 의미 분리 다중 commit (fast)
 /cca   # 리뷰·수정·검증·commit 전체 실행
 /cpr   # Pull Request 읽기 전용 미리보기
 /cp    # branch push와 Pull Request 실제 생성
@@ -90,11 +98,11 @@ Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. �
 - 최신 Claude Code 권장
 - `/cpr`, `/cp` 사용 시 GitHub CLI(`gh`)와 GitHub 인증
 
-Python은 lock, Diff snapshot, untracked 보존, fingerprint와 안전한 cleanup을 담당합니다. Python이 없거나 Guard가 실패하면 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 시작하지 않습니다.
+Python은 lock, Diff snapshot, untracked 보존, fingerprint와 안전한 cleanup을 담당합니다. Python이 없거나 Guard가 실패하면 `/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`는 시작하지 않습니다.
 
 ### 프로젝트 설치
 
-현재 저장소에만 `/cc`, `/ccr`, `/cr`, `/cca`, `/cpr`, `/cp`를 제공합니다.
+현재 저장소에만 `/cc`, `/ccr`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`를 제공합니다.
 
 macOS / Linux / WSL / Git Bash:
 
@@ -154,6 +162,9 @@ Windows에서는 `install.ps1`의 `Project` 또는 `Global` 범위를 다시 사
 ├── skills/
 │   ├── cc/
 │   ├── ccr/
+│   ├── cf/
+│   ├── cfr/
+│   ├── ccf/
 │   ├── cr/
 │   ├── cca/
 │   ├── cpr/
@@ -188,7 +199,7 @@ Write 훅과 Skill 권한 패턴은 설치 위치의 절대경로를 사용해�
 
 ### 설치 후 확인
 
-대상 저장소에서 Claude Code를 다시 열고 `/`를 입력해 `ccr`, `cc`, `cr`, `cca`, `cpr`, `cp`가 표시되는지 확인합니다. 새 `.claude/agents` 디렉터리를 현재 세션에서 처음 만들었다면 Claude Code를 한 번 재시작하십시오.
+대상 저장소에서 Claude Code를 다시 열고 `/`를 입력해 `ccr`, `cc`, `cf`, `cfr`, `ccf`, `cr`, `cca`, `cpr`, `cp`가 표시되는지 확인합니다. 새 `.claude/agents` 디렉터리를 현재 세션에서 처음 만들었다면 Claude Code를 한 번 재시작하십시오.
 
 ## 명령 사용법
 
@@ -228,6 +239,43 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 ```
 
 `/cc`는 소스 코드를 수정하지 않습니다. 현재 변경을 분석하고 index만 구성하여 여러 commit을 만듭니다. 검증 실패나 코드 문제를 발견하면 수정하지 않고 중단하여 snapshot을 보존합니다.
+
+### Fast Commit
+
+실험 중 중간 저장이나 WIP 보존처럼 `/cc`의 정밀 분석이 과한 상황을 위한 빠른 경로입니다.
+
+```text
+/cfr   # /cf가 만들 커밋 미리보기 (읽기 전용)
+/cf    # 미커밋 변경 전부를 단일 commit
+/ccf   # 파일 단위로 의미를 나눈 다중 commit
+```
+
+```text
+/cf 로그인 화면 실험 중간 저장
+```
+
+```text
+/cf --scope lib/auth --verify
+```
+
+```text
+/ccf 캐시 레이어 정리
+```
+
+| | `/cc` | `/ccf` | `/cf` |
+|---|---|---|---|
+| 커밋 수 | 의미 단위 여러 개 | 의미 단위 여러 개 | 단일 |
+| 분리 단위 | 파일 + hunk | 파일만 | 없음 |
+| worktree lock | 획득 | 획득하지 않음 | 획득 |
+| Diff snapshot | 생성·정리 | 생성 후 보관 | 생성·정리 |
+| 프로젝트 검증 | 기본 실행 | 실행하지 않음 | `--verify`일 때만 |
+| secret·conflict 차단 | 함 | 함 | 함 |
+
+세 명령 모두 소스 코드를 수정하지 않으며, secret·자격 파일·merge conflict marker·산출물 대량 유입을 발견하면 **commit하지 않고 중단합니다.** 이 차단 스캔은 어떤 인자로도 끌 수 없습니다.
+
+`/cf`의 커밋은 여러 의도가 한 덩어리에 들어가고, `/ccf`의 커밋은 파일 단위로만 나뉘므로 한 파일에 섞인 의도는 분리되지 않습니다. 두 결과 모두 완전한 Atomic Commit이 아닐 수 있으므로 공유 branch와 release 히스토리에는 `/cc` 또는 `/cca`를 사용하십시오.
+
+`/ccf`는 속도를 위해 worktree lock을 획득하지 않습니다. 같은 worktree에서 다른 CommitForge 명령과 **동시에 실행하지 마십시오.** 대신 Diff snapshot은 남기므로 보고에 기록된 시작 HEAD로 `git reset --soft <시작 HEAD>` 하여 되돌릴 수 있습니다. 이 snapshot은 자동 삭제되지 않습니다.
 
 ### 심층 코드 리뷰만 실행
 
@@ -487,7 +535,7 @@ tag는 문자열을 추측하지 않고 전용 계산기가 SemVer와 기존 tag
 
 `/cr learn`과 `/cca learn --preview`는 최근 non-merge commit을 branch·기간·package·type별로 표본화해 제목·본문·scope·분리·검증 선호, 근거 commit, 반례, 확신도를 보여주지만 파일을 만들지 않습니다. 실제 `/cca learn`만 machine-readable `.commitforge/profile.json`과 사람이 읽는 `.commitforge/profile.md`를 갱신합니다.
 
-bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하며, commit 메시지의 검증 명령은 CI·manifest·script 정의로 교차 검증합니다. 프로필은 자동 stage/commit하지 않고 이후 `/ccr`, `/cc`, `/cr`, `/cca`가 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
+bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하며, commit 메시지의 검증 명령은 CI·manifest·script 정의로 교차 검증합니다. 프로필은 자동 stage/commit하지 않고 이후 `/ccr`, `/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`가 프로젝트 명시 규칙 다음 우선순위로 참고합니다.
 
 ### Pull Request 미리보기와 생성
 
@@ -509,7 +557,7 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 
 - `/cpr`: committed diff의 주목적에 맞는 `feat/...`, `fix/...` 등의 충돌 없는 branch 이름만 제안하며 branch를 만들지 않습니다.
 - `/cp`: remote tracking base보다 앞선 commit을 리뷰한 뒤 같은 규칙으로 branch를 실제 생성하고 그 branch를 push해 PR을 만듭니다.
-- 미커밋 변경만 있거나 ahead commit이 없으면 두 명령 모두 차단됩니다. 먼저 `/cca` 또는 `/cc`로 commit한 뒤 다시 실행하십시오.
+- 미커밋 변경만 있거나 ahead commit이 없으면 두 명령 모두 차단됩니다. 먼저 `/cca`, `/cc` 또는 `/cf`로 commit한 뒤 다시 실행하십시오.
 - `--branch <name>`으로 head 이름을 명시할 수 있습니다. 형식·충돌·diff 의미를 검증하며 기존 local/remote branch를 덮어쓰지 않습니다.
 - 자동 branch 생성 뒤 push나 PR 생성이 실패하면 branch를 자동 삭제하거나 `main`/`master`로 복귀하지 않고 현재 상태와 재시도 방법을 보고합니다.
 
@@ -524,15 +572,16 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 | 옵션 | 적용 | 의미 |
 |---|---|---|
 | `--scope <경로...>` | 전체 | 지정 범위 중심으로 분석/커밋 |
-| `--compact` | `/ccr` | 메시지 본문 초안을 간결하게 출력 |
+| `--compact` | `/ccr`, `/cfr` | 메시지 본문 초안을 간결하게 출력 |
 | `--team` | `/cr`, `/ccr`, `/cpr`, `/cca` | 환경이 활성화된 경우 read-only 리뷰 단계에서 Agent Team 강제 선호 |
 | `--no-team` | `/cr`, `/ccr`, `/cpr`, `/cca` | Agent Team을 끄고 기존 subagent 사용 |
 | `--fix` | `/cr` 일반 리뷰 | 현재 working hunk의 확정적·국소 문제 수정 허용; `release`·`emergency`·`learn`에서는 거부 |
 | `--no-fix` | `/cca` | 소스 수정 금지; blocker에서 중단 |
-| `--no-verify` | `/cc`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cca`는 hook 우회도 허용 |
+| `--verify` | `/cf`, `/cfr` | 기본 생략하는 프로젝트 검증을 실행; `/cfr`은 실행할 명령을 식별만 |
+| `--no-verify` | `/cc`, `/cf`, `/ccf`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cf`, `/ccf`, `/cca`는 hook 우회도 허용 |
 | `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
 | `--iterations 1-5` | `/cr`, `/cca` | 리뷰-수정 반복 상한, 기본 3 |
-| `--keep-snapshot` | `/cc`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
+| `--keep-snapshot` | `/cc`, `/cf`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
 | `--base <ref>` | `/cr` | merge-base부터 HEAD 및 현재 변경 검토 |
 | `--range <A..B>` | `/cr` | 명시한 commit 범위 검토 |
 | `pr` | `/cr` | 현재 GitHub PR의 base/head 범위 검토 |
@@ -663,12 +712,14 @@ Claude가 종료 hook을 전달할 수 없거나 API 실패 후 세션을 더 �
 
 ### 현재 프로젝트 잠금 정리
 
-모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
+`/ccf`를 제외한 모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
 
 ```text
 /cr clean
 /cc clean
 /ccr clean
+/cf clean
+/cfr clean
 /cca clean
 /cpr clean
 /cp clean
@@ -721,7 +772,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py begin \
 
 ### 같은 worktree
 
-`/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
+`/cc`, `/cf`, `/cfr`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다. `/ccf`는 속도를 위해 lock을 획득하지 않으므로 다른 명령과 동시에 실행하면 안 됩니다.
 
 다만 이 lock은 다른 IDE, terminal, Git GUI를 강제로 막지 못합니다. 실행 중 다른 세션이 파일이나 index를 바꾸면 fingerprint 불일치로 재분석 또는 중단합니다.
 
@@ -738,7 +789,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 ## 작업 전 Diff 보존
 
-`/cc`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다.
+`/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다. `/ccf`의 snapshot은 lock 없이 만들어져 자동 삭제되지 않습니다.
 
 ```text
 <git-dir>/claude-atomic-snapshots/<timestamp-session-random>/

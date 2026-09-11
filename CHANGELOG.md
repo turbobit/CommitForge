@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.15.0 — 2026-09-11
+
+- Fast Commit 경로 `/cf`, `/cfr`, `/ccf` 추가. `/cc`의 정밀 Atomic 분석이 과한
+  실험·WIP 상황에서 훨씬 빠르게 commit하기 위한 별도 경로
+- `/cf`는 아직 커밋되지 않은 모든 변경(staged·unstaged·untracked)을 하나의
+  index로 합쳐 단일 commit을 생성. 대표 type은
+  `feat > fix > perf > refactor > test > docs > build/ci > style > chore`
+  우선순위로 고르고 섞인 의도를 본문에 모두 나열해 정보 손실 방지
+- `/cfr`은 `/cf`가 만들 커밋을 읽기 전용으로 미리 보여주며 대상 파일, 대표 type
+  근거, 메시지 초안, 차단 사유, 권장 후속 명령을 보고
+- `/ccf`는 의미 분리를 유지한 다중 commit을 최소 경로로 생성. 파일 단위
+  그룹핑만 사용하고 hunk 분리·fingerprint 재검사·의존성 정밀 분석·프로젝트
+  검증·reviewer를 생략
+- 세 명령 모두 secret·자격 파일·merge conflict marker·산출물 대량 유입 차단
+  스캔을 유지하며, 이 스캔은 `--verify`·`--no-verify`·`--scope` 어느 것으로도
+  끌 수 없음
+- `/cf`는 프로젝트 검증을 기본 생략하고 `--verify`로만 실행. `--no-verify`는
+  commit hook까지 우회
+- `/ccf`는 속도를 위해 worktree lock을 획득하지 않음. 대신 Guard에 lock 없이
+  Diff snapshot만 만드는 `guard.py snapshot` 서브커맨드를 추가해 복구 수단은
+  유지하며, 이 snapshot은 소유 token이 공개되지 않아 자동 삭제되지 않음
+- `/cf`와 `/ccf`의 결과는 완전한 Atomic Commit이 아닐 수 있으므로 결과 보고에서
+  그 사실과 `/cc`·`/cca` 권장을 항상 명시
+- core에 `fast-commit-rules.md` 추가, `reporting.md`에 `/cf`·`/cfr`·`/ccf`
+  보고 형식 추가, `recovery.md`에 lock 없는 snapshot 복구 절차 추가
+
 ## 1.14.1 — 2026-07-31
 
 - Claude Code의 `Stop`을 세션 종료로 잘못 해석해 여러 turn에 걸친 `/cr`·`/cca`
