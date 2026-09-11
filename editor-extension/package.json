@@ -12,8 +12,32 @@
   "contributes": {
     "commands": [
       { "command": "commitforge.refresh", "title": "CommitForge: 상태 새로고침" },
-      { "command": "commitforge.focusView", "title": "CommitForge: 뷰 열기" }
+      { "command": "commitforge.focusView", "title": "CommitForge: 뷰 열기" },
+      { "command": "commitforge.install", "title": "CommitForge: 설치" },
+      { "command": "commitforge.uninstall", "title": "CommitForge: 제거" },
+      { "command": "commitforge.verify", "title": "CommitForge: 설치 검증" }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "commitforge",
+          "title": "CommitForge",
+          "icon": "$(git-commit)"
+        }
+      ]
+    },
+    "views": {
+      "commitforge": [{ "id": "commitforge.view", "name": "상태" }]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "commitforge.refresh",
+          "when": "view == commitforge.view",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "CommitForge",
       "properties": {

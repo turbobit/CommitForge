@@ -13,6 +13,13 @@ export class EventEmitter<T> {
 }
 
 export class ThemeIcon {
+  constructor(
+    public id: string,
+    public color?: ThemeColor,
+  ) {}
+}
+
+export class ThemeColor {
   constructor(public id: string) {}
 }
 
