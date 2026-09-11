@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, rm, symlink, realpath } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -172,6 +172,37 @@ describe("detectInstall", () => {
     expect(report.state).toBe("misconfigured");
     expect(report.corePathOk).toBe(false);
   });
+
+  it(
+    "core 경로가 심링크를 통과해도 ok로 판정한다 (install.py의 realpath 마킹과 " +
+      "detect.ts의 어휘적 비교 불일치 회귀 방지)",
+    async () => {
+      // install.py:87은 core_path를 .resolve()(심링크 해석)로 기록한다. 워크스페이스가
+      // 심링크로 열리면(예: macOS /tmp -> /private/tmp) detect.ts가 어휘적 경로만
+      // 비교할 경우 정상 설치도 misconfigured로 오판한다.
+      const realRoot = join(root, "real");
+      const aliasRoot = join(root, "alias");
+      await mkdir(realRoot, { recursive: true });
+      await symlink(realRoot, aliasRoot, "dir");
+
+      // install.py가 실제로 기록하는 값은 완전히 정규화된 realpath이므로, 픽스처도
+      // 같은 방식으로 계산해야 한다 (그러지 않으면 임시 디렉터리 자체가 심링크를
+      // 낀 경로(macOS /var -> /private/var)일 때 이 테스트가 잘못된 이유로 실패한다).
+      const canonicalRealRoot = await realpath(realRoot);
+      const corePath = join(canonicalRealRoot, ".claude", "skills", "_git-atomic-core");
+
+      await makeInstall(realRoot, { corePath });
+
+      const report = await detectInstall(
+        join(aliasRoot, ".claude"),
+        buildManifest(corePath),
+        "project",
+      );
+
+      expect(report.corePathOk).toBe(true);
+      expect(report.state).toBe("ok");
+    },
+  );
 
   it("hook이 없으면 misconfigured다", async () => {
     const claudeDir = await makeInstall(root, { hooks: false });

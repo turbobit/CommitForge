@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, realpath as fsRealpath } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   claudeEntries,
@@ -111,6 +111,34 @@ function expectedFilePaths(manifest: Manifest): string[] {
 }
 
 /**
+ * install.py:87은 core_path를 `.resolve()`(심링크 해석)로 기록한다. Node의
+ * `path.resolve()`는 어휘적이라 심링크를 풀지 않으므로, 워크스페이스 경로 자체가
+ * 심링크(또는 macOS의 `/tmp`·`/var`처럼 실경로와 다른 별칭)이면 어휘적 비교만으로는
+ * 정상 설치도 못 알아본다. 어휘적 경로와 realpath 둘 다 후보로 두고 SKILL.md 내용이
+ * 그중 하나라도 포함하면 통과로 본다. realpath 계산이 실패하면(경로가 아직 없는 등)
+ * 어휘적 경로만 쓴다.
+ */
+async function corePathCandidates(claudeDir: string): Promise<string[]> {
+  const lexical = resolve(join(claudeDir, "skills", "_git-atomic-core"));
+  const candidates = [lexical];
+  try {
+    const real = await fsRealpath(lexical);
+    if (real !== lexical) candidates.push(real);
+  } catch {
+    // 경로가 아직 존재하지 않거나 접근할 수 없으면 어휘적 경로만 후보로 남긴다.
+  }
+  return candidates;
+}
+
+/** Windows는 드라이브 문자·경로 대소문자가 뒤섞일 수 있어(`c:\` vs `C:\`) 무시하고 비교한다. */
+function textIncludesPath(text: string, candidate: string): boolean {
+  if (process.platform === "win32") {
+    return text.toLowerCase().includes(candidate.toLowerCase());
+  }
+  return text.includes(candidate);
+}
+
+/**
  * 설치된 SKILL.md는 install.py가 core 경로를 치환하므로 해시가 달라진다.
  * 대신 치환된 경로가 이 설치를 가리키는지를 본다. 다른 머신에서 클론한
  * .claude/ 를 그대로 쓰는 경우를 잡기 위해서다.
@@ -120,7 +148,7 @@ async function checkCorePaths(
   paths: string[],
   missing: string[],
 ): Promise<boolean> {
-  const expected = resolve(join(claudeDir, "skills", "_git-atomic-core"));
+  const candidates = await corePathCandidates(claudeDir);
   let allOk = true;
 
   for (const relative of paths) {
@@ -129,7 +157,7 @@ async function checkCorePaths(
       missing.push(relative);
       continue;
     }
-    if (!text.includes(expected)) allOk = false;
+    if (!candidates.some((candidate) => textIncludesPath(text, candidate))) allOk = false;
   }
   return allOk;
 }
