@@ -1,0 +1,237 @@
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { detectInstall } from "../src/core/detect";
+import { parseManifest, type Manifest } from "../src/core/payload";
+
+const sha = (text: string) => createHash("sha256").update(text).digest("hex");
+
+const AGENT_BODY = "agent body\n";
+const CORE_BODY = "core body\n";
+
+function buildManifest(coreTemplatePath: string): Manifest {
+  return parseManifest(
+    JSON.stringify({
+      name: "CommitForge",
+      version: "1.15.0",
+      file_count: 3,
+      files: [
+        {
+          path: ".claude/agents/cca-git-reviewer.md",
+          size: AGENT_BODY.length,
+          sha256: sha(AGENT_BODY),
+        },
+        {
+          path: ".claude/skills/_git-atomic-core/guard.md",
+          size: CORE_BODY.length,
+          sha256: sha(CORE_BODY),
+        },
+        {
+          path: ".claude/skills/cr/SKILL.md",
+          size: coreTemplatePath.length,
+          sha256: sha(coreTemplatePath),
+        },
+      ],
+    }),
+  );
+}
+
+/** 정상 설치 상태를 임시 디렉터리에 만든다. */
+async function makeInstall(
+  root: string,
+  opts: { marker?: boolean; corePath?: string; hooks?: boolean } = {},
+): Promise<string> {
+  const claudeDir = join(root, ".claude");
+  const corePath = opts.corePath ?? join(claudeDir, "skills", "_git-atomic-core");
+
+  await mkdir(join(claudeDir, "agents"), { recursive: true });
+  await mkdir(join(claudeDir, "skills", "_git-atomic-core"), { recursive: true });
+  await mkdir(join(claudeDir, "skills", "cr"), { recursive: true });
+
+  await writeFile(join(claudeDir, "agents", "cca-git-reviewer.md"), AGENT_BODY);
+  await writeFile(join(claudeDir, "skills", "_git-atomic-core", "guard.md"), CORE_BODY);
+  await writeFile(
+    join(claudeDir, "skills", "cr", "SKILL.md"),
+    `---\nname: cr\nallowed-tools:\n  - Read\n---\n\n${corePath}/deep-review-protocol.md 를 읽는다\n`,
+  );
+
+  if (opts.marker !== false) {
+    await writeFile(
+      join(claudeDir, ".commitforge-install.json"),
+      JSON.stringify({
+        schema: "commitforge-install/v1",
+        version: "1.15.0",
+        scope: "project",
+        installed_at: "2026-09-11T08:12:03Z",
+        python: "/usr/bin/python3",
+        core_path: corePath,
+      }),
+    );
+  }
+
+  if (opts.hooks !== false) {
+    await writeFile(
+      join(claudeDir, "settings.local.json"),
+      JSON.stringify({
+        hooks: {
+          SessionEnd: [
+            {
+              hooks: [
+                {
+                  type: "command",
+                  command: `/usr/bin/python3 ${corePath}/scripts/session_lifecycle.py`,
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+  }
+  return claudeDir;
+}
+
+describe("detectInstall", () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), "cf-detect-"));
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("설치가 없으면 missing이다", async () => {
+    const report = await detectInstall(join(root, ".claude"), buildManifest("/x"), "project");
+
+    expect(report.state).toBe("missing");
+    expect(report.installedVersion).toBeNull();
+  });
+
+  it("정상 설치는 ok다", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("ok");
+    expect(report.installedVersion).toBe("1.15.0");
+    expect(report.corePathOk).toBe(true);
+    expect(report.hooksRegistered).toBe(true);
+  });
+
+  it("해시가 전부 다르면 version-mismatch다", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(join(claudeDir, "agents", "cca-git-reviewer.md"), "changed\n");
+    await writeFile(join(claudeDir, "skills", "_git-atomic-core", "guard.md"), "changed\n");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("version-mismatch");
+    expect(report.mismatchedFiles).toHaveLength(2);
+  });
+
+  it("core 경로가 남을 가리키면 misconfigured다", async () => {
+    const claudeDir = await makeInstall(root, { corePath: "/other/machine/_git-atomic-core" });
+
+    const report = await detectInstall(
+      claudeDir,
+      buildManifest("/other/machine/_git-atomic-core"),
+      "project",
+    );
+
+    expect(report.state).toBe("misconfigured");
+    expect(report.corePathOk).toBe(false);
+  });
+
+  it("hook이 없으면 misconfigured다", async () => {
+    const claudeDir = await makeInstall(root, { hooks: false });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("misconfigured");
+    expect(report.hooksRegistered).toBe(false);
+  });
+
+  it("파일이 누락되면 corrupt다", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await rm(join(claudeDir, "agents", "cca-git-reviewer.md"));
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("corrupt");
+    expect(report.missingFiles).toContain(".claude/agents/cca-git-reviewer.md");
+  });
+
+  it("마커가 없어도 해시가 맞으면 ok이고 번들 버전을 쓴다", async () => {
+    const claudeDir = await makeInstall(root, { marker: false });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("ok");
+    expect(report.installedVersion).toBe("1.15.0");
+  });
+
+  it("마커 버전이 번들과 달라도 해시가 맞으면 ok이되 경고를 남긴다", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(
+      join(claudeDir, ".commitforge-install.json"),
+      JSON.stringify({
+        schema: "commitforge-install/v1",
+        version: "9.9.9",
+        scope: "project",
+        installed_at: "2026-01-01T00:00:00Z",
+        python: "/usr/bin/python3",
+        core_path: corePath,
+      }),
+    );
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("ok");
+    expect(report.warnings.join(" ")).toMatch(/9\.9\.9/);
+  });
+
+  it("global 범위는 settings.json에서 hook을 찾는다", async () => {
+    const claudeDir = await makeInstall(root, { hooks: false });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(
+      join(claudeDir, "settings.json"),
+      JSON.stringify({
+        hooks: {
+          SessionEnd: [
+            {
+              hooks: [
+                { type: "command", command: `python3 ${corePath}/scripts/session_lifecycle.py` },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "global");
+
+    expect(report.hooksRegistered).toBe(true);
+    expect(report.state).toBe("ok");
+  });
+
+  it("손상된 settings JSON은 hook 미등록으로 보고 경고한다", async () => {
+    const claudeDir = await makeInstall(root, { hooks: false });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(join(claudeDir, "settings.local.json"), "{ broken");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.hooksRegistered).toBe(false);
+    expect(report.warnings.join(" ")).toMatch(/settings\.local\.json/);
+  });
+});
