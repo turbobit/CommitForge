@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import {
   claudeEntries,
@@ -78,6 +78,15 @@ async function readMarker(
   }
 }
 
+async function exists(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 매니페스트에 실제로 포함된 rewritten SKILL.md 경로만 추린다. install.py가
  * core 경로를 치환하는 9개 명령 중, 이 매니페스트에 실려온 것만 검사 대상이다
@@ -89,6 +98,16 @@ function rewrittenSkillPaths(manifest: Manifest): string[] {
   return claudeEntries(manifest)
     .map((entry) => entry.path)
     .filter((path) => rewritten.has(path));
+}
+
+/**
+ * 매니페스트가 기대하는 CommitForge 파일 전체 (해시 대조 대상 + 치환되는
+ * SKILL.md). `.claude/skills/` 존재 여부만으로 판정하면 자기 skill을 쓰는
+ * 사용자를 corrupt로 오판하므로, 이 목록에 든 파일이 하나도 없을 때만
+ * missing으로 본다.
+ */
+function expectedFilePaths(manifest: Manifest): string[] {
+  return [...exactEntries(manifest).map((entry) => entry.path), ...rewrittenSkillPaths(manifest)];
 }
 
 /**
@@ -141,8 +160,17 @@ export async function detectInstall(
   const missingFiles: string[] = [];
   const mismatchedFiles: string[] = [];
 
-  const anchor = await readIfPresent(join(claudeDir, "skills", "cr", "SKILL.md"));
-  if (anchor === null) {
+  // 존재 여부만 가볍게 확인한다 (access, 내용 읽기 아님). 기대 파일이 하나도
+  // 없으면 미설치, 일부만 있으면 아래 일반 로직이 missingFiles를 채워 corrupt로
+  // 분류한다.
+  const expected = expectedFilePaths(manifest);
+  const presentCount = (
+    await Promise.all(
+      expected.map((relative) => exists(join(claudeDir, relative.replace(/^\.claude\//, "")))),
+    )
+  ).filter(Boolean).length;
+
+  if (expected.length > 0 && presentCount === 0) {
     return {
       state: "missing",
       scope,

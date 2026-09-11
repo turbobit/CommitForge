@@ -111,6 +111,31 @@ describe("detectInstall", () => {
     expect(report.installedVersion).toBeNull();
   });
 
+  it("CommitForge와 무관한 사용자 skill만 있어도 missing이다 (단일 앵커 의존 제거 회귀 방지)", async () => {
+    const claudeDir = join(root, ".claude");
+    await mkdir(join(claudeDir, "skills", "my-own-skill"), { recursive: true });
+    await writeFile(
+      join(claudeDir, "skills", "my-own-skill", "SKILL.md"),
+      "---\nname: my-own-skill\ndescription: 나만 쓰는 skill\n---\n본문\n",
+    );
+
+    const report = await detectInstall(claudeDir, buildManifest("/x"), "project");
+
+    expect(report.state).toBe("missing");
+    expect(report.installedVersion).toBeNull();
+  });
+
+  it("정상 설치에서 skills/cr/SKILL.md 하나만 지워지면 corrupt다 (missing이 아님)", async () => {
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await rm(join(claudeDir, "skills", "cr", "SKILL.md"));
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("corrupt");
+    expect(report.missingFiles).toContain(".claude/skills/cr/SKILL.md");
+  });
+
   it("정상 설치는 ok다", async () => {
     const claudeDir = await makeInstall(root);
     const corePath = join(claudeDir, "skills", "_git-atomic-core");
