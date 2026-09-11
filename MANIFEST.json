@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 129,
-  "total_bytes": 1159111,
+  "file_count": 132,
+  "total_bytes": 1165525,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -422,8 +422,8 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 5891,
-      "sha256": "0d5858858025e6018e6f6c85672d912e82b998db29b5b733fe3c6ae44136d11c"
+      "size": 5978,
+      "sha256": "53d77d9a77eddc25ed8bf9cdbe6580da5eac745ddaa0ef2ae05fd3009368b190"
     },
     {
       "path": "editor-extension/src/state.ts",
@@ -446,6 +446,11 @@
       "sha256": "92d5484e1e8a41328bcae582edb2d584c16493c2e3d7c772f4baea798c026cd1"
     },
     {
+      "path": "editor-extension/src/vscode/watchers.ts",
+      "size": 1894,
+      "sha256": "25bdbe4ef4dd42a1c1e8b703876b2b49507dc94dc5763e9fdf650d4247b387f2"
+    },
+    {
       "path": "editor-extension/test/catalog.test.ts",
       "size": 9743,
       "sha256": "192cacef321f5b67d185f1c0971e117352353387ef49ddf01b9b9ced18dcf9a4"
@@ -454,6 +459,11 @@
       "path": "editor-extension/test/composer.test.ts",
       "size": 4821,
       "sha256": "a07d01c7e953349c80ab01e0c0763c39a958ca23990d0da8e4f56791982761ce"
+    },
+    {
+      "path": "editor-extension/test/debounce.test.ts",
+      "size": 1123,
+      "sha256": "87e01291f490303c2ab9199678acc2691747d4f44e7e4e324c9449680efccd0d"
     },
     {
       "path": "editor-extension/test/detect.test.ts",
@@ -524,6 +534,11 @@
       "path": "editor-extension/test/treeView.test.ts",
       "size": 10761,
       "sha256": "c4d735bbb38e7418655bbb72088f441461cc8e7f5ef833be1dd5d07824344f06"
+    },
+    {
+      "path": "editor-extension/test/watchers.test.ts",
+      "size": 3310,
+      "sha256": "7ddfa3562a33b2bea01d514ef12cb185f5e1a38499f742f07e573c9d528290d1"
     },
     {
       "path": "editor-extension/tsconfig.json",
