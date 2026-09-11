@@ -3,6 +3,7 @@ import { StateStore } from "./state";
 import { createStatusBar } from "./vscode/statusBar";
 import { createTreeView, type Node } from "./vscode/treeView";
 import { runInstaller } from "./vscode/installer";
+import { createWatchers } from "./vscode/watchers";
 import type { Scope } from "./core/detect";
 
 const FOLDER_KEY = "commitforge.activeFolder";
@@ -70,6 +71,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     output,
     createStatusBar(store),
     createTreeView(store),
+    createWatchers(store, folder),
     vscode.commands.registerCommand("commitforge.refresh", () => store.refresh()),
     vscode.commands.registerCommand("commitforge.focusView", () =>
       vscode.commands.executeCommand("commitforge.view.focus"),
