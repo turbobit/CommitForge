@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findOption, loadCatalog, parseArgumentHint, parseSkillFile } from "../src/core/catalog";
@@ -183,7 +182,11 @@ async function loadRealCatalog() {
   return loadCatalog(skillsDir, commandNames(manifest));
 }
 
-describe.skipIf(!existsSync(skillsDir))("loadCatalog", () => {
+// payload/가 없으면(빌드 전) 이 블록은 건너뛰지 않고 그대로 실패한다 — spec §10이
+// 요구하는 "argument-hint 문법 변경 시 즉시 실패"의 핵심 검증이므로, 조용한 skip으로
+// 사라지게 두지 않는다. `npm test`는 pretest에서 sync-payload를 먼저 실행하므로
+// 정상 환경에서는 항상 존재해야 한다.
+describe("loadCatalog", () => {
   it("실제 페이로드에서 명령 9개를 모두 읽는다", async () => {
     const specs = await loadRealCatalog();
 

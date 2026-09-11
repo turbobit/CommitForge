@@ -8,7 +8,6 @@ import {
 } from "../src/core/payload";
 import { loadManifest } from "../src/core/payload";
 import { join } from "node:path";
-import { existsSync } from "node:fs";
 
 const manifestText = JSON.stringify({
   name: "CommitForge",
@@ -90,7 +89,10 @@ describe("rewrittenSkillPaths", () => {
 
 const payloadRoot = join(__dirname, "..", "payload");
 
-describe.skipIf(!existsSync(join(payloadRoot, "MANIFEST.json")))("실제 payload", () => {
+// payload/가 없으면(빌드 전) 이 블록은 건너뛰지 않고 그대로 실패한다. `npm test`는
+// pretest에서 sync-payload를 먼저 실행하므로 정상 환경에서는 항상 존재해야 하고,
+// 값진 회귀 검증(61/52 분류, 명령 9개 파생)이 조용한 skip 뒤에 숨지 않아야 한다.
+describe("실제 payload", () => {
   it(".claude/ 항목이 61개고 그중 52개가 해시 대조 대상이다", async () => {
     const manifest = await loadManifest(payloadRoot);
 

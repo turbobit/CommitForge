@@ -14,6 +14,7 @@
     "sync-payload": "node scripts/sync-payload.mjs",
     "build": "npm run sync-payload && node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
+    "pretest": "npm run sync-payload",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "package": "npm run build && vsce package --out commitforge.vsix"
