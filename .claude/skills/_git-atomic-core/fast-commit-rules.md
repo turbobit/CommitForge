@@ -15,7 +15,7 @@ CommitForge의 빠른 커밋 경로 `/cf`, `/cfr`, `/ccf`가 공유하는 계약
 | 커밋 수 | 단일(미리보기) | 단일 | 의미 단위 여러 개 |
 | 분리 단위 | 없음 | 없음 | 파일만 (hunk 분리 없음) |
 | worktree lock | 획득 | 획득 | **lock을 획득하지 않는다** |
-| Diff snapshot | 생성·정리 | 생성·정리 | `guard.sh snapshot`으로 생성 후 보관 |
+| Diff snapshot | 생성·정리 | 생성·정리 | `guard.sh snapshot`으로 생성, 성공 시 `release-snapshot`으로 정리 |
 | fingerprint 재검사 | 함 | 함 | 안 함 |
 | 프로젝트 검증 | 식별만 | `--verify`일 때만 | 안 함 |
 | 차단 스캔 | 함 | 함 | 함 |
@@ -187,8 +187,22 @@ Fast Commit은 **기본적으로 프로젝트 검증을 실행하지 않는다**
 ### 8.4 Snapshot과 복구
 
 `/ccf`는 `guard.sh snapshot`으로 **lock을 획득하지 않고** Diff snapshot만 만든다.
-이 snapshot은 소유 token이 공개되지 않아 `finish`·`abort`로 삭제되지 않고 항상
-보존된다.
+
+`finish`·`abort`는 `verify_owner`로 lock 소유자를 검증하므로 lock이 없는 이
+snapshot에는 쓸 수 없다. 대신 `release-snapshot`이 lock을 건드리지 않고 snapshot
+marker의 session·token만 검증해 삭제한다. `clean`은 이 snapshot을 삭제하지 않는다.
+
+정리 시점은 결과에 따라 갈린다.
+
+- **전부 성공**: `release-snapshot`으로 삭제한다. guard는 무결성 검증과 working
+  tree clean 검사를 통과할 때만 삭제하고, 하나라도 어긋나면 거부한다.
+- **차단·실패·중단**: 호출하지 않는다. snapshot이 그대로 남는 것이 복구 수단이다.
+- **`--keep-snapshot`**: 성공해도 보존한다.
+- **`--scope`**: 범위 밖 변경 때문에 dirty이므로 거부된다. 범위 밖이 시작 상태대로
+  보존됐음을 확인한 경우에만 `--allow-dirty`를 붙인다.
+
+guard가 거부하면 그 결과를 보고하고 수동 삭제로 우회하지 않는다.
 
 시작 HEAD를 기록해 두고, 결과가 잘못되면 `git reset --soft <시작 HEAD>`로
-되돌린다. snapshot은 확인 후 수동으로 정리한다.
+되돌린다. snapshot을 이미 정리한 뒤에는 커밋만 되돌릴 수 있고 snapshot은 복원할
+수 없다.

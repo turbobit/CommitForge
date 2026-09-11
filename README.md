@@ -267,7 +267,7 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 | 커밋 수 | 의미 단위 여러 개 | 의미 단위 여러 개 | 단일 |
 | 분리 단위 | 파일 + hunk | 파일만 | 없음 |
 | worktree lock | 획득 | 획득하지 않음 | 획득 |
-| Diff snapshot | 생성·정리 | 생성 후 보관 | 생성·정리 |
+| Diff snapshot | 생성·정리 | 성공 시 정리 · 실패 시 보관 | 생성·정리 |
 | 프로젝트 검증 | 기본 실행 | 실행하지 않음 | `--verify`일 때만 |
 | secret·conflict 차단 | 함 | 함 | 함 |
 
@@ -275,7 +275,9 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 
 `/cf`의 커밋은 여러 의도가 한 덩어리에 들어가고, `/ccf`의 커밋은 파일 단위로만 나뉘므로 한 파일에 섞인 의도는 분리되지 않습니다. 두 결과 모두 완전한 Atomic Commit이 아닐 수 있으므로 공유 branch와 release 히스토리에는 `/cc` 또는 `/cca`를 사용하십시오.
 
-`/ccf`는 속도를 위해 worktree lock을 획득하지 않습니다. 같은 worktree에서 다른 CommitForge 명령과 **동시에 실행하지 마십시오.** 대신 Diff snapshot은 남기므로 보고에 기록된 시작 HEAD로 `git reset --soft <시작 HEAD>` 하여 되돌릴 수 있습니다. 이 snapshot은 자동 삭제되지 않습니다.
+`/ccf`는 속도를 위해 worktree lock을 획득하지 않습니다. 같은 worktree에서 다른 CommitForge 명령과 **동시에 실행하지 마십시오.** 대신 Diff snapshot은 남기므로 보고에 기록된 시작 HEAD로 `git reset --soft <시작 HEAD>` 하여 되돌릴 수 있습니다.
+
+이 snapshot은 **전부 성공했을 때만 정리됩니다.** 차단 스캔에 걸리거나 커밋 도중 실패·중단하면 보존하므로, 복구가 필요한 상황에서는 항상 남아 있습니다. 성공해도 보존하려면 `--keep-snapshot`을 쓰십시오. `clean`은 이 snapshot을 삭제하지 않습니다.
 
 ### 심층 코드 리뷰만 실행
 
@@ -581,7 +583,7 @@ bot 제외 수, 분석 refs, 표본 부족과 규칙 충돌을 함께 기록하�
 | `--no-verify` | `/cc`, `/cf`, `/ccf`, `/cr`, `/cca` | 프로젝트 검증 생략 허용; `/cc`, `/cf`, `/ccf`, `/cca`는 hook 우회도 허용 |
 | `--strict` | `/cr`, `/cca` | 확인된 MINOR도 엄격하게 처리 |
 | `--iterations 1-5` | `/cr`, `/cca` | 리뷰-수정 반복 상한, 기본 3 |
-| `--keep-snapshot` | `/cc`, `/cf`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
+| `--keep-snapshot` | `/cc`, `/cf`, `/ccf`, `/cr`, `/cca` | 성공 후에도 Diff snapshot 보존 |
 | `--base <ref>` | `/cr` | merge-base부터 HEAD 및 현재 변경 검토 |
 | `--range <A..B>` | `/cr` | 명시한 commit 범위 검토 |
 | `pr` | `/cr` | 현재 GitHub PR의 base/head 범위 검토 |
@@ -789,7 +791,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 ## 작업 전 Diff 보존
 
-`/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다. `/ccf`의 snapshot은 lock 없이 만들어져 자동 삭제되지 않습니다.
+`/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다. `/ccf`의 snapshot은 lock 없이 만들어지므로 `finish`·`abort` 대신 `release-snapshot`으로만 삭제되며, 전부 성공했을 때만 정리됩니다.
 
 ```text
 <git-dir>/claude-atomic-snapshots/<timestamp-session-random>/

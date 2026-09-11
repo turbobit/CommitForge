@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.16.0 — 2026-09-11
+
+- `/ccf`가 **전부 성공하면 Diff snapshot을 정리**하고, 차단·실패·중단 시에는
+  보존하도록 변경. 이전에는 성공해도 항상 남아 수동으로 지워야 했음
+- Guard에 `release-snapshot` 서브커맨드 추가. `finish`·`abort`는 `verify_owner`로
+  lock 소유자를 검증하므로 lock을 획득하지 않는 `/ccf`에는 쓸 수 없어, snapshot
+  marker의 session·token만 검증하고 lock은 읽지도 해제하지도 않는 경로를 분리
+- 삭제는 **무결성 감사 통과**와 **working tree clean**을 모두 만족할 때만 수행.
+  손상·변조된 snapshot이나 커밋되지 않은 변경이 남은 상태에서는 거부하고 보존
+- `--scope` 모드는 범위 밖 변경 때문에 dirty이므로 거부되며, 범위 밖이 시작
+  상태대로 보존됐음을 확인한 경우에만 `--allow-dirty`로 정리
+- `/ccf`에 `--keep-snapshot` 추가. 성공해도 snapshot을 보존
+- `guard.py snapshot`이 응답에 `token`을 포함. 이 token은 lock 소유권이 아니라
+  해당 snapshot에 대한 소유 증명이며 `release-snapshot`에만 사용
+- `clean`은 이전과 같이 이 snapshot을 삭제하지 않음. 관련 문서의 정리 안내를
+  `release-snapshot` 기준으로 수정
+
 ## 1.15.0 — 2026-09-11
 
 - Fast Commit 경로 `/cf`, `/cfr`, `/ccf` 추가. `/cc`의 정밀 Atomic 분석이 과한

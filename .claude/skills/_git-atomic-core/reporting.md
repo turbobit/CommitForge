@@ -187,7 +187,7 @@ scope 근거:
 - commit hook 존중 / 우회 여부
 
 ## 종료
-- 보관된 snapshot 경로 (자동 삭제되지 않음)
+- snapshot: 정리했으면 그 사실, 보존했으면 경로와 보존 이유
 - 되돌리기: git reset --soft <시작 HEAD>
 - 남은 변경과 clean 여부
 - push하지 않았음
@@ -197,6 +197,10 @@ scope 근거:
 
 - 파일 단위 그룹핑이므로 결과가 완전한 Atomic Commit이 아닐 수 있다
 - 공유 branch·release 히스토리에는 `/cc` 또는 `/cca`를 권장한다
+
+snapshot을 정리한 경우 커밋만 되돌릴 수 있고 snapshot은 복원할 수 없음을 함께
+알린다. guard가 무결성 실패나 dirty를 이유로 정리를 거부했으면 그 결과와 남은
+snapshot 경로를 그대로 보고한다.
 
 ## `/cca`
 

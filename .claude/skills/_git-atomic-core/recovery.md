@@ -45,9 +45,22 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 
 ## Lock 없는 snapshot (`/ccf`)
 
-`/ccf`는 `guard.py snapshot`으로 lock 없이 Diff snapshot만 만든다. 이 snapshot은
-어떤 세션도 소유 token을 알지 못하므로 `finish`·`abort`로 삭제되지 않고 항상
-보존된다. 구성은 위와 동일하며 `audit-snapshot`으로 무결성을 확인할 수 있다.
+`/ccf`는 `guard.py snapshot`으로 lock 없이 Diff snapshot만 만든다. 구성은 위와
+동일하며 `audit-snapshot`으로 무결성을 확인할 수 있다.
+
+이 snapshot은 lock이 없어 `finish`·`abort`로 삭제할 수 없다. 두 명령은
+`verify_owner`로 lock 소유자를 검증하기 때문이다. 삭제는 `release-snapshot`만
+할 수 있고, 이 명령은 lock을 읽지도 해제하지도 않으며 snapshot marker의
+session·token이 일치할 때만 동작한다. `clean`도 이 snapshot을 삭제하지 않는다.
+
+```bash
+python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py release-snapshot \
+  --session <session> --token <token> --snapshot <snapshot>
+```
+
+`/ccf`는 **전부 성공했을 때만** 이 명령을 실행한다. 따라서 복구가 필요한 상황
+(차단·실패·중단)에서는 snapshot이 남아 있다. guard는 무결성 검증 실패나 dirty
+working tree일 때 삭제를 거부하므로, 거부된 snapshot도 그대로 보존된다.
 
 `/ccf`는 커밋을 여러 개 만들 수 있으므로 보고에 기록된 시작 HEAD로 되돌린다.
 
@@ -55,7 +68,9 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 git reset --soft <시작 HEAD>
 ```
 
-이후 불필요한 snapshot은 `status`로 경로를 확인한 뒤 수동으로 제거한다.
+snapshot이 이미 정리된 경우에는 커밋만 되돌릴 수 있고 snapshot은 복원할 수 없다.
+남은 snapshot은 `status`로 경로를 확인한 뒤 `release-snapshot` 또는 수동으로
+제거한다.
 
 ## 수동 복구 원칙
 

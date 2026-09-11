@@ -28,7 +28,7 @@
 - `reporting.md`: 결과 형식
 - `recovery.md`: 장애 복구
 - `examples.md`: 사례
-- `scripts/guard.py`: worktree별 lock, snapshot, 무결성 감사, fingerprint, cleanup (`snapshot` 서브커맨드는 lock 없이 Diff snapshot만 생성)
+- `scripts/guard.py`: worktree별 lock, snapshot, 무결성 감사, fingerprint, cleanup (`snapshot`은 lock 없이 Diff snapshot만 생성하고, `release-snapshot`은 lock을 건드리지 않고 그 snapshot만 삭제)
 - `scripts/session_lifecycle.py`: Claude 실제 session ID 바인딩, turn 종료 시 잠금 유지, SessionEnd 잠금 정리
 - `scripts/agent_team_mode.py`: Agent Teams 환경 활성 상태의 read-only 판정
 - `scripts/guard.sh`: macOS/Linux/WSL/Git Bash용 Python 3 launcher
