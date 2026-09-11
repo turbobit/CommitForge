@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 118,
-  "total_bytes": 1089252,
+  "file_count": 121,
+  "total_bytes": 1111480,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -357,8 +357,8 @@
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
-      "size": 140521,
-      "sha256": "4aeb1d28a4c140c118aa4492478e774f32e9145fb531eedfed24b788c1a30775"
+      "size": 140590,
+      "sha256": "402af758c623ad2ec2e58db3f85e5c05d354318aeda12aff2627d51da9a5251f"
     },
     {
       "path": "docs/superpowers/specs/2026-09-11-vscode-extension-design.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 917,
-      "sha256": "31bbccffec53c848fadec5761addbaf122c26c4fb22a457f0cecf7a8ce003e21"
+      "size": 956,
+      "sha256": "6dbe612b3794cda5f368d2183b7edfafb89e2b6163e858b67dc8779f9b707ddd"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -392,8 +392,8 @@
     },
     {
       "path": "editor-extension/src/core/catalog.ts",
-      "size": 6010,
-      "sha256": "7c58a33c19cd79fb747656cd30b92c4a7b20cbbd789b679189276cf6c7b837cd"
+      "size": 6200,
+      "sha256": "e4a6d69623c1752912cbc4a78bada29610b1c80f7e45b144a6cd87071d83a216"
     },
     {
       "path": "editor-extension/src/core/composer.ts",
@@ -402,18 +402,18 @@
     },
     {
       "path": "editor-extension/src/core/detect.ts",
-      "size": 7474,
-      "sha256": "878c997d4598b33f5f337521d35fecaab63fda1680aa8d46e05d6f2e7db62f9d"
+      "size": 8211,
+      "sha256": "d8325c23209dcfab415fe1d48d7aa552402a529b00c07c7ddd3ccd57fb348369"
     },
     {
       "path": "editor-extension/src/core/guard.ts",
-      "size": 2812,
-      "sha256": "4cd70eb5e905a7c67c0e94e82dc3e8fdba8c38f8f1100a6c85a35863c3deac24"
+      "size": 6065,
+      "sha256": "88aefd395b63daf90ddf03b9f968fd855826c3855ca82dbd704020c5d43518a2"
     },
     {
       "path": "editor-extension/src/core/payload.ts",
-      "size": 1566,
-      "sha256": "75e7e502a5c673cce53b856ccadeaf09bd756a0ee352a4aa180876c1231c5c16"
+      "size": 2520,
+      "sha256": "03f0eced712c81c4f95661bde2654484e90cf6ac643f04a8ce3596ef39b35a70"
     },
     {
       "path": "editor-extension/src/core/python.ts",
@@ -427,8 +427,8 @@
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
-      "size": 8071,
-      "sha256": "fefc8cea4ceab680e0046bd6a91f66162a8061f9b3c5f90a21803f75a3b62490"
+      "size": 9743,
+      "sha256": "192cacef321f5b67d185f1c0971e117352353387ef49ddf01b9b9ced18dcf9a4"
     },
     {
       "path": "editor-extension/test/composer.test.ts",
@@ -437,8 +437,18 @@
     },
     {
       "path": "editor-extension/test/detect.test.ts",
-      "size": 10668,
-      "sha256": "f291ca58e8e5a0d524bd904da7115932803c5e8f5b97736ea4fcbdd76489559c"
+      "size": 16174,
+      "sha256": "40ae5a7167a07666fecfb770d91596da07a2b03d6dd65c79857f337adaa7aac6"
+    },
+    {
+      "path": "editor-extension/test/fixtures/guard-status-held.json",
+      "size": 3158,
+      "sha256": "44fdab19397eb01c42e3d9356dbf208bfb776323055a5c9c93f7d9b4430039a8"
+    },
+    {
+      "path": "editor-extension/test/fixtures/guard-status-idle.json",
+      "size": 814,
+      "sha256": "1f6dc2bf1e4f2b09bcbce104a56fe8aa0d2210840b4a33575e3ba3ae16b0b998"
     },
     {
       "path": "editor-extension/test/fixtures/skill-cc.md",
@@ -452,13 +462,18 @@
     },
     {
       "path": "editor-extension/test/guard.test.ts",
-      "size": 3330,
-      "sha256": "2de1ec99bd628e162d43ca7d07a112f799cb268df1c4e411dd5581708097e102"
+      "size": 4443,
+      "sha256": "00b14f2389deba782c7a94d8264ea5d829484f528d620727350e32f305446343"
+    },
+    {
+      "path": "editor-extension/test/install-integration.test.ts",
+      "size": 3396,
+      "sha256": "d6c77793f384a69790e487cf83155c5dac534a2d574c1f897f9c1a1dbd3fd7ce"
     },
     {
       "path": "editor-extension/test/payload.test.ts",
-      "size": 2709,
-      "sha256": "88f9383eec1d74a4f80e742808deaa6c74d6544ef83038cbe1c4f061766b403e"
+      "size": 4036,
+      "sha256": "94a845ae456b4726f11c9b9fddf98e14cf75dc15d753a6e69843255f5def64b6"
     },
     {
       "path": "editor-extension/test/python.test.ts",
