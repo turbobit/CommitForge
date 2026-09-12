@@ -3,7 +3,7 @@
   "version": "1.17.0",
   "reproducible": true,
   "file_count": 149,
-  "total_bytes": 1482219,
+  "total_bytes": 1524730,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -167,8 +167,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/recovery.md",
-      "size": 7000,
-      "sha256": "cf8a9ea7ec4bdb7c53d9151b59fb116acd03092524e0507008c7b4213a287113"
+      "size": 7365,
+      "sha256": "d792d678351136bda134c73bfcf4814a42a78888e0b7b9add61ec10422ca9278"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
@@ -177,8 +177,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 7442,
-      "sha256": "35624aa114ff6c7b55e888a50b78c70c3ac177576d1543b1dfb14d3b2ce57ee0"
+      "size": 8041,
+      "sha256": "79556edbc40dd810f2ad1c9323cb397e0adccd2f5cb205271b8c1dcda846253a"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
@@ -217,8 +217,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 78051,
-      "sha256": "8643e30f123ec1e4796aacbdab9970a810848183aec3c4463a3fcb76518f2d83"
+      "size": 81218,
+      "sha256": "793167ee9de56e28bd3cebb14b9f07a7bf9c3a761387fedf7e460cebda893b6f"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -227,8 +227,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 31768,
-      "sha256": "72e8d6c36fb9eb3e85dabb422893caa4c29041e1ec6ff53b093258582be17be0"
+      "size": 40534,
+      "sha256": "f65c351b7f5663e8461c3f406bba509429b7eef45cb3e0abcc2e21e40e7fba81"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -312,8 +312,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 24796,
-      "sha256": "9c61f279d46afe093c10175bc44ced80c2ee8cde61a0a527ac7e849a8a5f5f93"
+      "size": 28397,
+      "sha256": "58b835602221adf86bf33cd04237c8d75fd27c6079835f1a1ef368ebe935b3a1"
     },
     {
       "path": ".gitattributes",
@@ -332,8 +332,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 25007,
-      "sha256": "946df44f7011d899b4f9cd032227be3a4939703f0d3e5bd76d452baee0d57cc4"
+      "size": 25848,
+      "sha256": "bc1c4ff5bef57a00f739474ea93a3faf9abd38ad9c30774e1315d87cb4018e8f"
     },
     {
       "path": "INSTALL.md",
@@ -352,8 +352,8 @@
     },
     {
       "path": "README.md",
-      "size": 50149,
-      "sha256": "c5fec96979d2004b168a903dc4bb49726f912d33d74cafe68f9e70cb1b9a9aa8"
+      "size": 51973,
+      "sha256": "942d0d6147345d2dbbab3b2299b411b355309dc5804e7dfb59e8e3fa43ec756a"
     },
     {
       "path": "VERSION",
@@ -377,8 +377,8 @@
     },
     {
       "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
-      "size": 19930,
-      "sha256": "92e19c42a3a884bea780ebf335ac3acb816844a837e2797e74be3b19ff83f996"
+      "size": 23371,
+      "sha256": "a68ca7ffdac733215d9b23ce1828bd9da64fccbb83baa99c6db4141839eb04ab"
     },
     {
       "path": "editor-extension/.vscodeignore",
@@ -682,8 +682,8 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 42452,
-      "sha256": "ab20e23fb3d43cd90f2b3255bf90d73c26b9d2e8761e5d9163782f1e5fe8fc07"
+      "size": 43580,
+      "sha256": "d64afa54aa337ae1f5c20a25714634ea1a1278faa3138981626987bc4d79e4c3"
     },
     {
       "path": "tests/test_install_marker.py",
@@ -692,8 +692,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 36315,
-      "sha256": "426f349d1fd16b056e39aa9200556e863e12f0aa73b2f4ab776a0943dad20344"
+      "size": 55037,
+      "sha256": "f10a257394eb612331d8b712a0f3084f191bc435d47dd802ad7617a7d66eb11b"
     },
     {
       "path": "tests/test_package.py",
@@ -747,8 +747,8 @@
     },
     {
       "path": "verify.py",
-      "size": 17894,
-      "sha256": "3fd1e1784698541efc384f05d5ea0e199d3b8f05bdf2457b822b392484d02f22"
+      "size": 17951,
+      "sha256": "eb96b100dae55d81e2dbf8707a10340eec3e067c1ff1f5fc08692dedb84451a3"
     }
   ]
 }
