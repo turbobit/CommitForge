@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 142,
-  "total_bytes": 1218728,
+  "total_bytes": 1221328,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -412,8 +412,8 @@
     },
     {
       "path": "editor-extension/src/core/composer.ts",
-      "size": 4790,
-      "sha256": "53ebccf188b604164dd129df66461eae0f106ea1002ccefe06e41432b074e5d1"
+      "size": 5829,
+      "sha256": "8358ee3e7c0f566dcbd28466c6cb95430e60ff310b85724e690643b65c5d0a11"
     },
     {
       "path": "editor-extension/src/core/detect.ts",
@@ -487,8 +487,8 @@
     },
     {
       "path": "editor-extension/test/composer.test.ts",
-      "size": 7876,
-      "sha256": "2d960b3c24ac48098443013efa16108a400c7be22ff50f0736b26bb8ba1368bc"
+      "size": 9437,
+      "sha256": "ce8e1726bce8a5d4c61297b7e8e7445a82ea4c481056a9e7ee76f8e7b164dd48"
     },
     {
       "path": "editor-extension/test/debounce.test.ts",
