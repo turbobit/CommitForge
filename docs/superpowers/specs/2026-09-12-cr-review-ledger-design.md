@@ -259,14 +259,22 @@ import guard
 | 활성 세대 없음 (`inventory` 미실행) | 실패 `ledger_no_generation` |
 | 활성 세대 fingerprint ≠ 현재 | 실패 `ledger_stale` |
 | 활성 세대의 live inventory 개수 ≠ `run.json`에 기록된 개수 | 실패 `ledger_inventory_mismatch` |
-| 활성 세대 inventory 개수 = 0 | 실패 `ledger_empty_inventory` |
+| 활성 세대 inventory 개수 = 0 **이고** snapshot에 변경이 있음 | 실패 `ledger_empty_inventory` |
+| 활성 세대 inventory 개수 = 0 이고 snapshot이 비어 있음 | 통과 (검토 대상 없음) |
 | `UNKNOWN` 존재 | 실패 `ledger_unknown` |
 | 미판정 id 존재 | 실패 `ledger_incomplete` (개수·샘플 포함) |
 | 전부 terminal | 통과 + 커버리지 수치 |
 
 순서가 중요하다. 잘린 inventory(개수 0, 기록된 개수 2)는
-`ledger_inventory_mismatch`이지 `ledger_empty_inventory`가 아니다. 후자는 분모가
-실제로 비어 있게 만들어진 경우, 즉 리뷰 대상 scope가 선언되지 않은 경우다.
+`ledger_inventory_mismatch`이지 `ledger_empty_inventory`가 아니다.
+
+분모 0에는 두 가지 의미가 있고 snapshot이 이를 구분한다. `parse_diff_entries`는
+변경된 파일마다(binary·mode-only 포함) 최소 1개 엔트리를 보장하므로, 내용을 담은
+snapshot이 정직하게 `total: 0`을 만들 수는 없다. 따라서 **snapshot에 변경이 있는데
+분모가 0**이면 scope 미선언이거나 분모 유실이므로 차단한다. snapshot이 비어 있고
+분모가 0인 것은 그냥 빈 리뷰이며, `/cr` SKILL.md §2가 규정한 "검토 대상 없음"
+종료 경로다. 이를 차단하면 문서화된 흐름이 `--allow-unledgered`나 `abort` 없이는
+끝나지 못한다. 선언한 커밋 범위에 commit이 없는 경우도 같은 이유로 빈 리뷰다.
 
 `ledger.py`의 거부 사유도 함께 둔다.
 

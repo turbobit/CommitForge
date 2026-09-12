@@ -3,7 +3,7 @@
   "version": "1.17.0",
   "reproducible": true,
   "file_count": 149,
-  "total_bytes": 1524730,
+  "total_bytes": 1532569,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -217,8 +217,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 81218,
-      "sha256": "793167ee9de56e28bd3cebb14b9f07a7bf9c3a761387fedf7e460cebda893b6f"
+      "size": 83303,
+      "sha256": "699c484681dd5317b12b3525f9df4ec23d1b8e18c6f273715625ffb6bffb2398"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -312,8 +312,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 28397,
-      "sha256": "58b835602221adf86bf33cd04237c8d75fd27c6079835f1a1ef368ebe935b3a1"
+      "size": 29406,
+      "sha256": "9631561229b7d98520ff3cf591f1e28ce7908c75c62c6e7894ec235c03479fbe"
     },
     {
       "path": ".gitattributes",
@@ -332,8 +332,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 25848,
-      "sha256": "bc1c4ff5bef57a00f739474ea93a3faf9abd38ad9c30774e1315d87cb4018e8f"
+      "size": 26184,
+      "sha256": "c08a6f36671dc68906a126c32d379bb0bc6a8a358874b1be7b2d1f53cf33ca73"
     },
     {
       "path": "INSTALL.md",
@@ -377,8 +377,8 @@
     },
     {
       "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
-      "size": 23371,
-      "sha256": "a68ca7ffdac733215d9b23ce1828bd9da64fccbb83baa99c6db4141839eb04ab"
+      "size": 24126,
+      "sha256": "3b65082093964cc32708ad5f1a125a0f3a7ef2b30d438860ef0407b7d690ddb2"
     },
     {
       "path": "editor-extension/.vscodeignore",
@@ -692,8 +692,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 55037,
-      "sha256": "f10a257394eb612331d8b712a0f3084f191bc435d47dd802ad7617a7d66eb11b"
+      "size": 58691,
+      "sha256": "0a2691fbfa82fa4eb2f41b0a6cd391de605fce441d61678e9c4e70b5f2343545"
     },
     {
       "path": "tests/test_package.py",

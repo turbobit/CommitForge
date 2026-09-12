@@ -13,9 +13,12 @@
   `iteration`·기록된 판정을 보존한다. 커밋 범위는 계산된 뒤에 선언한다
 - `inventory`는 2세대 이후 live working tree에서 분모를 만들고, 이미 만들어진
   세대를 다른 id 집합으로 덮어쓰지 않는다(`ledger_inventory_conflict`)
-- 모든 diff 수집을 `diff.noprefix`·`diff.mnemonicPrefix` 설정과 무관하게
-  `a/`·`b/` prefix가 붙도록 고정하고, 경로는 `+++`/`---` 헤더에서 읽어
-  공백을 포함한 경로도 정확히 식별한다
+- 모든 diff 수집을 `diff.noprefix`·`diff.mnemonicPrefix`·`diff.srcPrefix`·
+  `diff.dstPrefix` 설정과 무관하게 `a/`·`b/` prefix가 붙도록 고정하고, 경로는
+  `+++`/`---`/`rename to` 헤더에서 읽어 공백을 포함한 경로도 정확히 식별한다
+- 분모가 0이어도 snapshot이 비어 있으면 차단하지 않는다. 아무것도 바뀌지 않은
+  저장소의 `/cr`은 정상적인 빈 리뷰이며 "검토 대상 없음"으로 종료한다.
+  snapshot에 변경이 있는데 분모가 0일 때만 `ledger_empty_inventory`다
 - 대규모 diff 리뷰에서 컨텍스트 압축으로 변경 원장이 유실되어도 미검토 hunk가
   침묵 통과하지 않는다. 커버리지 판정 근거가 대화 기억에서 디스크로 옮겨졌다
 

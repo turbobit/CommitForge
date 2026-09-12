@@ -203,10 +203,9 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
 
 ## 1.5 리뷰 원장 초기화와 재개
 
-원장 명령은 다음 순서로만 실행한다. 순서가 정해져 있는 이유는 `init`은
-Guard `begin` 직후에 실행해야 컴팩트 이후 재개가 가능하고, 커밋 범위
-`<A>..<B>`는 §2에서 `period_range.py`·`git merge-base`·`pr_context.py`로
-계산되기 전에는 알 수 없기 때문이다.
+원장 명령은 다음 순서로만 실행한다. `init`은 Guard `begin` 직후여야 컴팩트 이후
+재개가 가능하고, 커밋 범위 `<A>..<B>`는 §2에서 `period_range.py`·`git
+merge-base`·`pr_context.py`로 계산되기 전에는 알 수 없기 때문이다.
 
 1. `status` — 재개 여부 판정 (아래, Guard `begin` 직후)
 2. `init --scope working` — 신규 실행이면 즉시 (아래, Guard `begin` 직후)
@@ -231,9 +230,16 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" status \
 
 scope는 **실제 리뷰 대상과 일치해야 한다.** 선언하지 않은 scope는 분모에
 들어가지 않으므로, 그 범위를 아무리 충실히 리뷰해도 종료 게이트에는 보이지
-않는다. working tree가 깨끗한 `pr`·`today`·`3days`·`weekly`·`--base`·`--range`
-실행에서 커밋 범위를 선언하지 않으면 분모가 0이 되고, 게이트는 이를
-`ledger_empty_inventory`로 차단한다.
+않는다.
+
+게이트의 `ledger_empty_inventory`는 **snapshot에 변경이 있는데 분모가 0**일 때만
+발생한다. 원인은 (1) 리뷰 대상 scope 미선언(`pr`·`today`·`3days`·`weekly`·
+`--base`·`--range`에서 커밋 범위를 빠뜨렸거나 `working`을 빠뜨림) 또는
+(2) 분모 유실이다.
+
+분모가 0이어도 **snapshot이 비어 있으면 차단하지 않는다.** 아무것도 바뀌지 않은
+저장소의 `/cr`은 정상적인 빈 리뷰이며 §2의 "검토 대상 없음" 종료가 그대로
+동작한다. 선언한 커밋 범위에 commit이 없는 경우도 빈 리뷰이지 오류가 아니다.
 
 Guard `begin` 직후에는 아직 범위를 모르므로 `working`만 선언한다.
 
@@ -433,6 +439,14 @@ basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다�
 `--require-ledger`는 "원장이 아예 없으면 추가로 실패한다"는 뜻이다. `/cr`은 항상
 원장을 만들므로 이 flag를 계속 붙이고, 원장을 만들지 않는 `/cpr`·`/cca`는 영향을
 받지 않는다.
+
+**검토 대상이 없는 실행의 정식 종료 경로.** working change와 선택한 기간·commit
+range가 모두 비어 있으면 분모는 0이고 snapshot도 비어 있다. 이 조합은 게이트를
+그대로 통과하므로, `--allow-unledgered`나 `abort`를 쓰지 말고 아래의 평소
+`verify-review` → `finish`를 그대로 실행한 뒤 "검토 대상 없음"으로 보고한다.
+`ledger_empty_inventory`로 차단됐다면 그것은 빈 리뷰가 아니라 scope 누락이나
+분모 유실이므로, `--allow-unledgered`로 덮지 말고 §1.5.2로 돌아가 누락된 scope를
+선언하고 `inventory`를 다시 실행한다.
 
 `finish` 직전에 최종 보고 재료를 받아 둔다. `finish` 이후에는 snapshot과 lock이
 사라져 실행할 수 없다.

@@ -67,12 +67,24 @@ def decode(data: bytes) -> str:
     return data.decode("utf-8", "surrogateescape")
 
 
-# `diff.noprefix=true` and `diff.mnemonicPrefix=true` are common global
-# settings that strip or rename the `a/`/`b/` path prefixes. Every diff this
-# package captures, compares or parses must be produced with the prefixes
-# forced on: the review ledger derives its inventory ids from those headers,
-# so a user's config must not be able to change how a path is read back out.
-DIFF_PREFIX_CONFIG = ["-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false"]
+# `diff.noprefix`, `diff.mnemonicPrefix`, `diff.srcPrefix` and `diff.dstPrefix`
+# all change the path prefixes git writes into a diff header. Every diff this
+# package captures, compares or parses must be produced with `a/`/`b/` forced
+# on: the review ledger derives its inventory ids from those headers, so a
+# user's config must not be able to change how a path is read back out.
+#
+# `srcPrefix`/`dstPrefix` survive `noprefix=false`, so they must be pinned
+# explicitly. `--default-prefix` does the same in one option but only exists
+# from git 2.41; this package declares no minimum git version, and an unknown
+# *option* is a hard error while an unknown *config key* passed with `-c` is
+# silently ignored by every version. Pinning via `-c` is therefore the form
+# that is safe on old and new git alike.
+DIFF_PREFIX_CONFIG = [
+    "-c", "diff.noprefix=false",
+    "-c", "diff.mnemonicPrefix=false",
+    "-c", "diff.srcPrefix=a/",
+    "-c", "diff.dstPrefix=b/",
+]
 
 
 def diff_argv(*args: str) -> list[str]:
@@ -1200,7 +1212,30 @@ def review_invariants(
     }
 
 
-def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str | None:
+def snapshot_has_reviewable_content(snapshot: Path) -> bool:
+    """Report whether the snapshot captured anything that had to be reviewed.
+
+    `capture_snapshot` always writes all three files, so a missing one means
+    the snapshot was truncated or tampered with. That is treated as content so
+    the caller fails closed rather than reading a damaged snapshot as "there
+    was nothing to review".
+    """
+    for name in ("staged.diff", "working.diff", "untracked.z"):
+        path = snapshot / name
+        try:
+            if not path.is_file() or path.stat().st_size > 0:
+                return True
+        except OSError:
+            return True
+    return False
+
+
+def _ledger_gate_failure(
+    data: dict[str, Any],
+    summary: dict[str, Any],
+    *,
+    snapshot_content: bool,
+) -> str | None:
     """Return the first applicable gate failure reason, or None when clean.
 
     Order matters: an absent generation must be reported as
@@ -1215,11 +1250,17 @@ def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str |
     for a denominator that was genuinely built empty.
 
     A zero-entry denominator is vacuously "complete": every one of its zero
-    ids has a terminal verdict. That is the normal shape of a `/cr pr`,
-    `/cr today|3days|weekly`, `--base` or `--range` run whose range scope was
-    never declared -- the worktree is clean and the reviewed commits live in
-    a scope the ledger was never told about. Certifying such a run as a
-    completed review is exactly the silent pass this gate exists to prevent.
+    ids has a terminal verdict. But a `/cr` run on a genuinely clean tree is
+    also legitimately empty, and SKILL.md §2 documents finishing it as
+    "검토 대상 없음". The two are told apart by the snapshot: because
+    `parse_diff_entries` guarantees every changed file yields at least one
+    entry -- binary and mode-only changes included -- a snapshot that captured
+    content can never honestly produce `total: 0`. That combination means a
+    scope was never declared or the denominator was lost, and is refused.
+    An empty snapshot with `total: 0` is simply an empty review and passes.
+
+    A declared range scope that legitimately contains no commits is likewise
+    an empty review, not an error.
     """
     if not summary["generation"]:
         return "ledger_no_generation"
@@ -1228,7 +1269,7 @@ def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str |
     expected_total = (data.get("inventory_totals") or {}).get(summary["generation"])
     if expected_total is not None and expected_total != summary["total"]:
         return "ledger_inventory_mismatch"
-    if not summary["total"]:
+    if not summary["total"] and snapshot_content:
         return "ledger_empty_inventory"
     if summary["unknown_count"]:
         return "ledger_unknown"
@@ -1247,11 +1288,16 @@ def ledger_present(snapshot: Path) -> bool:
     ledger on disk is machine evidence that a `/cr` run started building a
     denominator, so it is always checked. `/cpr` and `/cca` never create one,
     so their paths are unchanged.
-    """
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
-    import ledger
 
-    return (snapshot / ledger.LEDGER_DIR_NAME / ledger.RUN_NAME).is_file()
+    The two path segments are duplicated from `ledger.py` on purpose: do not
+    "helpfully" replace them with an import. Every `finish` and
+    `verify-review` now reaches this function, including `/cc`, `/cca` and
+    `/cpr`, which never create a ledger. Importing `ledger.py` here would turn
+    a missing or unimportable `ledger.py` into a `ModuleNotFoundError` and an
+    exit-3 crash for all of them. `ledger_gate` keeps its lazy import because
+    it only runs once a ledger has actually been found on disk.
+    """
+    return (snapshot / "ledger" / "run.json").is_file()
 
 
 def ledger_gate(
@@ -1305,7 +1351,9 @@ def ledger_gate(
     except ledger.guard.GuardError as exc:
         raise GuardError(str(exc), **exc.details) from exc
 
-    failure = _ledger_gate_failure(data, summary)
+    failure = _ledger_gate_failure(
+        data, summary, snapshot_content=snapshot_has_reviewable_content(snapshot)
+    )
 
     if allow_unledgered:
         return {**summary, "bypassed_reason": failure}
@@ -1331,8 +1379,8 @@ def ledger_gate(
         )
     if failure == "ledger_empty_inventory":
         raise GuardError(
-            "원장 inventory가 비어 있어 리뷰를 완료로 인정할 수 없습니다. "
-            "리뷰 대상 scope가 선언되지 않았을 수 있습니다.",
+            "snapshot에 변경이 있는데 원장 inventory가 비어 있습니다. "
+            "리뷰 대상 scope가 선언되지 않았거나 분모가 유실됐습니다.",
             reason="ledger_empty_inventory",
             generation=summary["generation"],
             scopes=list(data.get("scopes") or []),

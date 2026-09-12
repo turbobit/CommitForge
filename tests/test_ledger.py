@@ -882,23 +882,37 @@ class AutoArmedGateTest(LedgerTestCase):
 
 
 class EmptyInventoryGateTest(LedgerTestCase):
-    """A zero-entry denominator is vacuously complete and must not pass.
+    """A zero-entry denominator is vacuously complete.
 
-    This is the normal shape of `/cr pr`, `/cr today|3days|weekly`, `--base`
-    and `--range`: the worktree is clean and everything reviewed lives in a
-    range scope. If that scope was never declared, the ledger certifies a
-    review of nothing.
+    It must be refused when the snapshot captured content -- that means a
+    scope covering those changes was never declared, or the denominator was
+    lost -- and must pass when the snapshot is genuinely empty, which is the
+    documented "검토 대상 없음" exit of SKILL.md §2.
     """
 
-    def initialized(self) -> dict:
+    def undeclared_working_scope(self) -> dict:
+        # The reviewed changes are in the working tree, but only an empty
+        # range scope was declared: the denominator misses everything.
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        (self.tmp / "extra.txt").write_text("fresh\n", encoding="utf-8")
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"], "--scope", f"range:{head}..{head}"
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(built["total"], 0)
+        return started
+
+    def clean_tree(self) -> dict:
         started = self.begin()
         self.ledger("init", "--session", started["session"], "--scope", "working")
         _, built = self.ledger("inventory", "--session", started["session"])
         self.assertEqual(built["total"], 0)
         return started
 
-    def test_empty_inventory_blocks_verify_review(self) -> None:
-        started = self.initialized()
+    def test_empty_inventory_over_a_non_empty_snapshot_blocks_verify_review(self) -> None:
+        started = self.undeclared_working_scope()
         proc, refused = self.guard(
             "verify-review", "--session", started["session"],
             "--source-read-only", check=False,
@@ -906,8 +920,8 @@ class EmptyInventoryGateTest(LedgerTestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_empty_inventory")
 
-    def test_empty_inventory_blocks_finish_and_keeps_snapshot(self) -> None:
-        started = self.initialized()
+    def test_empty_inventory_over_a_non_empty_snapshot_blocks_finish(self) -> None:
+        started = self.undeclared_working_scope()
         proc, refused = self.guard(
             "finish", "--session", started["session"],
             "--review-only", "--source-read-only", check=False,
@@ -915,6 +929,41 @@ class EmptyInventoryGateTest(LedgerTestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_empty_inventory")
         self.assertTrue(Path(started["snapshot"]).exists())
+
+    def test_clean_tree_review_passes_the_gate_and_finishes(self) -> None:
+        # SKILL.md §2: "working change와 선택한 기간·commit range가 모두 비어
+        # 있을 때만 Guard finish 후 '검토 대상 없음'으로 종료한다." The
+        # zero-total rule must not turn that documented exit into a dead end.
+        started = self.clean_tree()
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"], "--source-read-only"
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger"]["complete"])
+        self.assertFalse(verified["ledger_bypassed"])
+
+        _, finished = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only",
+        )
+        self.assertTrue(finished["ok"])
+        self.assertTrue(finished["snapshot_removed"])
+        self.assertFalse(finished["ledger_bypassed"])
+        self.assertFalse(Path(started["snapshot"]).exists())
+
+    def test_declared_range_with_no_commits_is_an_empty_review(self) -> None:
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "working", "--scope", f"range:{head}..{head}",
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(built["total"], 0)
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"], "--source-read-only"
+        )
+        self.assertTrue(verified["ok"])
 
     def test_declaring_the_range_scope_fills_the_denominator(self) -> None:
         # The supported fix: declare the range once §2 has computed it. The
@@ -925,7 +974,7 @@ class EmptyInventoryGateTest(LedgerTestCase):
         run(["git", "commit", "-m", "test: ranged"], self.tmp)
         head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
 
-        started = self.initialized()
+        started = self.clean_tree()
         self.ledger(
             "init", "--session", started["session"],
             "--scope", "working", "--scope", f"range:{base}..{head}",
@@ -942,7 +991,7 @@ class EmptyInventoryGateTest(LedgerTestCase):
         self.assertTrue(verified["ledger"]["complete"])
 
     def test_allow_unledgered_reports_empty_inventory_bypass(self) -> None:
-        started = self.initialized()
+        started = self.undeclared_working_scope()
         _, verified = self.guard(
             "verify-review", "--session", started["session"],
             "--source-read-only", "--allow-unledgered",
@@ -1104,13 +1153,37 @@ class InitMergeTest(LedgerTestCase):
 
 
 class DiffPrefixConfigTest(LedgerTestCase):
+    def hostile_prefix_config(self) -> None:
+        # Every knob git offers for rewriting diff path prefixes. srcPrefix
+        # and dstPrefix (git >= 2.41) survive `diff.noprefix=false`, so they
+        # have to be pinned separately or the denominator's paths come back
+        # as `dst/<path>`.
+        run(["git", "config", "diff.noprefix", "true"], self.tmp)
+        run(["git", "config", "diff.mnemonicPrefix", "true"], self.tmp)
+        run(["git", "config", "diff.srcPrefix", "src/"], self.tmp)
+        run(["git", "config", "diff.dstPrefix", "dst/"], self.tmp)
+
+    def test_guard_and_ledger_agree_on_the_ledger_path_literals(self) -> None:
+        # `guard.ledger_present` duplicates these two segments on purpose so
+        # that a `finish` for /cc, /cca or /cpr never has to import ledger.py.
+        # Duplication is only safe while the two definitions agree.
+        sys.path.insert(0, str(SCRIPTS))
+        import guard as guard_module
+        import ledger as ledger_module
+
+        source = (SCRIPTS / "guard.py").read_text(encoding="utf-8")
+        self.assertIn(
+            f'snapshot / "{ledger_module.LEDGER_DIR_NAME}" / "{ledger_module.RUN_NAME}"',
+            source,
+        )
+        self.assertTrue(hasattr(guard_module, "ledger_present"))
+
     def test_noprefix_config_still_yields_the_real_path(self) -> None:
         # `diff.noprefix=true` is a common global setting. It drops the
         # `a/`/`b/` prefixes, and the `diff --git` header then reads as
         # `diff --git tracked.txt tracked.txt`, which used to produce the id
         # `working:tracked.txt tracked.txt#1`.
-        run(["git", "config", "diff.noprefix", "true"], self.tmp)
-        run(["git", "config", "diff.mnemonicPrefix", "true"], self.tmp)
+        self.hostile_prefix_config()
         (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
         started = self.begin()
         self.ledger("init", "--session", started["session"], "--scope", "working")
@@ -1119,7 +1192,7 @@ class DiffPrefixConfigTest(LedgerTestCase):
         self.assertIn("working:tracked.txt#1", ids)
 
     def test_noprefix_config_still_yields_the_real_path_in_a_range_scope(self) -> None:
-        run(["git", "config", "diff.noprefix", "true"], self.tmp)
+        self.hostile_prefix_config()
         base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
         (self.tmp / "ranged.txt").write_text("one\n", encoding="utf-8")
         run(["git", "add", "ranged.txt"], self.tmp)
@@ -1136,6 +1209,7 @@ class DiffPrefixConfigTest(LedgerTestCase):
         # `diff --git a/x b/y.txt b/x b/y.txt` has no unambiguous separator,
         # so the header heuristic resolved it to `y.txt` -- colliding with a
         # real `y.txt` so one verdict covered both entries.
+        self.hostile_prefix_config()
         nested = self.tmp / "x b"
         nested.mkdir()
         (nested / "y.txt").write_text("one\n", encoding="utf-8")
@@ -1156,6 +1230,7 @@ class DiffPrefixConfigTest(LedgerTestCase):
     def test_rename_into_a_path_containing_b_slash_keeps_the_real_path(self) -> None:
         # A rename has no content and therefore no `+++` line; its path comes
         # from the `rename to` line rather than the ambiguous two-sided header.
+        self.hostile_prefix_config()
         nested = self.tmp / "x b"
         nested.mkdir()
         run(["git", "mv", "tracked.txt", "x b/renamed.txt"], self.tmp)
