@@ -121,10 +121,15 @@ function formatVersionBadge(report: InstallReport): string {
  * 이 둘을 별도 경고로 다루는 이유와 같다).
  *
  * `version-mismatch`는 사용 가능 쪽으로 본다: classify()가 이 상태를 매기는
- * 것은 기대 파일이 전부 존재하고 해시만 일관되게 다를 때뿐이라(corePathOk·
- * hooksRegistered도 실제로 통과해야 도달한다), 명령 자체는 동작하고 버전만
- * 다르다 — statusBar.ts도 이 상태에서 배지에 버전 차이만 얹지 "손상"으로
- * 취급하지 않는다.
+ * 것은 기대 파일이 전부 존재하고 해시가 **일관되게 전부** 다를 때뿐이라
+ * (일부만 다르면 corrupt다), 다른 버전이 통째로 깔려 있다는 뜻이고 명령
+ * 자체는 동작한다 — statusBar.ts도 이 상태에서 배지에 버전 차이만 얹지
+ * "손상"으로 취급하지 않는다.
+ *
+ * 다만 classify()는 해시 불일치를 먼저 판정하고 반환하므로, 이 상태에서
+ * corePathOk·hooksRegistered가 검사되지 않은 채 남을 수 있다. 즉 hook이
+ * 등록되지 않은 다른 버전 설치도 여기로 온다. statusBar.ts가 예전부터
+ * 가진 것과 같은 맹점이라 두 위젯이 어긋나지는 않는다.
  */
 function isUsable(report: InstallReport): boolean {
   return report.state === "ok" || report.state === "version-mismatch";
