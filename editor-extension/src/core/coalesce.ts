@@ -77,6 +77,16 @@ export function coalesceAsync(fn: () => Promise<void>): () => Promise<void> {
       (err: unknown) => {
         running = false;
         waiters?.reject(err);
+        // 이 트레일링이 실패해도 pending을 그냥 두면 안 된다. 트레일링이
+        // 도는 도중 새 joiner가 도착해 pending이 다시 섰을 수 있고
+        // (joinTrailing()이 이미 새 trailingWaiters/trailingPromise를 만들어
+        // 둔 상태), 여기서 손 놓으면 그 joiner의 promise는 영영 settle되지
+        // 않고 pending은 true로 샌다 — 다음 leader가 성공할 때 요청하지 않은
+        // 트레일링이 한 번 더 도는 부작용까지 낳는다. 이 실패 자체는
+        // `waiters.reject(err)`로 이미 원래 대기자에게 전달했으니, 새로
+        // 도착한 요청은 별도로(fire-and-forget) 이어서 처리하고 그 결과가
+        // 어떻든 unhandled rejection을 남기지 않도록 catch한다.
+        if (pending) void runTrailing().catch(() => {});
         throw err;
       },
     );

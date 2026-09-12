@@ -66,9 +66,18 @@ export class StateStore implements vscode.Disposable {
    * 포함한 guard.py 실행이 debounce 창(200ms)보다 길어지는 일이 드물지 않고,
    * 그 사이 도착한 마지막 변화가 다음 트리거 없이는 반영되지 않을 수 있기
    * 때문이다. 실행이 끝나면 그 변화를 반영하도록 한 번 더 돈다.
+   *
+   * 반드시 `runRefresh()`가 반환한 promise를 그대로 반환해야 한다 — 이
+   * 메서드를 `async`로 두고 `await this.runRefresh()`로 감싸면, `await`가
+   * 그 promise를 감싸는 새 바깥 promise를 하나 더 만든다(coalesce.ts의
+   * `joinTrailing()` 주석 참고). coalesceAsync가 트레일링 promise에 미리
+   * 붙여 둔 `.catch(() => {})`는 원본 promise만 보호할 뿐 이 바깥 promise는
+   * 보호하지 못해서, `watchers.ts`의 `void store.refresh()`처럼 반환값을
+   * 아무도 관찰하지 않는 호출부에서 트레일링이 실패하면 unhandled rejection이
+   * 샜다(실측: coalesce.test.ts "async 함수로 한 겹 감싼 반환값도..." 참고).
    */
-  async refresh(): Promise<void> {
-    await this.runRefresh();
+  refresh(): Promise<void> {
+    return this.runRefresh();
   }
 
   private async doRefresh(): Promise<void> {

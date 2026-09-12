@@ -96,6 +96,53 @@ describe("coalesceAsync", () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  // 회귀 2 재현: state.ts의 refresh()는 runRefresh()(=coalesceAsync가 반환한
+  // run)를 그대로 감싸 쓰는데, 트레일링이 실패했을 때 트레일링 도중 도착한
+  // joiner(pending)가 유실되면 그 joiner의 promise는 영영 settle되지 않고,
+  // commitforge.verify처럼 그 promise를 await하는 호출부는 무기한 멈춘다.
+  it("트레일링 실행이 실패해도 그 도중 도착한 joiner 요청이 유실되지 않고 pending이 새지 않는다", async () => {
+    const { fn, resolvers, rejecters } = deferredFn();
+    const run = coalesceAsync(fn);
+
+    const p1 = run(); // leader: fn #1
+    const pA = run(); // joiner A: pending을 세워 트레일링(#2)을 기다림
+
+    resolvers[0]?.(); // leader 성공
+    await p1;
+    expect(fn).toHaveBeenCalledTimes(2); // 트레일링 #2 시작됨
+
+    const pB = run(); // 트레일링 #2 도중 도착한 joiner B: 다시 pending을 세움
+
+    let pBSettled = false;
+    void pB.finally(() => {
+      pBSettled = true;
+    });
+
+    const failure = new Error("트레일링 #2 실패");
+    rejecters[1]?.(failure); // 트레일링 #2 실패
+
+    await expect(pA).rejects.toThrow("트레일링 #2 실패"); // A는 #2의 결과를 받는다
+
+    await flushMicrotasks();
+    // B의 요청은 #2 실패로 유실되면 안 되고, 트레일링 #3으로 이어져야 한다.
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(pBSettled).toBe(false); // #3이 아직 안 끝났으니 B는 아직 settle되지 않는다
+
+    resolvers[2]?.(); // 트레일링 #3 성공
+    await expect(pB).resolves.toBeUndefined();
+    expect(pBSettled).toBe(true);
+
+    // pending이 새지 않았는지: 다음 leader 호출에 요청하지 않은 추가
+    // 트레일링이 따라붙으면 안 된다.
+    const p4 = run();
+    expect(fn).toHaveBeenCalledTimes(4);
+    resolvers[3]?.();
+    await p4;
+
+    await flushMicrotasks();
+    expect(fn).toHaveBeenCalledTimes(4); // 누수된 pending으로 인한 5번째 호출이 없어야 한다
+  });
+
   it("트레일링 실행이 실패하면 기다리던 호출에 그 에러가 전파된다", async () => {
     const { fn, resolvers, rejecters } = deferredFn();
     const run = coalesceAsync(fn);
