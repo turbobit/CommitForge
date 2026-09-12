@@ -231,7 +231,7 @@ import guard
 
 `finish --review-only`도 동일 검사를 다시 수행한다. 기존 불변식이 `verify-review`와 `finish`에서 두 번 검사되는 패턴과 같다.
 
-**탈출구.** `--allow-unledgered`를 명시하면 통과하되 `ledger_bypassed: true`, `missing_count`, `missing_sample`을 출력한다. SKILL.md는 이 값들을 최종 보고에 강제 표시하도록 규정한다. 조용히 우회할 수 없다.
+**탈출구.** `--allow-unledgered`를 명시하면 통과하되 `ledger_bypassed: true`, `pending_count`, `pending`을 출력한다. SKILL.md는 이 값들을 최종 보고에 강제 표시하도록 규정한다. 조용히 우회할 수 없다.
 
 ## 8. 동시성과 격리
 

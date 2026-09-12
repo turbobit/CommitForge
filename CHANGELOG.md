@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.17.0 — 2026-09-12
+
+- `/cr`에 리뷰 원장을 도입했다. `ledger.py`가 Guard 스냅샷과 커밋 범위에서 hunk
+  분모를 기계 생성하고, 판정·finding·reviewer 상태를 디스크에 적재한다
+- `guard.py verify-review`와 `finish`에 `--require-ledger`를 추가했다. 미판정
+  hunk나 `UNKNOWN`이 남으면 완료를 차단한다. `--allow-unledgered`는 명시적
+  탈출구이며 우회 사실이 출력에 남는다
+- 대규모 diff 리뷰에서 컨텍스트 압축으로 변경 원장이 유실되어도 미검토 hunk가
+  침묵 통과하지 않는다. 커버리지 판정 근거가 대화 기억에서 디스크로 옮겨졌다
+
 ## 1.16.0 — 2026-09-11
 
 - `/ccf`가 **전부 성공하면 Diff snapshot을 정리**하고, 차단·실패·중단 시에는

@@ -29,7 +29,7 @@
 - 입력·출력·상태·부작용
 - 호출자·피호출자·타입·설정·테스트
 - 적용할 전문 reviewer
-- 확인 결과: `PASS`, `FINDING`, `N/A`
+- 확인 결과: `PASS`, `FINDING`, `N_A`
 
 공백·formatting·generated hunk도 분류하고 원인을 확인한다. Binary는 생성 원본, 크기, 포맷, 소비 경로를 확인할 수 없으면 수동 검토 대상으로 표시한다.
 

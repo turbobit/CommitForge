@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "reproducible": true,
-  "file_count": 147,
-  "total_bytes": 1401272,
+  "file_count": 149,
+  "total_bytes": 1482219,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -112,8 +112,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/deep-review-protocol.md",
-      "size": 6417,
-      "sha256": "a7c435916f18e41c5d9574ed1a6508d7b7753aa5a51395b8ecf62f29a211ca98"
+      "size": 6810,
+      "sha256": "919423be7d22d06cc36c543099b7ba0351fb427e2bccd701ad4d07cc8750ab18"
     },
     {
       "path": ".claude/skills/_git-atomic-core/examples.md",
@@ -142,8 +142,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/large-diff-review.md",
-      "size": 2522,
-      "sha256": "905eefb96453056a2482358ef9c63b8de5714121c3e6881fa5570514a501a391"
+      "size": 2963,
+      "sha256": "62e7191886c8927bf026649679895f642e2a390a95b6bb2c07540e85737ac76b"
     },
     {
       "path": ".claude/skills/_git-atomic-core/lock-cleanup.md",
@@ -167,8 +167,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/recovery.md",
-      "size": 6519,
-      "sha256": "905fdf944a94f6616c0107e4316087546a0eaa0c1048027ea4935720c3944af9"
+      "size": 7000,
+      "sha256": "cf8a9ea7ec4bdb7c53d9151b59fb116acd03092524e0507008c7b4213a287113"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
@@ -177,13 +177,13 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 7249,
-      "sha256": "6b817965d1e888b667a4a5aaffbbdb91b604fa3b1f5cc9ec4e856563ddd77793"
+      "size": 7442,
+      "sha256": "35624aa114ff6c7b55e888a50b78c70c3ac177576d1543b1dfb14d3b2ce57ee0"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 11191,
-      "sha256": "085e66168c97d38c4debac833bb6a42cbada9eb795b8a79ace559cc6782d852e"
+      "size": 11642,
+      "sha256": "9c98ff3579150e535ba0bef90a777f6935d9d62ee4f0d095120ddb85cd2fd332"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -217,13 +217,18 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 71998,
-      "sha256": "968b3a2ee846e0ec2ebb71058224e14b987e744dca0813d025956e98af80d95d"
+      "size": 78051,
+      "sha256": "8643e30f123ec1e4796aacbdab9970a810848183aec3c4463a3fcb76518f2d83"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
       "size": 576,
       "sha256": "05cf055f32591fa8de69003b5510b8993a53724d13c93e524437a6e3adcaa2cb"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
+      "size": 31768,
+      "sha256": "72e8d6c36fb9eb3e85dabb422893caa4c29041e1ec6ff53b093258582be17be0"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -307,8 +312,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 21792,
-      "sha256": "28146ede74532d8e7f3275bab1347d276d26dbf47d78746d8cb39567d05142d6"
+      "size": 24796,
+      "sha256": "9c61f279d46afe093c10175bc44ced80c2ee8cde61a0a527ac7e849a8a5f5f93"
     },
     {
       "path": ".gitattributes",
@@ -327,8 +332,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 24334,
-      "sha256": "4dc724c8a5a650c71e77ddd4063d8676514473329c316432380535f4fe6ce100"
+      "size": 25007,
+      "sha256": "946df44f7011d899b4f9cd032227be3a4939703f0d3e5bd76d452baee0d57cc4"
     },
     {
       "path": "INSTALL.md",
@@ -353,7 +358,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "46081fd90571a274160408ebc81fc91b78ffca4049d477998e3b6909ac245e05"
+      "sha256": "00afc49f1599e59129a59b64c2b019de3fe35300c05bb9d96cb25002576ff43b"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -372,8 +377,8 @@
     },
     {
       "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
-      "size": 19811,
-      "sha256": "c7835c223952a9eae0888631791971a3ef8c1e802b0de23d3d60348c6764be94"
+      "size": 19930,
+      "sha256": "92e19c42a3a884bea780ebf335ac3acb816844a837e2797e74be3b19ff83f996"
     },
     {
       "path": "editor-extension/.vscodeignore",
@@ -677,13 +682,18 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 41396,
-      "sha256": "f9c3f15ff86488fa385b7927dc41a0123de41e952f125b8472af54e7456abf9c"
+      "size": 42452,
+      "sha256": "ab20e23fb3d43cd90f2b3255bf90d73c26b9d2e8761e5d9163782f1e5fe8fc07"
     },
     {
       "path": "tests/test_install_marker.py",
       "size": 3986,
       "sha256": "6e14835e950cf2483a3f316d9b873d3a84c035cb11ea5287e56bd5ff294c0c27"
+    },
+    {
+      "path": "tests/test_ledger.py",
+      "size": 36315,
+      "sha256": "426f349d1fd16b056e39aa9200556e863e12f0aa73b2f4ab776a0943dad20344"
     },
     {
       "path": "tests/test_package.py",
