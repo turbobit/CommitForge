@@ -34,6 +34,9 @@ VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 
 GENERATION_PREFIX = "gen"
 INVENTORY_NAME = "inventory.jsonl"
+HUNKS_NAME = "hunks.jsonl"
+FINDINGS_NAME = "findings.jsonl"
+REVIEWERS_NAME = "reviewers.json"
 
 
 class LedgerLock:
@@ -384,6 +387,55 @@ def write_inventory(gen_dir: Path, entries: list[dict[str, Any]]) -> None:
             stream.write(json.dumps(entry, ensure_ascii=True, sort_keys=True) + "\n")
 
 
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read append-only records, tolerating one torn trailing line.
+
+    A crash during append can leave a partial last line. That must not
+    invalidate every record written before it.
+    """
+    if not path.is_file():
+        return []
+    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    records: list[dict[str, Any]] = []
+    for position, line in enumerate(lines):
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
+            if position == len(lines) - 1:
+                break
+            raise guard.GuardError(
+                "원장 레코드가 손상되었습니다.",
+                reason="ledger_corrupt",
+                path=str(path),
+                line=position + 1,
+            )
+    return records
+
+
+def append_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    if not records:
+        return
+    payload = "".join(
+        json.dumps(record, ensure_ascii=True, sort_keys=True) + "\n" for record in records
+    )
+    with path.open("a", encoding="utf-8", newline="\n") as stream:
+        stream.write(payload)
+
+
+def active_generation_dir(ledger_dir: Path, data: dict[str, Any]) -> Path:
+    name = data.get("active_generation") or ""
+    if not name:
+        raise guard.GuardError(
+            "활성 세대가 없습니다. inventory를 먼저 실행하십시오.",
+            reason="ledger_no_generation",
+        )
+    return ledger_dir / name
+
+
+def inventory_ids(gen_dir: Path) -> set[str]:
+    return {record["id"] for record in read_jsonl(gen_dir / INVENTORY_NAME)}
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     scopes = validate_scopes(args.scope)
     _, _, ledger_dir, resolved_token = resolve_ledger(args.session, args.token)
@@ -406,6 +458,9 @@ def cmd_status(args: argparse.Namespace) -> None:
     if not (ledger_dir / RUN_NAME).is_file():
         guard.emit({"ok": True, "exists": False})
     data = read_run(ledger_dir)
+    generation = data.get("active_generation") or ""
+    if generation:
+        read_jsonl(ledger_dir / generation / HUNKS_NAME)
     guard.emit(
         {
             "ok": True,
@@ -443,6 +498,78 @@ def cmd_inventory(args: argparse.Namespace) -> None:
     guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
 
 
+def cmd_record(args: argparse.Namespace) -> None:
+    try:
+        payload = json.load(sys.stdin)
+    except json.JSONDecodeError as exc:
+        raise guard.GuardError(
+            "record 입력 JSON을 읽을 수 없습니다.", reason="ledger_bad_input"
+        ) from exc
+    if not isinstance(payload, dict):
+        raise guard.GuardError(
+            "record 입력은 JSON object여야 합니다.", reason="ledger_bad_input"
+        )
+
+    verdicts = payload.get("verdicts") or []
+    findings = payload.get("findings") or []
+    reviewers = payload.get("reviewers") or []
+
+    _, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    with LedgerLock(ledger_dir):
+        data = read_run(ledger_dir)
+        gen_dir = active_generation_dir(ledger_dir, data)
+        known = inventory_ids(gen_dir)
+        finding_ids = {record.get("id") for record in read_jsonl(gen_dir / FINDINGS_NAME)}
+        finding_ids.update(record.get("id") for record in findings)
+
+        for verdict in verdicts:
+            identifier = verdict.get("id")
+            if identifier not in known:
+                raise guard.GuardError(
+                    f"inventory에 없는 id입니다: {identifier}",
+                    reason="ledger_unknown_id",
+                    id=identifier,
+                )
+            if verdict.get("verdict") not in VERDICTS:
+                raise guard.GuardError(
+                    f"허용되지 않는 판정입니다: {verdict.get('verdict')}",
+                    reason="ledger_invalid_verdict",
+                    id=identifier,
+                )
+            if verdict.get("verdict") == "FINDING":
+                linked = verdict.get("finding_ids") or []
+                missing = [value for value in linked if value not in finding_ids]
+                if not linked or missing:
+                    raise guard.GuardError(
+                        "FINDING 판정에는 대응하는 finding 레코드가 필요합니다.",
+                        reason="ledger_finding_missing",
+                        id=identifier,
+                        missing=missing,
+                    )
+
+        append_jsonl(gen_dir / FINDINGS_NAME, findings)
+        append_jsonl(gen_dir / HUNKS_NAME, verdicts)
+        if reviewers:
+            existing = guard.read_json(gen_dir / REVIEWERS_NAME) or {}
+            for reviewer in reviewers:
+                existing[reviewer["name"]] = reviewer.get("status", "UNKNOWN")
+            tmp = gen_dir / f"{REVIEWERS_NAME}.tmp"
+            tmp.write_text(json.dumps(existing, ensure_ascii=True, indent=2), encoding="utf-8")
+            os.replace(tmp, gen_dir / REVIEWERS_NAME)
+
+        data["stage"] = "review"
+        write_run(ledger_dir, data)
+
+    guard.emit(
+        {
+            "ok": True,
+            "recorded_verdicts": len(verdicts),
+            "recorded_findings": len(findings),
+            "recorded_reviewers": len(reviewers),
+        }
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -460,12 +587,21 @@ def build_parser() -> argparse.ArgumentParser:
     inventory.add_argument("--session", required=True)
     inventory.add_argument("--token")
 
+    record = sub.add_parser("record", help="Append verdicts, findings and reviewer status")
+    record.add_argument("--session", required=True)
+    record.add_argument("--token")
+
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
-    handlers = {"init": cmd_init, "status": cmd_status, "inventory": cmd_inventory}
+    handlers = {
+        "init": cmd_init,
+        "status": cmd_status,
+        "inventory": cmd_inventory,
+        "record": cmd_record,
+    }
     try:
         handlers[args.command](args)
     except guard.GuardError as exc:

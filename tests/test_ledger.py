@@ -327,5 +327,102 @@ class InventoryRangeScopeTest(LedgerTestCase):
         self.assertEqual(len(ids), len(set(ids)))
 
 
+class RecordTest(LedgerTestCase):
+    def prepared(self) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def test_record_accepts_known_ids(self) -> None:
+        started, ids = self.prepared()
+        _, saved = self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": "cca-line-reviewer"}]},
+        )
+        self.assertTrue(saved["ok"])
+        self.assertEqual(saved["recorded_verdicts"], 1)
+
+    def test_record_rejects_fabricated_id(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {"verdicts": [{"id": "working:does-not-exist.py#9", "verdict": "PASS"}]},
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_unknown_id")
+
+    def test_record_rejects_invalid_verdict(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "LOOKS_FINE"}]},
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_verdict")
+
+    def test_finding_verdict_requires_finding_record(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["f-1"]}]},
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_finding_missing")
+
+    def test_finding_verdict_accepted_with_finding(self) -> None:
+        started, ids = self.prepared()
+        _, saved = self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["f-1"]}],
+                "findings": [{"id": "f-1", "severity": "MAJOR", "file": "tracked.txt"}],
+            },
+        )
+        self.assertEqual(saved["recorded_findings"], 1)
+
+    def test_reader_tolerates_one_truncated_trailing_line(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, status = self.ledger("status", "--session", started["session"])
+        hunks = (
+            Path(started["snapshot"]) / "ledger" / status["active_generation"] / "hunks.jsonl"
+        )
+        with hunks.open("a", encoding="utf-8") as stream:
+            stream.write('{"id": "truncated"')
+        _, again = self.ledger("status", "--session", started["session"])
+        self.assertTrue(again["ok"])
+
+    def test_concurrent_records_do_not_lose_entries(self) -> None:
+        started, ids = self.prepared()
+        processes = [
+            subprocess.Popen(
+                [sys.executable, str(LEDGER), "record", "--session", started["session"]],
+                cwd=self.tmp, text=True, stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            )
+            for _ in range(4)
+        ]
+        for index, proc in enumerate(processes):
+            proc.communicate(
+                json.dumps(
+                    {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": f"r{index}"}]}
+                )
+            )
+        for proc in processes:
+            self.assertEqual(proc.returncode, 0)
+
+        _, status = self.ledger("status", "--session", started["session"])
+        hunks = (
+            Path(started["snapshot"]) / "ledger" / status["active_generation"] / "hunks.jsonl"
+        )
+        lines = [line for line in hunks.read_text(encoding="utf-8").splitlines() if line.strip()]
+        self.assertEqual(len(lines), 4)
+
+
 if __name__ == "__main__":
     unittest.main()
