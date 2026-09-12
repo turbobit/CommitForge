@@ -1183,6 +1183,32 @@ def review_invariants(
     }
 
 
+def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str | None:
+    """Return the first applicable gate failure reason, or None when clean.
+
+    Order matters: an absent generation must be reported as
+    `ledger_no_generation` (inventory was simply never run) rather than
+    `ledger_stale` (coverage()'s no-generation early-return hard-codes
+    `fingerprint_matches_current: False`, which would otherwise be
+    misdiagnosed as a missed `advance`). A total that disagrees with the
+    count persisted at inventory-build time can only mean the denominator
+    was truncated or corrupted after the fact, since `parse_diff_entries`
+    guarantees every changed file yields at least one entry.
+    """
+    if not summary["generation"]:
+        return "ledger_no_generation"
+    if not summary["fingerprint_matches_current"]:
+        return "ledger_stale"
+    expected_total = (data.get("inventory_totals") or {}).get(summary["generation"])
+    if expected_total is not None and expected_total != summary["total"]:
+        return "ledger_inventory_mismatch"
+    if summary["unknown_count"]:
+        return "ledger_unknown"
+    if summary["pending_count"]:
+        return "ledger_incomplete"
+    return None
+
+
 def ledger_gate(
     ctx: dict[str, Path],
     snapshot: Path,
@@ -1193,6 +1219,14 @@ def ledger_gate(
 
     Imported lazily: ledger.py imports guard.py, so a module-level import here
     would be circular.
+
+    Every return carries `bypassed_reason`: the reason the gate would have
+    refused had `allow_unledgered` not been set, or None when nothing was
+    suppressed. `--allow-unledgered` must never report a silent "nothing was
+    bypassed" for a ledger that is in fact stale, mismatched, unknown or
+    incomplete — a caller that only checked `complete` could miss exactly the
+    post-`--fix`-without-`advance` case this gate exists to catch, since a
+    fully-verdicted-but-stale ledger has `complete: True`.
     """
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import ledger
@@ -1200,39 +1234,71 @@ def ledger_gate(
     ledger_dir = snapshot / ledger.LEDGER_DIR_NAME
     if not (ledger_dir / ledger.RUN_NAME).is_file():
         if allow_unledgered:
-            return {"complete": False, "reason": "ledger_missing", "pending_count": 0}
+            return {
+                "complete": False,
+                "reason": "ledger_missing",
+                "pending_count": 0,
+                "bypassed_reason": "ledger_missing",
+            }
         raise GuardError(
             "리뷰 원장이 없어 커버리지를 확인할 수 없습니다.",
             reason="ledger_missing",
             ledger_dir=str(ledger_dir),
         )
 
-    data = ledger.read_run(ledger_dir)
-    summary = ledger.coverage(ctx, ledger_dir, data)
+    # ledger.py is imported a second time under the name "ledger" here, but
+    # its own `import guard` at module load re-executes guard.py under the
+    # name "guard" rather than reusing this module (which runs as
+    # "__main__" when invoked as a script). That makes `ledger.guard.GuardError`
+    # a distinct class object from this module's `GuardError`, so a ledger-origin
+    # error must be re-raised as this module's own type or `except GuardError`
+    # in `main()` will miss it, lose its `reason`, and fall through to the
+    # generic exit-3 handler.
+    try:
+        data = ledger.read_run(ledger_dir)
+        summary = ledger.coverage(ctx, ledger_dir, data)
+    except ledger.guard.GuardError as exc:
+        raise GuardError(str(exc), **exc.details) from exc
+
+    failure = _ledger_gate_failure(data, summary)
 
     if allow_unledgered:
-        return summary
-    if not summary["fingerprint_matches_current"]:
+        return {**summary, "bypassed_reason": failure}
+
+    if failure == "ledger_no_generation":
+        raise GuardError(
+            "활성 세대가 없어 커버리지를 확인할 수 없습니다. inventory를 먼저 실행하십시오.",
+            reason="ledger_no_generation",
+        )
+    if failure == "ledger_stale":
         raise GuardError(
             "원장의 활성 세대가 현재 저장소 상태와 다릅니다. advance가 누락되었습니다.",
             reason="ledger_stale",
             generation=summary["generation"],
         )
-    if summary["unknown_count"]:
+    if failure == "ledger_inventory_mismatch":
+        raise GuardError(
+            "원장 inventory 항목 수가 기록된 값과 달라 손상되었을 수 있습니다.",
+            reason="ledger_inventory_mismatch",
+            generation=summary["generation"],
+            expected_total=(data.get("inventory_totals") or {}).get(summary["generation"]),
+            actual_total=summary["total"],
+        )
+    if failure == "ledger_unknown":
         raise GuardError(
             "UNKNOWN 판정이 남아 있어 완료할 수 없습니다.",
             reason="ledger_unknown",
             unknown_count=summary["unknown_count"],
             unknown=summary["unknown"],
         )
-    if summary["pending_count"]:
+    if failure == "ledger_incomplete":
         raise GuardError(
             "미판정 hunk가 남아 있어 완료할 수 없습니다.",
             reason="ledger_incomplete",
             pending_count=summary["pending_count"],
             pending=summary["pending"],
         )
-    return summary
+    return {**summary, "bypassed_reason": None}
 
 
 def cmd_verify_review(args: argparse.Namespace) -> None:
@@ -1257,7 +1323,9 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
     if args.require_ledger:
         summary = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
         result["ledger"] = summary
-        result["ledger_bypassed"] = bool(args.allow_unledgered) and not summary["complete"]
+        result["ledger_bypassed"] = (
+            bool(args.allow_unledgered) and summary.get("bypassed_reason") is not None
+        )
     emit(result)
 
 
@@ -1351,7 +1419,9 @@ def cmd_finish(args: argparse.Namespace) -> None:
     ledger_bypassed = False
     if args.require_ledger:
         ledger_result = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
-        ledger_bypassed = bool(args.allow_unledgered) and not ledger_result["complete"]
+        ledger_bypassed = (
+            bool(args.allow_unledgered) and ledger_result.get("bypassed_reason") is not None
+        )
 
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])

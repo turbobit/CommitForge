@@ -415,9 +415,20 @@ def generation_name(iteration: int, short: str) -> str:
 
 
 def write_inventory(gen_dir: Path, entries: list[dict[str, Any]]) -> None:
-    with (gen_dir / INVENTORY_NAME).open("w", encoding="utf-8", newline="\n") as stream:
+    """Replace a generation's inventory atomically.
+
+    Written to a temp file in the same directory and then `os.replace`d onto
+    the target, matching `write_run`'s existing pattern. Writing in place
+    (the prior approach) truncates the file first, so a crash mid-write left
+    an empty `inventory.jsonl` that `read_jsonl` reports as `[]` rather than
+    as an error -- an empty denominator that the gate would otherwise wrongly
+    treat as fully covered.
+    """
+    tmp = gen_dir / f"{INVENTORY_NAME}.tmp"
+    with tmp.open("w", encoding="utf-8", newline="\n") as stream:
         for entry in entries:
             stream.write(json.dumps(entry, ensure_ascii=True, sort_keys=True) + "\n")
+    os.replace(tmp, gen_dir / INVENTORY_NAME)
 
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -622,6 +633,9 @@ def cmd_inventory(args: argparse.Namespace) -> None:
 
         data["active_generation"] = name
         data["stage"] = "inventory"
+        totals = dict(data.get("inventory_totals") or {})
+        totals[name] = len(entries)
+        data["inventory_totals"] = totals
         write_run(ledger_dir, data)
 
     guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
@@ -649,6 +663,9 @@ def cmd_advance(args: argparse.Namespace) -> None:
 
         data["active_generation"] = name
         data["stage"] = "review"
+        totals = dict(data.get("inventory_totals") or {})
+        totals[name] = len(entries)
+        data["inventory_totals"] = totals
         write_run(ledger_dir, data)
 
     guard.emit(

@@ -711,6 +711,78 @@ class GateTest(LedgerTestCase):
         self.assertEqual(refused["reason"], "ledger_incomplete")
         self.assertTrue(Path(started["snapshot"]).exists())
 
+    def test_stale_ledger_blocks_verify_review(self) -> None:
+        # A fully-verdicted ledger whose fingerprint has moved (simulating
+        # --fix without a following advance) must still be refused: the
+        # gate exists specifically to catch this "complete but stale" case.
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_stale")
+
+    def test_allow_unledgered_reports_stale_bypass_reason(self) -> None:
+        # complete=True for a stale-but-fully-verdicted ledger, so
+        # ledger_bypassed must be derived from the reason the gate would
+        # have raised, not from `complete` alone -- otherwise this exact
+        # bypass would silently report ledger_bypassed: false.
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"],
+            "--require-ledger", "--allow-unledgered",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger"]["complete"])
+        self.assertTrue(verified["ledger_bypassed"])
+        self.assertEqual(verified["ledger"]["bypassed_reason"], "ledger_stale")
+
+    def test_no_generation_blocks_verify_review_with_accurate_reason(self) -> None:
+        # Before `inventory` ever runs, coverage()'s no-generation
+        # early-return hard-codes fingerprint_matches_current: False; the
+        # gate must not misreport this as ledger_stale (implying a missed
+        # advance) when the truth is inventory was simply never run.
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_no_generation")
+
+    def test_truncated_inventory_blocks_verify_review(self) -> None:
+        # write_inventory persists the per-generation entry count into
+        # run.json; if inventory.jsonl is later truncated (crash mid-write,
+        # or tampering) the mismatch must fail closed rather than let a
+        # zero-entry denominator report complete: True.
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        generation = status["generation"]
+        inventory_path = Path(started["snapshot"]) / "ledger" / generation / "inventory.jsonl"
+        inventory_path.write_text("", encoding="utf-8")
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_inventory_mismatch")
+
 
 if __name__ == "__main__":
     unittest.main()
