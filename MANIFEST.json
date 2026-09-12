@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 144,
-  "total_bytes": 1239335,
+  "total_bytes": 1242632,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -372,8 +372,8 @@
     },
     {
       "path": "editor-extension/README.md",
-      "size": 5022,
-      "sha256": "3d185213ac9d5cdde427114d8c84018567682fdcbbefc24f141e6b2117372c0c"
+      "size": 5303,
+      "sha256": "55042aab9a22f6850bf3934c8f501c300007a3b6e248757dc6f81b9ec6ea4798"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -387,8 +387,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 6351,
-      "sha256": "b0548a7f94a72514207c2af98a7071a0f7a9a075d857302b8262b9bd212a4a3d"
+      "size": 6450,
+      "sha256": "d0ebe4dbe4905c422e1b868c9566ee754e7263db0b0e557a9ab4e453d4f57c98"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -457,8 +457,8 @@
     },
     {
       "path": "editor-extension/src/vscode/quickPick.ts",
-      "size": 11130,
-      "sha256": "f490dc1e291b0e9c0742b4a7d3e28b094499737e89a0787c01d729976cd61d3d"
+      "size": 12264,
+      "sha256": "879bb47fea4e0616518b0c07c0815a23d04c5d90d23148017edf37588f2cf997"
     },
     {
       "path": "editor-extension/src/vscode/statusBar.ts",
@@ -472,8 +472,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 9327,
-      "sha256": "aa70ee8a207728b52cab962ab437c3e38690fce3e1b0c6fea7369e37e6f9f107"
+      "size": 9362,
+      "sha256": "bc0464b1c3e0ab92a60e687b8c0a560347d75288c36140c6eb12ef2e33520174"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
@@ -562,8 +562,8 @@
     },
     {
       "path": "editor-extension/test/quickPick.test.ts",
-      "size": 2953,
-      "sha256": "8231e99cdfa13283a39fa6bcd011ee0ce2c56a70786588ac6a565913d8d55c63"
+      "size": 4253,
+      "sha256": "cb44b162895fee2023bf33c629d7dfebdf5b69a12a369fbeefc33cab00fe81cb"
     },
     {
       "path": "editor-extension/test/statusText.test.ts",
@@ -592,8 +592,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 11968,
-      "sha256": "c140fcd9354c70826d7a58bd93757cb16835bfe940f0b454800dc2824b5651d2"
+      "size": 12416,
+      "sha256": "c8918d164d66ab4cfe8da3fe53eb7819cfabf18c0d58521103653550ad21a5b6"
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
