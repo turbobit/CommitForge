@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 144,
-  "total_bytes": 1242632,
+  "file_count": 145,
+  "total_bytes": 1249659,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -372,8 +372,8 @@
     },
     {
       "path": "editor-extension/README.md",
-      "size": 5303,
-      "sha256": "55042aab9a22f6850bf3934c8f501c300007a3b6e248757dc6f81b9ec6ea4798"
+      "size": 5559,
+      "sha256": "9df064fa56dc92f7d64722f90fdb833cd2c5bd2f46474c49171e8606cb56068f"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -407,8 +407,8 @@
     },
     {
       "path": "editor-extension/src/core/coalesce.ts",
-      "size": 5279,
-      "sha256": "8d5ba0892995265eab8f25448347ee9740c2e9bb81e55efa144f20a8f4ff0b57"
+      "size": 6152,
+      "sha256": "71d31534cb02057c0c168c16b2be65a59bd54305b56324ef0cfd47f11d8a4b3c"
     },
     {
       "path": "editor-extension/src/core/composer.ts",
@@ -442,8 +442,8 @@
     },
     {
       "path": "editor-extension/src/state.ts",
-      "size": 4218,
-      "sha256": "fa05355d18b85bf94f98563b0a4d8798fce9061491e22729b9ba937e70c0ada6"
+      "size": 4949,
+      "sha256": "4bf6b1fa1d01ba7bec7f2c6fab303b2ff2e326a8490b3cb35941f9840c19f65b"
     },
     {
       "path": "editor-extension/src/vscode/guardErrorLog.ts",
@@ -487,8 +487,8 @@
     },
     {
       "path": "editor-extension/test/coalesce.test.ts",
-      "size": 5810,
-      "sha256": "ae93e68cff230d34088f0c08c7a06521c48d16cedf9d4252bc62a2515b3e6a11"
+      "size": 7853,
+      "sha256": "cb93d9b8a9cac2087bf3419fec8e73ed8e268aa7ab4c62b42433d752ad23fdb6"
     },
     {
       "path": "editor-extension/test/composer.test.ts",
@@ -564,6 +564,11 @@
       "path": "editor-extension/test/quickPick.test.ts",
       "size": 4253,
       "sha256": "cb44b162895fee2023bf33c629d7dfebdf5b69a12a369fbeefc33cab00fe81cb"
+    },
+    {
+      "path": "editor-extension/test/state.test.ts",
+      "size": 3124,
+      "sha256": "0b1cab6d2a85f7dd7f2006c68684193abe18e6c040899e3e330f59052848d347"
     },
     {
       "path": "editor-extension/test/statusText.test.ts",
