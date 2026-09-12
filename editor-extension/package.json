@@ -13,6 +13,8 @@
     "commands": [
       { "command": "commitforge.refresh", "title": "CommitForge: 상태 새로고침", "icon": "$(refresh)" },
       { "command": "commitforge.focusView", "title": "CommitForge: 뷰 열기" },
+      { "command": "commitforge.run", "title": "CommitForge: 명령 실행", "icon": "$(play)" },
+      { "command": "commitforge.cleanLock", "title": "CommitForge: lock 해제(clean)", "icon": "$(unlock)" },
       { "command": "commitforge.install", "title": "CommitForge: 설치", "icon": "$(cloud-download)" },
       { "command": "commitforge.upgrade", "title": "CommitForge: 업그레이드", "icon": "$(arrow-up)" },
       { "command": "commitforge.reinstall", "title": "CommitForge: 재설치", "icon": "$(sync)" },
@@ -38,6 +40,11 @@
     },
     "menus": {
       "view/title": [
+        {
+          "command": "commitforge.run",
+          "when": "view == commitforge.view",
+          "group": "navigation"
+        },
         {
           "command": "commitforge.refresh",
           "when": "view == commitforge.view",
@@ -97,6 +104,11 @@
         {
           "command": "commitforge.revealSnapshots",
           "when": "view == commitforge.view && viewItem == commitforge.node.snapshots",
+          "group": "inline@1"
+        },
+        {
+          "command": "commitforge.cleanLock",
+          "when": "view == commitforge.view && viewItem == commitforge.node.lock",
           "group": "inline@1"
         }
       ]

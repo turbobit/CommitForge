@@ -24,7 +24,12 @@ export function sanitizeFreeText(input: string): string {
 }
 
 function quote(value: string): string {
-  if (!/[\s"]/.test(value)) return value;
+  // 공백·큰따옴표뿐 아니라 백슬래시가 있어도 감싼다. 감싸지 않으면 이 값은
+  // 터미널로 그대로 전송되고, /cr의 PreToolUse hook(cr_edit_gate.py)이
+  // 원문 인자 문자열을 shlex.split으로 다시 파싱한다 — shlex는 따옴표 밖의
+  // 백슬래시도 다음 문자를 이스케이프하는 것으로 취급해 예를 들어 "a\b"가
+  // "ab"로 뭉개진다. 감싸서 이스케이프하면 그 왕복이 보존된다.
+  if (!/[\s"\\]/.test(value)) return value;
   // 감쌀 때는 백슬래시와 큰따옴표를 이스케이프해 따옴표 구조가 깨지지 않게 한다.
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;

@@ -4,6 +4,7 @@ import { createStatusBar } from "./vscode/statusBar";
 import { createTreeView, type Node } from "./vscode/treeView";
 import { runInstaller } from "./vscode/installer";
 import { createWatchers } from "./vscode/watchers";
+import { runCleanLock, runCommandFlow } from "./vscode/quickPick";
 import type { Scope } from "./core/detect";
 
 const FOLDER_KEY = "commitforge.activeFolder";
@@ -76,6 +77,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("commitforge.focusView", () =>
       vscode.commands.executeCommand("commitforge.view.focus"),
     ),
+    // 확장의 존재 이유: 명령을 골라 조립하고 터미널로 보낸다(spec §6).
+    vscode.commands.registerCommand("commitforge.run", () => runCommandFlow(store, context)),
+    // 트리 "잠금" 노드의 [해제(clean)] 버튼. guard.py clean을 직접 부르지
+    // 않고 /cr clean을 터미널로 보낸다(spec §4.2(3), §7.3).
+    vscode.commands.registerCommand("commitforge.cleanLock", () => runCleanLock(store, context)),
     // 트리의 project/global 행에서 호출되면 VS Code가 그 TreeItem(Node)을
     // 첫 인자로 넘긴다. 이미 범위를 아는 상태이므로 QuickPick으로 다시
     // 묻지 않는다. 명령 팔레트에서 인자 없이 호출됐을 때만 묻는다.

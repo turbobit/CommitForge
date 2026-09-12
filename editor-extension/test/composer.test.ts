@@ -63,6 +63,14 @@ describe("compose", () => {
     );
   });
 
+  it("공백 없이 백슬래시만 있는 값도 감싸고 이스케이프한다", () => {
+    // 감싸지 않으면 터미널로 그대로 전송된 뒤 cr_edit_gate.py의 shlex.split이
+    // 따옴표 밖 백슬래시를 이스케이프로 취급해 "a\\b"가 "ab"로 뭉개진다.
+    expect(compose(cca, { options: [{ name: "--base", value: "a\\b" }] })).toBe(
+      '/cca --base "a\\\\b"',
+    );
+  });
+
   it("옵션 순서는 spec 정의 순서를 따른다", () => {
     const result = compose(cca, {
       options: [{ name: "--strict" }, { name: "--team" }],
