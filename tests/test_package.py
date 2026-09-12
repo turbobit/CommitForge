@@ -678,6 +678,7 @@ class PackageMetadataTest(unittest.TestCase):
             "cca-dependency-supply-chain-reviewer",
             "cca-reliability-recovery-reviewer",
             "cca-privacy-governance-reviewer",
+            "cca-release-deployment-reviewer",
             "cca-requirements-product-reviewer",
         )
         for reviewer in reviewers:
@@ -687,6 +688,47 @@ class PackageMetadataTest(unittest.TestCase):
             self.assertTrue((ROOT / f".claude/agents/{reviewer}.md").is_file())
         self.assertIn("명시적 기준이 없으면", conditional)
         self.assertIn("비활성화 근거", conditional)
+
+    def test_every_rule_in_the_trigger_script_has_an_agent_and_a_table_row(self) -> None:
+        # The script, the activation table and the agent directory are three
+        # copies of one list. A rule with no agent activates a reviewer that
+        # cannot run; an agent with no rule never activates from a path.
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "reviewer_triggers",
+            ROOT / ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
+        )
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        conditional = (
+            ROOT / ".claude/skills/_git-atomic-core/conditional-reviewers.md"
+        ).read_text(encoding="utf-8")
+        for reviewer in module.RULES:
+            self.assertTrue(
+                (ROOT / f".claude/agents/{reviewer}.md").is_file(),
+                f"{reviewer} has a trigger rule but no agent definition",
+            )
+            self.assertIn(reviewer, conditional)
+
+    def test_performance_reviewer_covers_exhaustion_and_responsiveness(self) -> None:
+        # A leak, a pegged core and a frozen main thread are not "slow code":
+        # they are unbounded growth and lost responsiveness, and a checklist
+        # built from complexity and I/O alone never asks about them.
+        performance = (
+            ROOT / ".claude/agents/cca-performance-reviewer.md"
+        ).read_text(encoding="utf-8")
+        for topic in (
+            "메모리 누수",
+            "cleanup",
+            "unbounded",
+            "busy",
+            "timeout",
+            "main thread",
+            "long task",
+            "hydration",
+        ):
+            self.assertIn(topic, performance)
 
 
 if __name__ == "__main__":

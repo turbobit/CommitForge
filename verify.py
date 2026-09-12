@@ -57,6 +57,7 @@ REQUIRED = [
     ".claude/agents/cca-dependency-supply-chain-reviewer.md",
     ".claude/agents/cca-reliability-recovery-reviewer.md",
     ".claude/agents/cca-privacy-governance-reviewer.md",
+    ".claude/agents/cca-release-deployment-reviewer.md",
     ".claude/agents/cca-requirements-product-reviewer.md",
     ".github/workflows/verify.yml",
     ".github/dependabot.yml",
@@ -274,6 +275,7 @@ def main() -> None:
         "cca-dependency-supply-chain-reviewer",
         "cca-reliability-recovery-reviewer",
         "cca-privacy-governance-reviewer",
+        "cca-release-deployment-reviewer",
         "cca-requirements-product-reviewer",
     )
     if conditional_path.exists():
