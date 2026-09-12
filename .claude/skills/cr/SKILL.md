@@ -38,6 +38,7 @@ allowed-tools:
   - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/report_validator.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/period_range.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/release_version.py" *)'
@@ -200,6 +201,30 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
 - Guard를 성공적으로 획득한 뒤 실패·차단된 경우에만 `abort`로 자신의 lock만
   해제하고 snapshot은 보존한다.
 
+## 1.5 리뷰 원장 초기화와 재개
+
+Guard `begin` 직후 원장 상태를 먼저 확인한다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" status \
+  --session "$COMMITFORGE_SESSION_ID"
+```
+
+- `exists`가 `false`면 신규 실행이다. `init`으로 scope를 선언한 뒤 `inventory`로 분모를 만든다.
+- `exists`가 `true`이고 `fingerprint_matches_current`가 `true`면 **처음부터 다시 리뷰하지 않는다.** `pending`에 남은 id만 이어서 검토한다. 컴팩트로 대화 기억을 잃었더라도 원장이 진행 상황의 정본이다.
+- `fingerprint_matches_current`가 `false`면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 말고 사용자에게 보고한다.
+
+scope는 실제 리뷰 대상과 일치해야 한다. 기본은 `working`이며, `--base`·`--range`·`pr`·`today`·`3days`·`weekly`는 해당 커밋 범위를 함께 선언한다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
+  --session "$COMMITFORGE_SESSION_ID" --scope working --scope "range:<A>..<B>"
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" inventory \
+  --session "$COMMITFORGE_SESSION_ID"
+```
+
+`inventory`가 반환한 id 집합이 커버리지의 분모다. 이 목록을 직접 만들거나 수정하지 않는다.
+
 ## 2. 변경 전체 스캔
 
 다음을 분리해 읽는다.
@@ -271,6 +296,19 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 - main agent가 모든 finding을 실제 코드와 diff로 재검증한다.
 - 모든 hunk와 삭제 동작이 `PASS`, `FINDING`, `N/A` 중 하나여야 한다.
 - unreviewed hunk가 하나라도 있으면 완료로 처리하지 않는다.
+- reviewer batch 결과를 받을 때마다 **즉시** 원장에 기록한다. 다음 batch를 시작하기 전에 기록한다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" record \
+  --session "$COMMITFORGE_SESSION_ID" <<'JSON'
+{"verdicts": [{"id": "working:src/auth.py#3", "verdict": "PASS", "reviewer": "cca-line-reviewer"}],
+ "findings": [], "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"}]}
+JSON
+```
+
+- 기록 후에는 해당 판정을 컨텍스트에 유지하지 않아도 된다. 원장이 정본이다.
+- 원장 기록은 lead만 수행한다. reviewer subagent와 Agent Team teammate는 기록하지 않는다.
+- `inventory`에 없는 id는 거부된다. 판정 대상은 분모에서만 고른다.
 
 ## 4. Gate, 수정, 전면 재리뷰
 
@@ -288,6 +326,12 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 2. 이전 기본·활성 조건부 reviewer 결과를 모두 무효화한다.
 3. trigger를 다시 판정하고 새 상태로 기본 10개와 활성 조건부 reviewer를 전부 다시 실행한다.
 4. 새 문제와 회귀가 없는지 검증한다.
+5. 새 fingerprint로 원장 세대를 전이한다. 생략하면 종료 게이트가 `ledger_stale`로 차단한다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" advance \
+  --session "$COMMITFORGE_SESSION_ID" --fingerprint "<새 fingerprint>"
+```
 
 반복 상한까지 blocker가 남으면 실패로 종료하며 snapshot을 보존한다.
 
@@ -309,7 +353,8 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 ```bash
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" verify-review \
   --session "<session>" \
-  --source-read-only
+  --source-read-only \
+  --require-ledger
 ```
 
 기본 `/cr`은 반드시 `--source-read-only`를 사용한다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 이 flag를 생략한다. `release`·`emergency`·`learn`은 `--fix`가 있어도 반드시 `--source-read-only`를 사용한다.
@@ -325,6 +370,7 @@ basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다�
 - staged diff의 binary patch와 name/status가 동일함
 - commit 수가 늘지 않음
 - `/cr`이 설명하지 못하는 working tree 변화가 없음
+- 원장의 모든 inventory id가 `PASS`·`FINDING`·`N_A` 중 하나를 가짐
 
 정상 완료 시:
 
@@ -332,12 +378,15 @@ basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다�
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
   --session "<session>" \
   --review-only \
-  --source-read-only
+  --source-read-only \
+  --require-ledger
 ```
 
 기본 `/cr`은 `finish`에도 반드시 `--source-read-only`를 사용하고, 일반 리뷰의 `--fix`일 때만 생략한다. `release`·`emergency`·`learn`은 항상 `--source-read-only`를 유지한다. `finish --review-only`가 같은 불변 조건을 다시 확인하므로 검증과 정리 사이의 변경도 차단한다. `--keep-snapshot`이면 해당 옵션을 추가한다.
 
 불변식 위반, 검증 실패, unresolved blocker이면 `abort`로 lock만 해제하고 snapshot을 보존한다.
+
+`--allow-unledgered`는 원장이 불완전해도 통과시키는 탈출구다. 사용자가 명시적으로 요청한 경우에만 쓰며, 사용했다면 `ledger_bypassed`, `pending_count`와 `pending` 목록을 최종 보고에 반드시 표시한다. 조용히 우회하지 않는다.
 
 ## 7. 최종 보고
 
@@ -345,6 +394,8 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 
 - 시작/종료 HEAD와 staging 불변 여부
 - reviewer별 PASS/N/A/finding 수, unreviewed hunk 수
+- 원장 커버리지: 총 inventory 수, 판정별 분포, 활성 세대와 iteration
+- `--allow-unledgered`를 사용했다면 그 사실과 미판정 hunk 수·목록
 - 채택·기각한 중요 finding과 근거
 - 자동 수정 내용과 남은 blocker
 - 실행·생략·실패한 검증

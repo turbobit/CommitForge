@@ -162,6 +162,12 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
 - secret·개인정보 값은 필드에 복사하지 않는다.
 - 정확한 위치가 없으면 finding이 아니라 조사 항목으로 분리한다.
 - 수정 후 fingerprint가 바뀌면 기존 finding을 새 결과로 덮지 않고 `FIXED` 또는 `STALE`로 연결한다.
+- 이 스키마가 곧 원장의 finding 레코드다. 별도 스키마를 만들지 않고
+  `ledger.py record`의 `findings` 배열에 그대로 넣는다.
+- 원장에 쓰는 주체는 lead뿐이다. teammate와 reviewer subagent는 결과를 lead에게
+  반환하고, lead가 수신 즉시 적재한다.
+- `cca-*` reviewer agent에 Bash를 부여하지 않는다. 읽기 전용 경계이자 원장의
+  단일 writer를 보장하는 조건이다.
 
 ## 4. 중복 제거
 

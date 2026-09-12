@@ -65,6 +65,8 @@
 - reviewer 실행·fallback·UNKNOWN 수와 중복 통합 수
 - hunk coverage: 전체/PASS/FINDING/N/A/미검토
 - 채택·기각한 finding과 근거
+- 원장 커버리지 수치는 `ledger.py report`의 `coverage`에서 가져온다. 기억으로
+  집계하지 않는다. `--format json`·`sarif` 산출물도 같은 출력에서 만든다.
 
 ## 수정 및 검증
 - 자동 수정 내용과 남은 blocker

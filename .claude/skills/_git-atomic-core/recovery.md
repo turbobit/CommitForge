@@ -42,6 +42,13 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 - `untracked.tar.gz`: 크기 한도 내 추적되지 않은 파일
 - `untracked.z`: untracked 경로 목록
 - `*.stat`
+- `ledger/`: 리뷰 원장. `run.json`과 세대별 `inventory.jsonl`·`hunks.jsonl`·
+  `findings.jsonl`·`reviewers.json`으로 구성된다. 하위 디렉터리라서
+  `audit-snapshot`의 파일 무결성 목록에는 포함되지 않는다.
+
+`abort`와 `--keep-snapshot`은 원장을 함께 보존하므로, 차단된 실행이 어디까지
+검토했는지 `ledger.py status`와 `report`로 사후 분석할 수 있다. `finish`는
+스냅샷과 함께 원장을 삭제한다.
 
 ## Lock 없는 snapshot (`/ccf`)
 

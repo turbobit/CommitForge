@@ -222,10 +222,11 @@ import guard
 | 조건 | 결과 |
 |---|---|
 | 원장 없음 | 실패 `ledger_missing` |
+| 활성 세대 없음 (`inventory` 미실행) | 실패 `ledger_no_generation` |
 | 활성 세대 fingerprint ≠ 현재 | 실패 `ledger_stale` |
-| 미판정 id 존재 | 실패 `ledger_incomplete` (개수·샘플 포함) |
+| 활성 세대의 live inventory 개수 ≠ `run.json`에 기록된 개수 | 실패 `ledger_inventory_mismatch` |
 | `UNKNOWN` 존재 | 실패 `ledger_unknown` |
-| 선언 scope 중 inventory 누락 | 실패 `ledger_scope_missing` |
+| 미판정 id 존재 | 실패 `ledger_incomplete` (개수·샘플 포함) |
 | 전부 terminal | 통과 + 커버리지 수치 |
 
 `finish --review-only`도 동일 검사를 다시 수행한다. 기존 불변식이 `verify-review`와 `finish`에서 두 번 검사되는 패턴과 같다.

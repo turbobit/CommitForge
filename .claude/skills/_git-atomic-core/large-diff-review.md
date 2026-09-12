@@ -37,8 +37,12 @@
    coverage를 유지한다.
 5. Security·Architecture owner는 개별 shard에 갇히지 않고 전체 contract graph를
    검토하며 관련 owner에게 `SendMessage`로 교차검증을 요청한다.
-6. lead aggregator가 finding stable ID, 반론, 중복과 hunk coverage를 통합한다.
-7. 전체 diff의 삭제 동작, wrapper/proxy, public contract와 미검토 hunk 0을 다시 확인한다.
+6. lead aggregator가 finding stable ID, 반론, 중복을 통합한다. shard 하나가
+   끝날 때마다 그 shard의 판정을 `ledger.py record`로 즉시 적재한다. lead는
+   판정을 컨텍스트에 누적하지 않는다.
+7. 전체 diff의 삭제 동작, wrapper/proxy, public contract를 다시 확인한다.
+   미검토 hunk가 0인지는 기억이 아니라 `ledger.py status`의 `complete`와
+   `pending`으로 확인한다.
 
 ## 제한
 
@@ -46,3 +50,5 @@
 - generated/vendor는 원본과 생성 원인을 중심으로 축약할 수 있다.
 - shard 경계를 넘는 finding을 한쪽에서만 종결하지 않는다.
 - context 부족으로 읽지 못한 hunk는 `UNKNOWN`이며 성공을 차단한다.
+- 대형 diff에서 원장은 선택이 아니다. 컨텍스트가 압축되면 판정 기억이 먼저
+  사라지고, 그 결과 미검토 hunk가 차단이 아니라 침묵 통과가 된다.
