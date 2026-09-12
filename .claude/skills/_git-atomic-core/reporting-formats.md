@@ -14,10 +14,15 @@
   "summary": {"critical": 0, "major": 0, "minor": 0, "note": 0},
   "reviewers": [],
   "findings": [],
-  "coverage": {"total_hunks": 0, "unreviewed_hunks": 0},
+  "coverage": {"generation": "gen-01-...", "total": 0, "pending_count": 0,
+               "unknown_count": 0, "by_verdict": {"PASS": 0, "FINDING": 0, "N_A": 0, "UNKNOWN": 0},
+               "scopes": [], "scopes_without_entries": []},
   "invariants": {"head": true, "branch": true, "index": true}
 }
 ```
+
+`coverage`는 `ledger.py report`의 `coverage` 객체를 그대로 옮긴 것이다. 기억으로
+집계하거나 필드 이름을 바꾸지 않는다.
 
 `findings`는 `review-execution.md` 공통 schema를 사용한다. `status`는 `OPEN`, `FIXED`, `REJECTED`, `N_A`, `UNKNOWN`, `BASELINED`, `STALE` 중 하나다.
 

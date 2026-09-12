@@ -460,6 +460,12 @@ class RecordTest(LedgerTestCase):
         self.assertTrue(again["ok"])
 
     def test_concurrent_records_do_not_lose_entries(self) -> None:
+        # `cmd_record` reads stdin before taking the lock, so feeding the
+        # processes with `communicate()` in a loop serialized them completely:
+        # each one exited before the next received any input, and the test
+        # passed identically with `LedgerLock` deleted. Write and close every
+        # stdin first, so all four are contending for the lock at once, and
+        # only then wait.
         started, ids = self.prepared()
         processes = [
             subprocess.Popen(
@@ -470,13 +476,16 @@ class RecordTest(LedgerTestCase):
             for _ in range(4)
         ]
         for index, proc in enumerate(processes):
-            proc.communicate(
+            assert proc.stdin is not None
+            proc.stdin.write(
                 json.dumps(
                     {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": f"r{index}"}]}
                 )
             )
+            proc.stdin.close()
         for proc in processes:
-            self.assertEqual(proc.returncode, 0)
+            out, err = proc.communicate(timeout=60)
+            self.assertEqual(proc.returncode, 0, f"stdout={out}\nstderr={err}")
 
         _, status = self.ledger("status", "--session", started["session"])
         hunks = (
@@ -627,12 +636,28 @@ class CoverageTest(LedgerTestCase):
         self.ledger("init", "--session", started["session"], "--scope", "working")
         _, status = self.ledger("status", "--session", started["session"])
         self.assertIsInstance(status["complete"], bool)
-        self.assertIsInstance(status["fingerprint_matches_current"], bool)
         self.assertIsInstance(status["generation"], str)
         self.assertIsInstance(status["pending"], list)
         self.assertIsInstance(status["pending_count"], int)
         self.assertIsInstance(status["unknown"], list)
         self.assertIsInstance(status["unknown_count"], int)
+        self.assertIsInstance(status["total"], int)
+        self.assertIsInstance(status["scopes"], list)
+        self.assertIsInstance(status["reviewers"], dict)
+        # Zero-filled, not `{}`: a consumer reading by_verdict["PASS"] must get
+        # 0 in every state, not a KeyError before inventory has run.
+        self.assertEqual(status["by_verdict"], {"PASS": 0, "FINDING": 0, "N_A": 0, "UNKNOWN": 0})
+        # `null`, not `false`: before inventory the fingerprint comparison has
+        # no answer, and reporting `false` made SKILL.md §1.5.1 read the normal
+        # pre-inventory state as ledger/repository divergence.
+        self.assertIsNone(status["fingerprint_matches_current"])
+
+    def test_status_after_inventory_reports_a_boolean_fingerprint_match(self) -> None:
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        self.ledger("inventory", "--session", started["session"])
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertIs(status["fingerprint_matches_current"], True)
 
 
 class GateTest(LedgerTestCase):
@@ -1056,6 +1081,11 @@ class InventoryRerunTest(LedgerTestCase):
         started = self.begin()
         self.ledger("init", "--session", started["session"], "--scope", "working")
         self.ledger("inventory", "--session", started["session"])
+        # `advance` models the post-fix transition, so the repository must
+        # actually have moved: advancing onto the state the active generation
+        # was already built from is refused as `ledger_advance_noop`.
+        lines[10] = "line11-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
         _, fingerprint = self.guard("fingerprint")
         self.ledger(
             "advance", "--session", started["session"],
@@ -1240,6 +1270,258 @@ class DiffPrefixConfigTest(LedgerTestCase):
         self.assertEqual(
             [entry["id"] for entry in built["entries"]], ["staged:x b/renamed.txt#0"]
         )
+
+
+class DenominatorIntegrityTest(LedgerTestCase):
+    """Regressions for ways a hunk used to fall out of the denominator."""
+
+    def begin(self) -> dict:
+        _, started = self.guard("begin", "--session", "session-den")
+        return started
+
+    def test_unmerged_paths_are_counted(self) -> None:
+        # A conflicted stash pop leaves `UU` entries whose diff is a combined
+        # `diff --cc` with `@@@` hunks. The parser recognized neither, so the
+        # conflicted file vanished from the denominator and the gate reported
+        # complete coverage for a file that was never reviewed.
+        (self.tmp / "tracked.txt").write_text("ours\n", encoding="utf-8")
+        run(["git", "stash"], self.tmp)
+        (self.tmp / "tracked.txt").write_text("theirs\n", encoding="utf-8")
+        run(["git", "commit", "-am", "test: theirs"], self.tmp)
+        run(["git", "stash", "pop"], self.tmp, check=False)
+        status = run(["git", "status", "--porcelain"], self.tmp).stdout
+        self.assertIn("U", status.split("\n")[0])
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertTrue(
+            any("tracked.txt" in entry["id"] for entry in built["entries"]),
+            f"conflicted path missing from the denominator: {built['entries']}",
+        )
+
+    def test_submodule_config_cannot_hide_a_pointer_change(self) -> None:
+        # `diff.submodule=log` renders a moved pointer as a prose block with no
+        # `diff --git` header and no hunk at all, so the change disappeared
+        # from the inventory entirely.
+        run(["git", "config", "diff.submodule", "log"], self.tmp)
+        run(["git", "config", "diff.ignoreSubmodules", "all"], self.tmp)
+        inner = self.tmp / "sub"
+        inner.mkdir()
+        run(["git", "init"], inner)
+        run(["git", "config", "user.name", "CCA Test"], inner)
+        run(["git", "config", "user.email", "cca@example.invalid"], inner)
+        (inner / "s.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "s.txt"], inner)
+        run(["git", "commit", "-m", "test: sub one"], inner)
+        added = run(
+            ["git", "-c", "protocol.file.allow=always", "submodule", "add", "./sub", "sub"],
+            self.tmp,
+            check=False,
+        )
+        if added.returncode != 0:
+            self.skipTest(f"submodule add unsupported here: {added.stderr}")
+        run(["git", "commit", "-m", "test: add submodule"], self.tmp)
+        (inner / "s.txt").write_text("two\n", encoding="utf-8")
+        run(["git", "commit", "-am", "test: sub two"], inner)
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertTrue(
+            any(entry["path"] == "sub" for entry in built["entries"]),
+            f"submodule pointer change missing from the denominator: {built['entries']}",
+        )
+
+    def test_repeated_scope_does_not_double_the_denominator(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        started = self.begin()
+        _, created = self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "working", "--scope", "working",
+        )
+        self.assertEqual(created["scopes"], ["working"])
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ids = [entry["id"] for entry in built["entries"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(built["total"], len(set(ids)))
+
+    def test_edit_after_begin_rebuilds_the_denominator_from_the_worktree(self) -> None:
+        # `cmd_init` clears `active_generation` without bumping `iteration`, so
+        # keying the snapshot-vs-live choice on `iteration > 1` re-read a stale
+        # snapshot while naming the generation with the *current* fingerprint.
+        # `ledger_stale` then could not fire and the new hunk was never counted.
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "commit", "-am", "test: many lines"], self.tmp)
+        lines[0] = "line1-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        lines[-1] = "line20-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(built["total"], 2, built["entries"])
+
+
+class LedgerDurabilityTest(LedgerTestCase):
+    def begin(self) -> dict:
+        _, started = self.guard("begin", "--session", "session-dur")
+        return started
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "commit", "-am", "test: many lines"], self.tmp)
+        lines[0] = "a\n"
+        lines[-1] = "b\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(built["total"], 2)
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def hunks_path(self, started: dict) -> Path:
+        _, status = self.ledger("status", "--session", started["session"])
+        return (
+            Path(started["snapshot"]) / "ledger" / status["generation"] / "hunks.jsonl"
+        )
+
+    def test_append_after_a_torn_line_keeps_the_new_record_visible(self) -> None:
+        # The reader tolerates one torn trailing line, but appending straight
+        # onto it concatenated the next record onto the fragment: the batch
+        # reported success while being invisible to coverage, and the batch
+        # after that corrupted the file permanently.
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        hunks = self.hunks_path(started)
+        hunks.write_bytes(hunks.read_bytes() + b'{"id": "working:tracked.txt#2", "verd')
+
+        self.record(started["session"], {"verdicts": [{"id": ids[1], "verdict": "PASS"}]})
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertTrue(status["complete"], status)
+
+        # And a third batch must still read cleanly rather than raising
+        # ledger_corrupt on a line the second batch mangled.
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, again = self.ledger("status", "--session", started["session"])
+        self.assertTrue(again["complete"], again)
+
+    def test_non_object_record_is_named_as_corruption(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        hunks = self.hunks_path(started)
+        with hunks.open("a", encoding="utf-8") as stream:
+            stream.write("123\n")
+        with hunks.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"id": ids[1], "verdict": "PASS"}) + "\n")
+
+        proc, refused = self.ledger(
+            "status", "--session", started["session"], check=False
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(refused["reason"], "ledger_corrupt")
+        # And the same diagnosis must survive the crossing into guard, which
+        # only translates GuardError -- a raw AttributeError exited 3 with no
+        # reason at all.
+        proc, blocked = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", check=False,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(blocked["reason"], "ledger_corrupt")
+
+    def test_commands_before_init_report_ledger_missing(self) -> None:
+        started = self.begin()
+        for args in (
+            ("inventory", "--session", started["session"]),
+            ("advance", "--session", started["session"], "--fingerprint", "x" * 64),
+        ):
+            proc, refused = self.ledger(*args, check=False)
+            self.assertEqual(proc.returncode, 2, args)
+            self.assertIn(refused["reason"], {"ledger_missing", "ledger_fingerprint_mismatch"})
+        proc, refused = self.record(
+            started["session"], {"verdicts": []}, check=False
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(refused["reason"], "ledger_missing")
+
+    def test_corrupt_run_json_is_named_rather_than_crashing(self) -> None:
+        started, _ = self.prepared()
+        run_json = Path(started["snapshot"]) / "ledger" / "run.json"
+        run_json.write_text(json.dumps({"iteration": None}), encoding="utf-8")
+        for args in (
+            ("status", "--session", started["session"]),
+            ("report", "--session", started["session"]),
+            ("inventory", "--session", started["session"]),
+        ):
+            proc, refused = self.ledger(*args, check=False)
+            self.assertEqual(proc.returncode, 2, args)
+            self.assertEqual(refused["reason"], "ledger_corrupt", args)
+
+
+class AdvanceGuardTest(LedgerTestCase):
+    def begin(self) -> dict:
+        _, started = self.guard("begin", "--session", "session-adv")
+        return started
+
+    def test_repeat_advance_on_an_unchanged_tree_is_refused(self) -> None:
+        # `active_generation` only moves forward, so a redundant `advance`
+        # stranded a fully verdicted generation with no way back.
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "commit", "-am", "test: many lines"], self.tmp)
+        lines[0] = "a\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": e["id"], "verdict": "PASS"} for e in built["entries"]]},
+        )
+        _, fingerprint = self.guard("fingerprint")
+        proc, refused = self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"], check=False,
+        )
+        self.assertEqual(proc.returncode, 2)
+        self.assertEqual(refused["reason"], "ledger_advance_noop")
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertTrue(status["complete"])
+
+    def test_report_keeps_findings_from_earlier_generations(self) -> None:
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "commit", "-am", "test: many lines"], self.tmp)
+        lines[0] = "a\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.record(
+            started["session"],
+            {
+                "verdicts": [
+                    {"id": built["entries"][0]["id"], "verdict": "FINDING",
+                     "finding_ids": ["F1"]}
+                ],
+                "findings": [{"id": "F1", "severity": "MAJOR", "title": "boom"}],
+            },
+        )
+        lines[-1] = "b\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        _, fingerprint = self.guard("fingerprint")
+        self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+        _, reported = self.ledger("report", "--session", started["session"])
+        self.assertEqual([f["id"] for f in reported["findings"]], ["F1"])
 
 
 if __name__ == "__main__":

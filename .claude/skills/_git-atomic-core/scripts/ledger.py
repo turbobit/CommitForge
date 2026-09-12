@@ -27,12 +27,14 @@ RUN_NAME = "run.json"
 LOCK_NAME = ".lock"
 LOCK_TIMEOUT_SECONDS = 10.0
 LOCK_POLL_SECONDS = 0.05
+LOCK_STALE_AFTER_SECONDS = 60.0
 
 STAGES = ("init", "inventory", "review", "fix", "verify", "done")
 TERMINAL_VERDICTS = ("PASS", "FINDING", "N_A")
 VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 
 GENERATION_PREFIX = "gen"
+FINGERPRINT_PREFIX_LEN = 8
 INVENTORY_NAME = "inventory.jsonl"
 HUNKS_NAME = "hunks.jsonl"
 FINDINGS_NAME = "findings.jsonl"
@@ -55,20 +57,43 @@ class LedgerLock:
             try:
                 self.path.mkdir(mode=0o700)
                 return self
+            except FileNotFoundError as exc:
+                # The ledger directory does not exist yet. Only `init` creates
+                # it, so this is "the ledger was never initialized" -- it must
+                # surface as the documented `ledger_missing` rather than as a
+                # raw FileNotFoundError that `main()`'s generic handler turns
+                # into exit 3 with no `reason` for a caller to branch on.
+                raise guard.GuardError(
+                    "원장이 초기화되지 않았습니다.", reason="ledger_missing"
+                ) from exc
             except FileExistsError:
                 if time.monotonic() >= deadline:
+                    # An orphaned lock (SIGKILL between mkdir and rmdir) would
+                    # otherwise wedge every later command with no way to tell
+                    # a live holder from a dead one, so report its age the way
+                    # `guard.lock_owner_profile` does and name the recovery.
+                    age = guard.lock_dir_age_seconds(self.path)
                     raise guard.GuardError(
-                        "원장 잠금을 얻지 못했습니다.",
+                        "원장 잠금을 얻지 못했습니다. 다른 ledger 명령이 실행 중이 아니라면 "
+                        f"남겨진 잠금 디렉터리를 제거하십시오: {self.path}",
                         reason="ledger_lock_timeout",
                         lock_path=str(self.path),
+                        lock_age_seconds=age,
+                        stale_candidate=age is not None and age >= LOCK_STALE_AFTER_SECONDS,
                     )
                 time.sleep(LOCK_POLL_SECONDS)
 
     def __exit__(self, *exc_info: object) -> None:
         try:
             self.path.rmdir()
-        except OSError:
-            pass
+        except OSError as exc:
+            # Losing the lock directory wedges every later ledger command, so
+            # it must not vanish silently the way a bare `pass` did. The
+            # in-flight exception (if any) still wins; this only annotates.
+            print(
+                f"warning: 원장 잠금을 해제하지 못했습니다: {self.path} ({exc})",
+                file=sys.stderr,
+            )
 
 
 def resolve_ledger(
@@ -117,6 +142,35 @@ def read_run_optional(ledger_dir: Path) -> dict[str, Any] | None:
             reason="ledger_corrupt",
             path=str(path),
         )
+    # Callers read these four unguarded -- `int(data["iteration"])`,
+    # `data["stage"]`, `data["active_generation"]`, `data["scopes"]` -- so a
+    # run.json that parses but carries a wrong type or a missing key would
+    # raise TypeError/KeyError from deep inside a command and exit 3 with no
+    # `reason`, which is exactly the misdiagnosis this function exists to
+    # prevent. Validate the shape once, here, where it can still be named.
+    for field, kinds in (
+        ("stage", str),
+        ("iteration", int),
+        ("active_generation", str),
+        ("scopes", list),
+    ):
+        value = data.get(field)
+        # `bool` is an `int` subclass; an iteration of `true` is corruption.
+        if not isinstance(value, kinds) or isinstance(value, bool):
+            raise guard.GuardError(
+                f"원장 run.json의 {field} 항목이 올바르지 않습니다.",
+                reason="ledger_corrupt",
+                path=str(path),
+                field=field,
+            )
+    if data["iteration"] < 1 or not all(
+        isinstance(scope, str) for scope in data["scopes"]
+    ):
+        raise guard.GuardError(
+            "원장 run.json의 iteration 또는 scopes 값이 올바르지 않습니다.",
+            reason="ledger_corrupt",
+            path=str(path),
+        )
     return data
 
 
@@ -152,8 +206,18 @@ def split_range_expression(expression: str) -> tuple[str, str, str]:
 
 
 def validate_scopes(raw: list[str]) -> list[str]:
-    scopes = []
+    """Validate declared scopes, preserving order and dropping duplicates.
+
+    A scope is enumerated once per occurrence by `cmd_inventory`, so a repeated
+    `--scope working` would emit the same ids twice and double `total`,
+    `by_verdict` and every per-scope count the final report is required to
+    quote -- while `inventory_ids` (a set) stays consistent, so nothing else
+    would ever flag the inflation. Deduplicate here, at the only entry point.
+    """
+    scopes: list[str] = []
     for value in raw:
+        if value in scopes:
+            continue
         if value == "working":
             scopes.append(value)
             continue
@@ -370,6 +434,36 @@ def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
             remainder = line[len("diff --git ") :]
             state["path"] = extract_b_path(remainder)
             continue
+        # An unmerged path (a conflicted stash pop, merge or cherry-pick that
+        # left `UU` entries) is emitted as a combined diff, whose header is
+        # `diff --cc <path>` / `diff --combined <path>` -- a single
+        # EOL-terminated token with no `a/`/`b/` prefixes -- and whose hunks
+        # start with `@@@` rather than `@@`. Without this branch the header is
+        # unrecognized, `state["path"]` stays None, the `continue` below
+        # swallows the whole file section, and the conflicted file silently
+        # disappears from the denominator.
+        if line.startswith("diff --cc ") or line.startswith("diff --combined "):
+            flush()
+            token = line.split(" ", 2)[2]
+            state["path"] = unified_header_path(token, "") or token
+            continue
+        # `git diff --cached` reports a conflicted path as this one line and
+        # emits no diff body for it at all, so it must become a meta entry or
+        # it is invisible to the inventory.
+        if line.startswith("* Unmerged path "):
+            flush()
+            token = line[len("* Unmerged path ") :]
+            resolved = unified_header_path(token, "") or token
+            entries.append(
+                {
+                    "id": f"{source}:{resolved}#0",
+                    "kind": "unmerged",
+                    "source": source,
+                    "path": resolved,
+                    "header": "",
+                }
+            )
+            continue
         if state["path"] is None:
             continue
         if line.startswith("GIT binary patch") or line.startswith("Binary files "):
@@ -423,11 +517,19 @@ def untracked_record(path: str) -> dict[str, Any]:
 
 
 def untracked_entries(snapshot: Path) -> list[dict[str, Any]]:
+    """Read untracked paths back out of the snapshot.
+
+    `capture_snapshot` writes `untracked.z` with `surrogateescape`, and
+    `guard.list_untracked` -- which `live_scope_entries` uses for every
+    generation after the first -- decodes with the same handler. Decoding with
+    `replace` here instead would be lossy in both directions: the same file
+    would get a different id before and after an `advance`, and two distinct
+    non-UTF-8 names would collapse onto one id, so a single PASS would mark
+    both covered. Use guard's own inverse decoder.
+    """
     raw = (snapshot / "untracked.z").read_bytes()
     return [
-        untracked_record(chunk.decode("utf-8", "replace"))
-        for chunk in raw.split(b"\0")
-        if chunk
+        untracked_record(guard.decode(chunk)) for chunk in raw.split(b"\0") if chunk
     ]
 
 
@@ -437,6 +539,18 @@ def working_scope_entries(snapshot: Path) -> list[dict[str, Any]]:
     entries.extend(parse_diff_entries((snapshot / "working.diff").read_bytes(), "working"))
     entries.extend(untracked_entries(snapshot))
     return entries
+
+
+def range_source(expression: str) -> str:
+    """The inventory `source` for a committed range.
+
+    A distinct source per range expression (rather than the shared literal
+    "range") keeps ids from two declared range scopes disjoint even when they
+    touch the same path at the same hunk index; the digest is a pure function
+    of the expression -- `hashlib`, never the process-salted builtin `hash` --
+    so a re-run of `inventory` is idempotent across processes.
+    """
+    return f"range@{hashlib.sha256(expression.encode('utf-8')).hexdigest()[:8]}"
 
 
 def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]:
@@ -474,12 +588,7 @@ def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]
             reason="ledger_range_unresolved",
             range=expression,
         ) from exc
-    # A distinct source per range expression (rather than the shared literal
-    # "range") keeps ids from two declared range scopes disjoint even when
-    # they touch the same path at the same hunk index; the digest is a pure
-    # function of the expression so a re-run of `inventory` is idempotent.
-    source = f"range@{hashlib.sha256(expression.encode('utf-8')).hexdigest()[:8]}"
-    return parse_diff_entries(diff, source)
+    return parse_diff_entries(diff, range_source(expression))
 
 
 def live_scope_entries(ctx: dict[str, Path], scopes: list[str]) -> list[dict[str, Any]]:
@@ -517,12 +626,14 @@ def live_scope_entries(ctx: dict[str, Path], scopes: list[str]) -> list[dict[str
     return entries
 
 
-def fingerprint_short(ctx: dict[str, Path]) -> str:
-    return guard.repository_fingerprint(ctx["root"])["fingerprint"][:8]
+def generation_name(iteration: int, fingerprint: str) -> str:
+    """`gen-<NN>-<fingerprint prefix>`, the generation directory name.
 
-
-def generation_name(iteration: int, short: str) -> str:
-    return f"{GENERATION_PREFIX}-{iteration:02d}-{short}"
+    `coverage` recovers the prefix with `rsplit("-", 1)` and checks it against
+    the live fingerprint, so the truncation length lives here only -- callers
+    pass the full fingerprint rather than each slicing their own prefix.
+    """
+    return f"{GENERATION_PREFIX}-{iteration:02d}-{fingerprint[:FINGERPRINT_PREFIX_LEN]}"
 
 
 def write_inventory(gen_dir: Path, entries: list[dict[str, Any]]) -> None:
@@ -547,29 +658,80 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 
     A crash during append can leave a partial last line. That must not
     invalidate every record written before it.
+
+    Every surviving record must also be an object. `json.loads` happily
+    returns a scalar or a list, and callers then do `record.get(...)` or
+    `entry["id"]`, which raises `AttributeError`/`TypeError`/`KeyError` --
+    exception types that `guard.ledger_gate`'s `except ledger.guard.GuardError`
+    wrapper does not catch, so the carefully built `ledger_corrupt` diagnosis
+    is lost and guard exits 3 with no `reason` at all. Reject the shape here,
+    where it can still be named.
+
+    `line=` is the real 1-based file line number, not the index among
+    non-blank lines, so the number can be used to find the record.
     """
     if not path.is_file():
         return []
-    lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    raw_lines = path.read_text(encoding="utf-8").splitlines()
+    numbered = [
+        (number, line) for number, line in enumerate(raw_lines, 1) if line.strip()
+    ]
     records: list[dict[str, Any]] = []
-    for position, line in enumerate(lines):
+    for position, (number, line) in enumerate(numbered):
         try:
-            records.append(json.loads(line))
+            record = json.loads(line)
         except json.JSONDecodeError:
-            if position == len(lines) - 1:
+            if position == len(numbered) - 1:
                 break
             raise guard.GuardError(
                 "원장 레코드가 손상되었습니다.",
                 reason="ledger_corrupt",
                 path=str(path),
-                line=position + 1,
+                line=number,
             )
+        if not isinstance(record, dict):
+            raise guard.GuardError(
+                "원장 레코드가 object가 아닙니다.",
+                reason="ledger_corrupt",
+                path=str(path),
+                line=number,
+            )
+        records.append(record)
     return records
 
 
+def drop_torn_tail(path: Path) -> bool:
+    """Truncate an unterminated trailing line. Returns True if one was dropped.
+
+    Every record is written with its newline in a single `write`, so a file
+    that does not end in one was cut short by a crash and its last line is a
+    partial record. `read_jsonl` already treats that line as absent; this
+    makes the file agree, which is what keeps the tolerance true across the
+    next append.
+    """
+    try:
+        raw = path.read_bytes()
+    except FileNotFoundError:
+        return False
+    if not raw or raw.endswith(b"\n"):
+        return False
+    os.truncate(path, raw.rfind(b"\n") + 1)
+    return True
+
+
 def append_jsonl(path: Path, records: list[dict[str, Any]]) -> None:
+    """Append records, dropping a torn trailing line first.
+
+    `read_jsonl` tolerates one unparsable last line, but that tolerance only
+    held until the next write: appending straight onto a line with no
+    terminating newline concatenated the new record onto the torn fragment.
+    The batch then reported success while being invisible to `coverage`, and
+    the batch after that made the mangled line non-last, turning the whole
+    file into a permanent `ledger_corrupt` with no recovery command.
+    """
     if not records:
         return
+    drop_torn_tail(path)
     payload = "".join(
         json.dumps(record, ensure_ascii=True, sort_keys=True) + "\n" for record in records
     )
@@ -587,11 +749,56 @@ def active_generation_dir(ledger_dir: Path, data: dict[str, Any]) -> Path:
     return ledger_dir / name
 
 
+def inventory_entry_id(record: dict[str, Any], path: Path) -> str:
+    """Return an inventory record's id, or fail closed as `ledger_corrupt`.
+
+    `read_jsonl` guarantees a dict; it cannot guarantee the fields. Indexing
+    `record["id"]` directly raised a bare `KeyError` that `guard.ledger_gate`'s
+    `except ledger.guard.GuardError` wrapper does not catch, so guard exited 3
+    with no `reason` instead of naming the corruption.
+    """
+    identifier = record.get("id")
+    if not isinstance(identifier, str) or not identifier:
+        raise guard.GuardError(
+            "원장 inventory 레코드에 id가 없습니다.",
+            reason="ledger_corrupt",
+            path=str(path),
+        )
+    return identifier
+
+
 def inventory_ids(gen_dir: Path) -> set[str]:
-    return {record["id"] for record in read_jsonl(gen_dir / INVENTORY_NAME)}
+    path = gen_dir / INVENTORY_NAME
+    return {inventory_entry_id(record, path) for record in read_jsonl(path)}
 
 
 PENDING_SAMPLE_LIMIT = 20
+
+
+def scope_sources(scope: str) -> set[str]:
+    """The `source` values a declared scope can contribute to the inventory."""
+    if scope == "working":
+        return {"staged", "working", "untracked"}
+    return {range_source(scope[len("range:") :])} if scope.startswith("range:") else set()
+
+
+def scopes_without_entries(
+    data: dict[str, Any], per_scope: dict[str, dict[str, int]]
+) -> list[str]:
+    """Declared scopes that contributed nothing to the denominator.
+
+    `coverage`'s `scopes` list is built from the entries themselves, so a
+    scope that produced none simply never appears -- a `/cr pr|--base|--range`
+    whose range resolved to zero commits (stale base, already-merged branch,
+    wrong period window) reported 100% coverage with no trace of the scope
+    anywhere. An empty range is legitimately an empty review and must not
+    block, but it must be visible, so name it instead of dropping it.
+    """
+    return [
+        scope
+        for scope in (data.get("scopes") or [])
+        if isinstance(scope, str) and not (scope_sources(scope) & set(per_scope))
+    ]
 
 
 def latest_verdicts(gen_dir: Path) -> dict[str, str]:
@@ -605,25 +812,19 @@ def latest_verdicts(gen_dir: Path) -> dict[str, str]:
 
 
 def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> dict[str, Any]:
-    generation = data.get("active_generation") or ""
-    if not generation:
-        return {
-            "complete": False,
-            "fingerprint_matches_current": False,
-            "generation": "",
-            "total": 0,
-            "pending": [],
-            "pending_count": 0,
-            "unknown": [],
-            "unknown_count": 0,
-            "by_verdict": {},
-            "scopes": [],
-            "reviewers": {},
-        }
+    """Summarize the active generation's denominator against its verdicts.
 
-    gen_dir = ledger_dir / generation
-    entries = read_jsonl(gen_dir / INVENTORY_NAME)
-    resolved = latest_verdicts(gen_dir)
+    The no-generation case takes the same tail return with empty inputs rather
+    than a hand-written second dict, so the two shapes cannot drift: a key
+    added to one but not the other used to be a KeyError waiting for the first
+    consumer that read it, and `by_verdict` had in fact already drifted to a
+    bare `{}` where the populated path returns a zero-filled histogram.
+    """
+    generation = data.get("active_generation") or ""
+    gen_dir = ledger_dir / generation if generation else None
+    inventory_path = gen_dir / INVENTORY_NAME if gen_dir else None
+    entries = read_jsonl(inventory_path) if inventory_path else []
+    resolved = latest_verdicts(gen_dir) if gen_dir else {}
 
     by_verdict = {name: 0 for name in VERDICTS}
     pending: list[str] = []
@@ -631,8 +832,16 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
     per_scope: dict[str, dict[str, int]] = {}
 
     for entry in entries:
-        identifier = entry["id"]
-        bucket = per_scope.setdefault(entry["source"], {"total": 0, "covered": 0})
+        identifier = inventory_entry_id(entry, inventory_path)
+        source = entry.get("source")
+        if not isinstance(source, str) or not source:
+            raise guard.GuardError(
+                "원장 inventory 레코드에 source가 없습니다.",
+                reason="ledger_corrupt",
+                path=str(inventory_path),
+                id=identifier,
+            )
+        bucket = per_scope.setdefault(source, {"total": 0, "covered": 0})
         bucket["total"] += 1
         verdict = resolved.get(identifier)
         if verdict is None:
@@ -652,12 +861,20 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
             continue
         bucket["covered"] += 1
 
-    current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
-    expected = generation.rsplit("-", 1)[-1]
+    if generation:
+        current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
+        matches = current.startswith(generation.rsplit("-", 1)[-1])
+    else:
+        # No generation means "inventory has not run yet", not "the repository
+        # moved". Reporting False here would be a sentinel that reads as a
+        # mismatch, which is why the gate has to test `generation` first and
+        # why SKILL.md's resume rule mistook the pre-inventory state for
+        # ledger/repository divergence. None says "unknown".
+        matches = None
 
     return {
-        "complete": not pending and not unknown,
-        "fingerprint_matches_current": current.startswith(expected),
+        "complete": bool(generation) and not pending and not unknown,
+        "fingerprint_matches_current": matches,
         "generation": generation,
         "total": len(entries),
         "pending": pending[:PENDING_SAMPLE_LIMIT],
@@ -668,7 +885,9 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         "scopes": [
             {"source": source, **counts} for source, counts in sorted(per_scope.items())
         ],
-        "reviewers": guard.read_json(gen_dir / REVIEWERS_NAME) or {},
+        "scopes_declared": list(data.get("scopes") or []),
+        "scopes_without_entries": scopes_without_entries(data, per_scope),
+        "reviewers": (guard.read_json(gen_dir / REVIEWERS_NAME) or {}) if gen_dir else {},
     }
 
 
@@ -739,19 +958,43 @@ def cmd_status(args: argparse.Namespace) -> None:
     )
 
 
+def all_findings(ledger_dir: Path, data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Every finding recorded in this run, oldest generation first.
+
+    Reading only the active generation lost the entire report of any review
+    that actually found something: a finding is recorded, `--fix` applies it,
+    and §4's mandatory `advance` opens a generation whose `findings.jsonl` is
+    empty. `report` then returned `findings: []` -- for exactly the runs that
+    had findings -- while the records sat unreachable in the previous
+    generation's directory. Only reviews that found nothing reported
+    correctly. Each finding carries its generation so a fixed one can still be
+    told apart from one found in the final pass.
+    """
+    findings: list[dict[str, Any]] = []
+    active = data.get("active_generation") or ""
+    for name in sorted(totals_by_generation(data) | ({active} if active else set())):
+        for record in read_jsonl(ledger_dir / name / FINDINGS_NAME):
+            findings.append({**record, "generation": name})
+    return findings
+
+
+def totals_by_generation(data: dict[str, Any]) -> set[str]:
+    totals = data.get("inventory_totals")
+    return set(totals) if isinstance(totals, dict) else set()
+
+
 def cmd_report(args: argparse.Namespace) -> None:
     ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
     data = read_run(ledger_dir)
     summary = coverage(ctx, ledger_dir, data)
     generation = data.get("active_generation") or ""
-    findings = read_jsonl(ledger_dir / generation / FINDINGS_NAME) if generation else []
     guard.emit(
         {
             "ok": True,
             "generation": generation,
             "iteration": data["iteration"],
             "coverage": summary,
-            "findings": findings,
+            "findings": all_findings(ledger_dir, data),
         }
     )
 
@@ -759,14 +1002,22 @@ def cmd_report(args: argparse.Namespace) -> None:
 def cmd_inventory(args: argparse.Namespace) -> None:
     """Build (or idempotently rebuild) the active generation's denominator.
 
-    The first generation derives its `working` scope from the snapshot, which
-    is the state `/cr` began from. Every later generation must derive it from
-    the live worktree instead -- the same rule `cmd_advance` follows -- because
-    the snapshot froze the pre-fix state and cannot contain the hunks the fix
-    itself created. Re-reading the snapshot after `advance` would shrink the
-    denominator back to the pre-fix set and rewrite `inventory_totals` to
-    match, so the mismatch check would not fire and the fix's own new hunks
-    would never be reviewed.
+    The `working` scope is derived from the snapshot only while the snapshot
+    is still the truth, i.e. while the repository fingerprint is unchanged
+    since `begin`. Otherwise it must come from the live worktree -- the same
+    rule `cmd_advance` follows -- because a stale snapshot cannot contain the
+    hunks an edit created. Re-reading the snapshot then would shrink the
+    denominator back to the pre-edit set and rewrite `inventory_totals` to
+    match, so the mismatch check would not fire and those hunks would never be
+    reviewed.
+
+    Keying that choice on `iteration > 1` was not enough: `cmd_init` clears
+    `active_generation` to widen a scope but deliberately leaves `iteration`
+    alone, so a re-`inventory` after an edit still took the snapshot branch
+    while `generation_name` stamped the generation with the *current*
+    fingerprint. The names then agreed, `ledger_stale` could not fire, and the
+    gate passed with the edit's hunks absent from the denominator. Comparing
+    fingerprints instead makes the content and the name always agree.
 
     An inventory that already exists for the active generation is never
     silently replaced by a different one. An identical id set is idempotent,
@@ -781,11 +1032,17 @@ def cmd_inventory(args: argparse.Namespace) -> None:
         data = read_run(ledger_dir)
         iteration = int(data["iteration"])
         active = data["active_generation"] or ""
-        name = active or generation_name(iteration, fingerprint_short(ctx))
+        fingerprint = guard.repository_fingerprint(ctx["root"])["fingerprint"]
+        name = active or generation_name(iteration, fingerprint)
         gen_dir = ledger_dir / name
 
+        snapshot_fingerprint = (
+            (guard.read_json(snapshot / guard.MARKER_NAME) or {}).get("fingerprint") or {}
+        ).get("fingerprint")
+        snapshot_is_current = snapshot_fingerprint == fingerprint
+
         entries: list[dict[str, Any]] = []
-        if iteration > 1:
+        if iteration > 1 or not snapshot_is_current:
             entries.extend(live_scope_entries(ctx, data["scopes"]))
         else:
             for scope in data["scopes"]:
@@ -823,6 +1080,17 @@ def cmd_inventory(args: argparse.Namespace) -> None:
 
 
 def cmd_advance(args: argparse.Namespace) -> None:
+    """Open a new generation for a repository state the active one predates.
+
+    `advance` is destructive by design: the new generation starts with an
+    empty `hunks.jsonl`, so every verdict has to be re-recorded against the
+    new denominator. That is correct after a fix, and catastrophic when the
+    command is repeated -- `active_generation` only ever moves forward, so a
+    second `advance` on an unchanged repository silently strands a fully
+    verdicted generation with no way back. `--fingerprint` alone does not
+    prevent it: it only proves the caller re-read the *current* fingerprint,
+    never that anything changed. Refuse the no-op explicitly.
+    """
     ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
     current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
     if args.fingerprint != current:
@@ -834,8 +1102,17 @@ def cmd_advance(args: argparse.Namespace) -> None:
         )
     with LedgerLock(ledger_dir):
         data = read_run(ledger_dir)
+        active = data["active_generation"] or ""
+        if active and active.rsplit("-", 1)[-1] == current[:FINGERPRINT_PREFIX_LEN]:
+            raise guard.GuardError(
+                "활성 세대가 이미 현재 저장소 상태로 만들어져 있어 전이할 것이 없습니다. "
+                "수정을 적용한 뒤 다시 실행하십시오.",
+                reason="ledger_advance_noop",
+                generation=active,
+                fingerprint=current,
+            )
         data["iteration"] = int(data["iteration"]) + 1
-        name = generation_name(data["iteration"], current[:8])
+        name = generation_name(data["iteration"], current)
         gen_dir = ledger_dir / name
         gen_dir.mkdir(mode=0o700, exist_ok=True)
 
@@ -896,11 +1173,18 @@ def _require_str_list_field(record: dict[str, Any], field: str, label: str) -> N
 
 
 def cmd_record(args: argparse.Namespace) -> None:
+    # Read the raw bytes and decode as UTF-8 explicitly. `json.load(sys.stdin)`
+    # decodes with the locale codec, so the Korean finding text this package
+    # pipes in raises UnicodeDecodeError on a Windows console codepage (cp949,
+    # cp1252) or silently stores mojibake (cp437) -- and UnicodeDecodeError is
+    # not a JSONDecodeError, so it escaped as exit 3 with no `reason` instead
+    # of `ledger_bad_input`.
     try:
-        payload = json.load(sys.stdin)
-    except json.JSONDecodeError as exc:
+        payload = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise guard.GuardError(
-            "record 입력 JSON을 읽을 수 없습니다.", reason="ledger_bad_input"
+            "record 입력 JSON을 읽을 수 없습니다. UTF-8 JSON이어야 합니다.",
+            reason="ledger_bad_input",
         ) from exc
     if not isinstance(payload, dict):
         raise guard.GuardError(

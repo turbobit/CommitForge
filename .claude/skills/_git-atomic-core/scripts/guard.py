@@ -45,7 +45,21 @@ class GuardError(RuntimeError):
 
 
 def emit(payload: dict[str, Any], exit_code: int = 0) -> None:
-    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    # Paths decoded with `surrogateescape` (see `decode`) carry lone surrogates
+    # that `print` cannot encode, and since ledger ids embed untracked paths
+    # those reach `emit` routinely. A UnicodeEncodeError here is unrecoverable:
+    # it is raised from inside `main()`'s own `except GuardError` handler, so
+    # no sibling clause catches it and the caller gets a traceback, exit 1 and
+    # zero JSON on stdout instead of a parseable refusal. Write the bytes
+    # ourselves with a lossy fallback so a bad byte costs one character, not
+    # the whole payload.
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    stream = getattr(sys.stdout, "buffer", None)
+    if stream is None:
+        print(text.encode("utf-8", "replace").decode("utf-8"))
+    else:
+        stream.write(text.encode("utf-8", "replace") + b"\n")
+        stream.flush()
     raise SystemExit(exit_code)
 
 
@@ -79,16 +93,29 @@ def decode(data: bytes) -> str:
 # *option* is a hard error while an unknown *config key* passed with `-c` is
 # silently ignored by every version. Pinning via `-c` is therefore the form
 # that is safe on old and new git alike.
+#
+# `diff.submodule` and `diff.ignoreSubmodules` belong here for the same
+# reason, and matter more than the prefixes do: under the common
+# `diff.submodule=log` a moved submodule pointer is rendered as a prose
+# `Submodule <name> <a>..<b>:` block with no `diff --git` header and no `@@`
+# hunk at all, so the change vanishes from the ledger denominator entirely
+# rather than merely being named differently; `diff.submodule=diff` instead
+# reports paths *inside* the submodule, which are not paths in this
+# repository; and `diff.ignoreSubmodules=all` drops the change outright.
+# `short` and `none` are git's own defaults, so pinning them restores the
+# documented shape rather than imposing a new one.
 DIFF_PREFIX_CONFIG = [
     "-c", "diff.noprefix=false",
     "-c", "diff.mnemonicPrefix=false",
     "-c", "diff.srcPrefix=a/",
     "-c", "diff.dstPrefix=b/",
+    "-c", "diff.submodule=short",
+    "-c", "diff.ignoreSubmodules=none",
 ]
 
 
 def diff_argv(*args: str) -> list[str]:
-    """Build a `git diff` argv whose `a/`/`b/` prefixes are guaranteed."""
+    """Build a `git diff` argv whose parsed output shape is guaranteed."""
     return [*DIFF_PREFIX_CONFIG, "diff", *args]
 
 
@@ -1219,6 +1246,10 @@ def snapshot_has_reviewable_content(snapshot: Path) -> bool:
     the snapshot was truncated or tampered with. That is treated as content so
     the caller fails closed rather than reading a damaged snapshot as "there
     was nothing to review".
+
+    This describes the *working tree at `begin`*, and nothing else: it is
+    blind to committed ranges, and it describes only the first generation. Use
+    `denominator_should_be_nonempty` rather than this predicate directly.
     """
     for name in ("staged.diff", "working.diff", "untracked.z"):
         path = snapshot / name
@@ -1230,37 +1261,64 @@ def snapshot_has_reviewable_content(snapshot: Path) -> bool:
     return False
 
 
+def denominator_should_be_nonempty(
+    data: dict[str, Any], summary: dict[str, Any], snapshot: Path
+) -> bool:
+    """Whether `total: 0` is provably wrong for this ledger.
+
+    A zero-entry denominator is vacuously "complete" -- every one of its zero
+    ids has a terminal verdict -- so the gate has to tell an honest empty
+    review apart from a lost or never-declared one. The snapshot alone cannot
+    do that, in either direction:
+
+    * It is blind to committed ranges. A `/cr pr|today|--base|--range` runs on
+      a clean worktree, so the snapshot is empty; if the model never reached
+      SKILL.md §1.5 step 4 and declared only `working`, `total` is 0, the
+      snapshot says "nothing to review", and the gate certified a PR review in
+      which no hunk was ever entered into the denominator.
+    * It describes only generation 1. After a `--fix` that reverts the tree to
+      its committed state, generation 2's denominator is honestly empty, but
+      the generation-1 snapshot still has content, so the gate refused a
+      correct run with `ledger_empty_inventory` and SKILL.md forbids the only
+      escape.
+
+    Ask the ledger's own declared scopes instead, and only consult the
+    snapshot for the one scope and the one generation it actually describes.
+
+    Note what this still cannot see: a `/cr pr` that declared only `working`
+    was never *told* about the range, so no machine check here can know one
+    was intended. That gap is closed upstream, by declaring every scope before
+    `inventory` runs, and made visible by `coverage`'s `scopes_without_entries`.
+    """
+    if summary["total"]:
+        return False
+    if not [scope for scope in (data.get("scopes") or []) if isinstance(scope, str)]:
+        # Nothing was ever declared, so nothing could ever have been counted.
+        return True
+    # The snapshot is evidence only for the generation it is the basis of.
+    return int(data.get("iteration") or 1) <= 1 and snapshot_has_reviewable_content(
+        snapshot
+    )
+
+
 def _ledger_gate_failure(
     data: dict[str, Any],
     summary: dict[str, Any],
     *,
-    snapshot_content: bool,
+    empty_denominator_is_wrong: bool,
 ) -> str | None:
     """Return the first applicable gate failure reason, or None when clean.
 
-    Order matters: an absent generation must be reported as
-    `ledger_no_generation` (inventory was simply never run) rather than
-    `ledger_stale` (coverage()'s no-generation early-return hard-codes
-    `fingerprint_matches_current: False`, which would otherwise be
-    misdiagnosed as a missed `advance`). A total that disagrees with the
-    count persisted at inventory-build time can only mean the denominator
-    was truncated or corrupted after the fact, since `parse_diff_entries`
-    guarantees every changed file yields at least one entry -- so that
-    mismatch is checked before `ledger_empty_inventory`, which is reserved
-    for a denominator that was genuinely built empty.
-
-    A zero-entry denominator is vacuously "complete": every one of its zero
-    ids has a terminal verdict. But a `/cr` run on a genuinely clean tree is
-    also legitimately empty, and SKILL.md §2 documents finishing it as
-    "검토 대상 없음". The two are told apart by the snapshot: because
-    `parse_diff_entries` guarantees every changed file yields at least one
-    entry -- binary and mode-only changes included -- a snapshot that captured
-    content can never honestly produce `total: 0`. That combination means a
-    scope was never declared or the denominator was lost, and is refused.
-    An empty snapshot with `total: 0` is simply an empty review and passes.
-
-    A declared range scope that legitimately contains no commits is likewise
-    an empty review, not an error.
+    An absent generation is reported as `ledger_no_generation` (inventory was
+    simply never run) rather than `ledger_stale`; `coverage` reports
+    `fingerprint_matches_current: None` in that state precisely so the two
+    cannot be confused. A total that disagrees with the count persisted at
+    inventory-build time can only mean the denominator was truncated or
+    corrupted after the fact, since `parse_diff_entries` guarantees every
+    changed file yields at least one entry -- so that mismatch is checked
+    before `ledger_empty_inventory`, which is reserved for a denominator that
+    should have had entries and does not (see
+    `denominator_should_be_nonempty`).
     """
     if not summary["generation"]:
         return "ledger_no_generation"
@@ -1269,7 +1327,7 @@ def _ledger_gate_failure(
     expected_total = (data.get("inventory_totals") or {}).get(summary["generation"])
     if expected_total is not None and expected_total != summary["total"]:
         return "ledger_inventory_mismatch"
-    if not summary["total"] and snapshot_content:
+    if empty_denominator_is_wrong:
         return "ledger_empty_inventory"
     if summary["unknown_count"]:
         return "ledger_unknown"
@@ -1325,10 +1383,15 @@ def ledger_gate(
     ledger_dir = snapshot / ledger.LEDGER_DIR_NAME
     if not (ledger_dir / ledger.RUN_NAME).is_file():
         if allow_unledgered:
+            # Return the same shape every other branch returns. A four-key
+            # dict made `ledger["pending"]`/`["total"]`/`["generation"]` a
+            # KeyError for any consumer, and its hard-coded `pending_count: 0`
+            # read as "nothing was left unreviewed" for the one case with no
+            # denominator at all -- the most dangerous bypass, reported as the
+            # most harmless. `reason` is kept for backwards compatibility.
             return {
-                "complete": False,
+                **ledger.coverage(ctx, ledger_dir, {}),
                 "reason": "ledger_missing",
-                "pending_count": 0,
                 "bypassed_reason": "ledger_missing",
             }
         raise GuardError(
@@ -1352,7 +1415,11 @@ def ledger_gate(
         raise GuardError(str(exc), **exc.details) from exc
 
     failure = _ledger_gate_failure(
-        data, summary, snapshot_content=snapshot_has_reviewable_content(snapshot)
+        data,
+        summary,
+        empty_denominator_is_wrong=denominator_should_be_nonempty(
+            data, summary, snapshot
+        ),
     )
 
     if allow_unledgered:
@@ -1399,7 +1466,61 @@ def ledger_gate(
             pending_count=summary["pending_count"],
             pending=summary["pending"],
         )
+    if failure is not None:
+        # The branches above enumerate every reason `_ledger_gate_failure`
+        # returns today, so this is unreachable now -- and that is exactly why
+        # it has to exist. Without it, adding a seventh reason (or renaming
+        # one on a single side) makes the chain fall through to the clean
+        # return below, so the gate reports `bypassed_reason: None` for a
+        # ledger it just diagnosed as failing. This is the one function
+        # documented as never failing open; make that structural.
+        raise GuardError(
+            f"원장 게이트가 거부했습니다: {failure}",
+            reason=failure,
+            generation=summary["generation"],
+        )
     return {**summary, "bypassed_reason": None}
+
+
+def apply_ledger_gate(
+    ctx: dict[str, Path], snapshot: Path, args: argparse.Namespace
+) -> tuple[dict[str, Any] | None, bool]:
+    """Run the coverage gate when it is armed. Returns (summary, bypassed).
+
+    Shared by `finish` and `verify-review` so the arming rule, the result key
+    and the bypass computation cannot drift between the two commands.
+
+    `ledger_present` is evaluated first, and unconditionally: writing this as
+    `args.require_ledger or ledger_present(snapshot)` short-circuits, so
+    `--require-ledger` (which cr/SKILL.md always passes) reached
+    `ledger_gate`'s `import ledger` even when ledger.py was missing or
+    unimportable. That raised ModuleNotFoundError into `main()`'s generic
+    handler -- exit 3, no `reason` -- before `release_lock`, orphaning the
+    worktree lock. Calling it first keeps the fail-closed `ledger_missing`
+    GuardError its docstring promises.
+    """
+    present = ledger_present(snapshot)
+    if not (present or args.require_ledger):
+        return None, False
+    if not present and args.require_ledger and not ledger_importable():
+        raise GuardError(
+            "--require-ledger가 지정됐지만 ledger.py를 불러올 수 없습니다. "
+            "설치가 손상되었을 수 있습니다.",
+            reason="ledger_missing",
+            snapshot=str(snapshot),
+        )
+    summary = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
+    return summary, summary.get("bypassed_reason") is not None
+
+
+def ledger_importable() -> bool:
+    """Whether `ledger.py` can be imported from this script's directory."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    try:
+        import ledger  # noqa: F401
+    except Exception:
+        return False
+    return True
 
 
 def cmd_verify_review(args: argparse.Namespace) -> None:
@@ -1421,12 +1542,10 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
         raise GuardError(
             "/cr 불변 조건을 충족하지 못했습니다: " + ", ".join(failed)
         )
-    if args.require_ledger or ledger_present(snapshot):
-        summary = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
+    summary, bypassed = apply_ledger_gate(ctx, snapshot, args)
+    if summary is not None:
         result["ledger"] = summary
-        result["ledger_bypassed"] = (
-            bool(args.allow_unledgered) and summary.get("bypassed_reason") is not None
-        )
+        result["ledger_bypassed"] = bypassed
     emit(result)
 
 
@@ -1516,13 +1635,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
                 + ", ".join(failed)
             )
 
-    ledger_result = None
-    ledger_bypassed = False
-    if args.require_ledger or ledger_present(snapshot):
-        ledger_result = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
-        ledger_bypassed = (
-            bool(args.allow_unledgered) and ledger_result.get("bypassed_reason") is not None
-        )
+    ledger_result, ledger_bypassed = apply_ledger_gate(ctx, snapshot, args)
 
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
@@ -1533,14 +1646,20 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "모든 의도된 변경이 커밋되었는지 확인하십시오."
         )
 
-    if not args.keep_snapshot:
+    # A bypassed gate means unreviewed hunks were waved through, and the only
+    # record of which ones is the ledger itself -- `coverage`'s `pending` list
+    # is capped at a 20-id sample, so deleting the snapshot here would destroy
+    # the audit trail of the very thing that was bypassed. Keep it.
+    keep_snapshot = args.keep_snapshot or ledger_bypassed
+    if not keep_snapshot:
         shutil.rmtree(snapshot)
     release_lock(ctx, session, token)
     emit(
         {
             "ok": True,
-            "snapshot_removed": not args.keep_snapshot,
+            "snapshot_removed": not keep_snapshot,
             "snapshot": str(snapshot),
+            "snapshot_kept_for_bypass": bool(ledger_bypassed and not args.keep_snapshot),
             "lock_released": True,
             "worktree_clean": not bool(dirty),
             "review_invariants": review_result,
@@ -1998,6 +2117,27 @@ def cmd_status(args: argparse.Namespace) -> None:
     )
 
 
+def add_ledger_flags(parser: argparse.ArgumentParser) -> None:
+    """Attach the coverage-gate flags shared by `finish` and `verify-review`.
+
+    Defined once so the two subcommands cannot drift into different CLI
+    surfaces while SKILL.md documents them as interchangeable.
+    """
+    parser.add_argument(
+        "--require-ledger",
+        action="store_true",
+        help=(
+            "Additionally fail when the snapshot carries no ledger at all; "
+            "an existing ledger is always gated regardless of this flag"
+        ),
+    )
+    parser.add_argument(
+        "--allow-unledgered",
+        action="store_true",
+        help="Pass despite a refusing ledger, reporting bypassed_reason and pending",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -2076,19 +2216,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow only this branch change when the snapshot began on main/master",
     )
     finish.add_argument("--keep-snapshot", action="store_true")
-    finish.add_argument(
-        "--require-ledger",
-        action="store_true",
-        help=(
-            "Additionally fail when the snapshot carries no ledger at all; "
-            "an existing ledger is always gated regardless of this flag"
-        ),
-    )
-    finish.add_argument(
-        "--allow-unledgered",
-        action="store_true",
-        help="Pass despite a refusing ledger, reporting bypassed_reason and pending",
-    )
+    add_ledger_flags(finish)
 
     verify_review = sub.add_parser(
         "verify-review",
@@ -2108,19 +2236,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-branch",
         help="Allow only this branch change when the snapshot began on main/master",
     )
-    verify_review.add_argument(
-        "--require-ledger",
-        action="store_true",
-        help=(
-            "Additionally fail when the snapshot carries no ledger at all; "
-            "an existing ledger is always gated regardless of this flag"
-        ),
-    )
-    verify_review.add_argument(
-        "--allow-unledgered",
-        action="store_true",
-        help="Pass despite a refusing ledger, reporting bypassed_reason and pending",
-    )
+    add_ledger_flags(verify_review)
 
     audit = sub.add_parser(
         "audit-snapshot",

@@ -10,7 +10,7 @@ permissionMode: plan
 color: cyan
 ---
 
-Main agent가 제공한 모든 staged·unstaged·untracked diff를 읽기 전용으로 검토한다. Shell을 실행하지 않는다. 각 hunk를 누락 없이 `PASS`, `FINDING`, `N/A`로 판정한다.
+Main agent가 제공한 모든 staged·unstaged·untracked diff를 읽기 전용으로 검토한다. Shell을 실행하지 않는다. 각 hunk를 누락 없이 `PASS`, `FINDING`, `N_A`로 판정한다. 리뷰 원장은 `N/A`를 받지 않고 `ledger_invalid_verdict`로 **batch 전체**를 거부하므로 철자를 그대로 쓴다.
 
 반드시 확인한다.
 
@@ -27,7 +27,7 @@ Main agent가 제공한 모든 staged·unstaged·untracked diff를 읽기 전용
 
 ```text
 ## Hunk 원장
-- 파일:hunk — PASS|FINDING|N/A — 판정 근거
+- 파일:hunk — PASS|FINDING|N_A — 판정 근거
 
 [심각도] 제목
 - 위치:

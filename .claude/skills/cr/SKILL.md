@@ -224,7 +224,7 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" status \
 
 - `exists`가 `false`면 신규 실행이다. 아래 1.5.2로 진행한다.
 - `exists`가 `true`이고 `fingerprint_matches_current`가 `true`면 **처음부터 다시 리뷰하지 않는다.** `pending`에 남은 id만 이어서 검토한다. 컴팩트로 대화 기억을 잃었더라도 원장이 진행 상황의 정본이다.
-- `fingerprint_matches_current`가 `false`면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 말고 사용자에게 보고한다.
+- `fingerprint_matches_current`가 `false`면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 말고 사용자에게 보고한다. `null`은 `inventory` 전의 정상 상태이므로 어긋난 것이 아니며, 1.5.2·1.5.3을 이어서 한다.
 
 ### 1.5.2 scope 선언
 
@@ -275,6 +275,7 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" inventory \
 - `inventory` 이후에 scope를 추가하면 활성 세대가 해제되므로 `inventory`를 다시
   실행해 분모를 넓힌다. 넓어진 분모는 이전 분모의 상위집합이므로 이미 기록한
   판정은 그대로 유효하다.
+- `coverage.scopes_without_entries`에 남은 scope는 분모에 아무것도 넣지 못한 범위다. 빈 범위면 정상이지만 base·기간·PR 계산 오류 신호일 수 있으므로 최종 보고에 표시한다. 변경이 없는 저장소에서도 `inventory`를 건너뛰지 않는다. 생략하면 `finish`가 `ledger_no_generation`으로 차단한다.
 
 ## 2. 변경 전체 스캔
 
@@ -299,7 +300,7 @@ shard/aggregator 절차를 적용한다. 시작 공지에는 실제로 초과한
 threshold, `Agent Team core 3명 + 조건부 specialist` 구조를 함께 표시하며,
 shard 수를 teammate 수처럼 표현하거나 계산하지 않은 hunk 수를 추정하지 않는다.
 
-working change와 선택한 기간·commit range가 모두 비어 있을 때만 Guard `finish` 후 “검토 대상 없음”으로 종료한다.
+working change와 선택한 기간·commit range가 모두 비어 있을 때만 §1.5.3의 `inventory`까지 마친 뒤 Guard `finish`로 “검토 대상 없음”을 종료한다.
 
 ## 3. 기본 10개 관점과 조건부 심층 리뷰
 
@@ -352,11 +353,14 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" record \
   --session "$COMMITFORGE_SESSION_ID" <<'JSON'
-{"verdicts": [{"id": "working:src/auth.py#3", "verdict": "PASS", "reviewer": "cca-line-reviewer"}],
- "findings": [], "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"}]}
+{"verdicts": [{"id": "working:src/auth.py#3", "verdict": "PASS", "reviewer": "cca-line-reviewer"},
+              {"id": "working:src/auth.py#7", "verdict": "FINDING", "finding_ids": ["cr-001"]}],
+ "findings": [{"id": "cr-001", "severity": "CRITICAL", "file": "src/auth.py"}],
+ "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"}]}
 JSON
 ```
 
+- `FINDING`은 finding 레코드의 `id`를 `finding_ids`로 연결한다. **거부는 batch 전체에 적용된다**: 판정 하나가 `N/A` 철자이거나 `finding_ids`가 비면 같은 batch의 `PASS`도 전부 버려진다. 거부되면 batch를 고쳐 다시 보내며, 판정을 낮춰 통과시키지 않는다.
 - 기록 후에는 해당 판정을 컨텍스트에 유지하지 않아도 된다. 원장이 정본이다.
 - 원장 기록은 lead만 수행한다. reviewer subagent와 Agent Team teammate는 기록하지 않는다.
 - `inventory`에 없는 id는 거부된다. 판정 대상은 분모에서만 고른다.
@@ -374,10 +378,10 @@ JSON
 수정 후에는:
 
 1. 전체 diff와 fingerprint를 다시 수집한다.
-2. 이전 기본·활성 조건부 reviewer 결과를 모두 무효화한다.
-3. trigger를 다시 판정하고 새 상태로 기본 10개와 활성 조건부 reviewer를 전부 다시 실행한다.
-4. 새 문제와 회귀가 없는지 검증한다.
-5. 새 fingerprint로 원장 세대를 전이한다. 생략하면 종료 게이트가 `ledger_stale`로 차단한다.
+2. **새 fingerprint로 원장 세대를 전이한다(아래 `advance`). 재리뷰보다 먼저 한다.** 전이 전 활성 세대는 수정 이전 분모라서, 그 상태로 기록하면 수정이 만든 hunk는 `ledger_unknown_id`로 거부되고 성공한 판정도 전이 시점에 버려진다. 생략하면 게이트가 `ledger_stale`로 차단한다.
+3. 이전 기본·활성 조건부 reviewer 결과를 모두 무효화한다.
+4. trigger를 다시 판정하고 기본 10개와 활성 조건부 reviewer를 전부 다시 실행하며, **새 세대의 `inventory` id 집합을 분모로** 기록한다.
+5. 새 문제와 회귀가 없는지 검증한다.
 
 `--fingerprint`에 넘길 값은 Guard가 계산한다. 직접 만들거나 `begin` 결과의 옛
 값을 재사용하지 않는다.
@@ -393,8 +397,7 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" advance \
   --session "$COMMITFORGE_SESSION_ID" --fingerprint "<guard.sh fingerprint의 fingerprint 값>"
 ```
 
-`advance`는 새 세대의 분모를 snapshot이 아니라 live working tree에서 만든다.
-수정이 새로 만든 hunk도 분모에 들어간다.
+`advance`는 새 세대의 분모를 snapshot이 아니라 live working tree에서 만들며, 수정이 만든 hunk도 분모에 들어간다. 새 세대는 판정이 비어 있으므로 재리뷰 결과를 전부 다시 `record`한다. 저장소가 실제로 바뀌지 않았으면 `ledger_advance_noop`으로 거부하는데, 완료된 세대를 잃지 않기 위한 것이므로 우회하지 말고 수정이 적용됐는지 확인한다.
 
 반복 상한까지 blocker가 남으면 실패로 종료하며 snapshot을 보존한다.
 
@@ -470,7 +473,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 
 불변식 위반, 검증 실패, unresolved blocker이면 `abort`로 lock만 해제하고 snapshot을 보존한다.
 
-`--allow-unledgered`는 원장이 불완전해도 통과시키는 탈출구다. 사용자가 명시적으로 요청한 경우에만 쓰며, 사용했다면 `ledger_bypassed`, `pending_count`와 `pending` 목록을 최종 보고에 반드시 표시한다. 조용히 우회하지 않는다.
+`--allow-unledgered`는 원장이 불완전해도 통과시키는 탈출구다. 사용자가 명시적으로 요청한 경우에만 쓰며, 사용했다면 **`bypassed_reason`**, `ledger_bypassed`, `pending_count`, `pending`을 최종 보고에 반드시 표시한다. `ledger_stale`·`ledger_missing`·`ledger_inventory_mismatch`·`ledger_empty_inventory` 우회는 모두 `pending_count`가 0이라, `bypassed_reason`을 빼면 가장 위험한 우회가 “미판정 0건”이라는 무해한 문장으로 보고된다. `pending`은 상위 20개 표본이다. 우회한 `finish`는 snapshot을 삭제하지 않으므로 응답의 `snapshot` 경로도 보고한다.
 
 ## 7. 최종 보고
 

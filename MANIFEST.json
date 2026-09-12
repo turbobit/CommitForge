@@ -3,7 +3,7 @@
   "version": "1.17.0",
   "reproducible": true,
   "file_count": 149,
-  "total_bytes": 1532569,
+  "total_bytes": 1572893,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -37,8 +37,8 @@
     },
     {
       "path": ".claude/agents/cca-line-reviewer.md",
-      "size": 1340,
-      "sha256": "e6d72097a5d37d7e9d0087cd4930760b4ae5df6b3a7e37b6a37b81eece7f53b6"
+      "size": 1472,
+      "sha256": "9740b1bffcb125ba053bd8ae7e8e8e46b518a86c0a5931d98242059e81a2043b"
     },
     {
       "path": ".claude/agents/cca-observability-reviewer.md",
@@ -113,7 +113,7 @@
     {
       "path": ".claude/skills/_git-atomic-core/deep-review-protocol.md",
       "size": 6810,
-      "sha256": "919423be7d22d06cc36c543099b7ba0351fb427e2bccd701ad4d07cc8750ab18"
+      "sha256": "bbb29b2722d0b0b405499f8a1eb9676947d28ffaebd9167015791233df688b9a"
     },
     {
       "path": ".claude/skills/_git-atomic-core/examples.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
-      "size": 1793,
-      "sha256": "28237fd1d85efd36f80b43e081d339999aea3833ac612b0e08e4b2829d89336b"
+      "size": 2124,
+      "sha256": "0e3d478f6cd93ba46b6bdb92e6862f22240207b80e6220f13a6547781761d670"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
@@ -182,8 +182,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 11642,
-      "sha256": "9c98ff3579150e535ba0bef90a777f6935d9d62ee4f0d095120ddb85cd2fd332"
+      "size": 12102,
+      "sha256": "92b8de50322c65e6aa9000837bb40dec0cbbfc769d04a37320a0d52a2a7cfd27"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -217,8 +217,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 83303,
-      "sha256": "699c484681dd5317b12b3525f9df4ec23d1b8e18c6f273715625ffb6bffb2398"
+      "size": 89268,
+      "sha256": "3995e63942dc760b7264c5f2f3624c26071c149003e0c493284308f7912255cf"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -227,8 +227,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 40534,
-      "sha256": "f65c351b7f5663e8461c3f406bba509429b7eef45cb3e0abcc2e21e40e7fba81"
+      "size": 55363,
+      "sha256": "bef4d233fffae3b533232a378dc78d6057400bd142a4dfa94bcc673ee92ee84e"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -312,8 +312,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 29406,
-      "sha256": "9631561229b7d98520ff3cf591f1e28ce7908c75c62c6e7894ec235c03479fbe"
+      "size": 31367,
+      "sha256": "17a3e722908787d747cdbbd5fc01b4c051296e527f936e865e16d18577a1f09f"
     },
     {
       "path": ".gitattributes",
@@ -332,8 +332,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 26184,
-      "sha256": "c08a6f36671dc68906a126c32d379bb0bc6a8a358874b1be7b2d1f53cf33ca73"
+      "size": 28244,
+      "sha256": "640ea7ddb6ca9aead4d77582fcf0659a21e53f5d7fd9fbf8253b0e5c3a9a821b"
     },
     {
       "path": "INSTALL.md",
@@ -377,8 +377,8 @@
     },
     {
       "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
-      "size": 24126,
-      "sha256": "3b65082093964cc32708ad5f1a125a0f3a7ef2b30d438860ef0407b7d690ddb2"
+      "size": 24298,
+      "sha256": "2ac1aa54cefb52dfdb9cb27a87eaffd3cf1126c446d0b9e666c505908767888d"
     },
     {
       "path": "editor-extension/.vscodeignore",
@@ -692,8 +692,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 58691,
-      "sha256": "0a2691fbfa82fa4eb2f41b0a6cd391de605fce441d61678e9c4e70b5f2343545"
+      "size": 73105,
+      "sha256": "5f199d92f17a281e378c99579482f97054620c721b1cef1cae7a5dc290999326"
     },
     {
       "path": "tests/test_package.py",

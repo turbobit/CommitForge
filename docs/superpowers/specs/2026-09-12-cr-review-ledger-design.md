@@ -184,7 +184,8 @@ tree와 함께 선언된 `working`)가 정상적으로 존재하며 이를 실�
 재개 규칙:
 
 - `exists: false`이면 신규 실행이다. `init` → `inventory`로 진행한다.
-- `exists: true`이고 `fingerprint_matches_current: true`이면 **처음부터 다시 하지 않는다.** `stage`와 `pending_sample`을 근거로 미판정 id만 이어서 검토한다.
+- `exists: true`이고 `fingerprint_matches_current: true`이면 **처음부터 다시 하지 않는다.** `pending`·`pending_count`를 근거로 미판정 id만 이어서 검토한다.
+- `fingerprint_matches_current: null`이면 아직 `inventory`를 실행하지 않은 정상 상태다. 어긋난 것이 아니므로 `inventory`로 이어서 진행한다.
 - `fingerprint_matches_current: false`이면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 않고 사용자에게 보고한다. read-only `/cr`에서는 외부 변경을, `--fix` 실행에서는 `advance` 누락을 뜻한다.
 
 `begin`이 새 token으로 새 스냅샷을 만들면 원장도 새로 시작된다. 따라서 재개는 같은 `/cr` 실행이 컴팩트를 겪은 경우를 대상으로 하며, `abort`로 보존된 이전 실행의 원장은 사후 분석 자료로만 쓴다.

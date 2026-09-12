@@ -21,6 +21,29 @@
   snapshot에 변경이 있는데 분모가 0일 때만 `ledger_empty_inventory`다
 - 대규모 diff 리뷰에서 컨텍스트 압축으로 변경 원장이 유실되어도 미검토 hunk가
   침묵 통과하지 않는다. 커버리지 판정 근거가 대화 기억에서 디스크로 옮겨졌다
+- 분모에서 hunk가 빠지던 경로를 닫았다. `begin` 이후 편집하면 `inventory`가
+  snapshot 대신 live working tree를 읽고(이전에는 `iteration`만 보다가 `init`의
+  scope 추가 경로에서 낡은 snapshot을 읽으면서 세대 이름만 현재 fingerprint로
+  붙어 `ledger_stale`이 발동하지 못했다), 충돌 상태의 `diff --cc`/`* Unmerged
+  path`와 `diff.submodule`·`diff.ignoreSubmodules` 설정에 가려지던 submodule
+  포인터 변경을 모두 센다. 중복 선언한 scope는 분모를 두 배로 만들지 않는다
+- `append_jsonl`이 잘린 마지막 줄에 이어붙이지 않는다. 이전에는 다음 batch가
+  조각에 붙어 조용히 사라지고 그다음 batch가 원장을 영구 손상시켰다
+- 원장 손상·미초기화가 exit 3이 아니라 `ledger_corrupt`·`ledger_missing`으로
+  보고된다. `run.json` 필드 타입, JSONL 레코드 형태, `init` 이전의 잠금 획득이
+  모두 진단 가능한 실패가 됐다
+- `advance`는 저장소가 실제로 바뀌지 않았으면 `ledger_advance_noop`으로 거부해
+  완료된 세대를 잃지 않게 하고, `report`는 이전 세대의 finding까지 모아
+  보고한다. 이전에는 수정 후 `advance` 한 번으로 모든 finding이 사라졌다
+- `--allow-unledgered`로 통과한 `finish`는 snapshot을 보존한다. 우회 내역의
+  유일한 기록이 원장이기 때문이다. 원장이 없을 때의 게이트 출력도 다른 경로와
+  같은 필드 집합을 갖는다
+- `guard.emit`이 surrogate escape 경로를 담은 payload에서 죽지 않는다. 이전에는
+  UnicodeEncodeError로 JSON 없이 exit 1이었다
+- reviewer 계약의 hunk 판정 철자를 `N_A`로 통일했다. `N/A`는 batch 전체가
+  거부되므로 `cca-line-reviewer`와 `review-execution.md`가 원장과 어긋나 있었다
+- `/cr` §4의 원장 세대 전이를 재리뷰 **앞으로** 옮겼다. 뒤에 두면 재리뷰 판정이
+  낡은 세대에 기록됐다가 전이 시점에 버려져 `finish`가 차단됐다
 
 ## 1.16.0 — 2026-09-11
 

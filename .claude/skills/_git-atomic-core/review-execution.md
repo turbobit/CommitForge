@@ -131,8 +131,11 @@ Agent Team 선택 시:
 - 변경 유형상 활성화된 조건부 reviewer도 해당 변경에서는 필수
 - agent 시작 실패·timeout·turn 소진 시 main agent가 같은 관점을 직접 수행한다.
 - fallback도 완료하지 못하면 해당 관점은 `UNKNOWN`이며 성공 또는 commit을 차단한다.
-- 선택 관점을 조용히 누락하지 않는다. `PASS`, `FINDING`, `N/A`, `UNKNOWN` 중 하나를 기록한다.
-- `UNKNOWN`은 `N/A`가 아니다. 적용되지 않는다는 근거가 있을 때만 `N/A`다.
+- 선택 관점을 조용히 누락하지 않는다. `PASS`, `FINDING`, `N_A`, `UNKNOWN` 중 하나를 기록한다.
+- `UNKNOWN`은 `N_A`가 아니다. 적용되지 않는다는 근거가 있을 때만 `N_A`다.
+- hunk 판정의 철자는 `N_A`다. 원장은 `N/A`를 `ledger_invalid_verdict`로 거부하며,
+  거부는 batch 전체를 버리므로 같은 batch의 `PASS`도 함께 사라진다. reviewer 산문에
+  쓰는 “해당 없음”의 `N/A`와 혼동하지 않는다.
 
 ## 3. Finding 공통 스키마
 
@@ -164,6 +167,8 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
 - 수정 후 fingerprint가 바뀌면 기존 finding을 새 결과로 덮지 않고 `FIXED` 또는 `STALE`로 연결한다.
 - 이 스키마가 곧 원장의 finding 레코드다. 별도 스키마를 만들지 않고
   `ledger.py record`의 `findings` 배열에 그대로 넣는다.
+- `FINDING` 판정에는 대응하는 finding의 `id`를 verdict의 `finding_ids` 배열에
+  넣어야 한다. 비어 있으면 `ledger_finding_missing`으로 batch 전체가 거부된다.
 - 원장에 쓰는 주체는 lead뿐이다. teammate와 reviewer subagent는 결과를 lead에게
   반환하고, lead가 수신 즉시 적재한다.
 - `cca-*` reviewer agent에 Bash를 부여하지 않는다. 읽기 전용 경계이자 원장의
