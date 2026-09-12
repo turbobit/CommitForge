@@ -498,6 +498,47 @@ def cmd_inventory(args: argparse.Namespace) -> None:
     guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
 
 
+def _require_list_of_dicts(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
+    """Validate `payload[key]` is absent, or a list whose elements are all objects.
+
+    record's stdin is model-authored input reaching the ledger directly, so a
+    malformed shape here must fail closed as `ledger_bad_input` rather than
+    raise `AttributeError`/`KeyError` deeper in `cmd_record` when a caller
+    later does `.get(...)` on an element that turned out not to be a dict.
+    """
+    value = payload.get(key)
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise guard.GuardError(
+            f"{key}는 object의 list여야 합니다.", reason="ledger_bad_input", field=key
+        )
+    return value
+
+
+def _require_str_field(record: dict[str, Any], field: str, label: str) -> str:
+    value = record.get(field)
+    if not isinstance(value, str) or not value:
+        raise guard.GuardError(
+            f"{label} 항목의 {field}는 비어 있지 않은 문자열이어야 합니다.",
+            reason="ledger_bad_input",
+            field=field,
+        )
+    return value
+
+
+def _require_str_list_field(record: dict[str, Any], field: str, label: str) -> None:
+    value = record.get(field)
+    if value is None:
+        return
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise guard.GuardError(
+            f"{label} 항목의 {field}는 문자열 list여야 합니다.",
+            reason="ledger_bad_input",
+            field=field,
+        )
+
+
 def cmd_record(args: argparse.Namespace) -> None:
     try:
         payload = json.load(sys.stdin)
@@ -510,9 +551,21 @@ def cmd_record(args: argparse.Namespace) -> None:
             "record 입력은 JSON object여야 합니다.", reason="ledger_bad_input"
         )
 
-    verdicts = payload.get("verdicts") or []
-    findings = payload.get("findings") or []
-    reviewers = payload.get("reviewers") or []
+    verdicts = _require_list_of_dicts(payload, "verdicts")
+    findings = _require_list_of_dicts(payload, "findings")
+    reviewers = _require_list_of_dicts(payload, "reviewers")
+
+    # Shape-validate every element before any semantic check (unknown id,
+    # invalid verdict, missing finding) and before any write, so a batch
+    # rejected for a malformed shape leaves the ledger untouched exactly like
+    # one rejected for a semantic reason.
+    for verdict in verdicts:
+        _require_str_field(verdict, "id", "verdicts")
+        _require_str_list_field(verdict, "finding_ids", "verdicts")
+    for finding in findings:
+        _require_str_field(finding, "id", "findings")
+    for reviewer in reviewers:
+        _require_str_field(reviewer, "name", "reviewers")
 
     _, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
     with LedgerLock(ledger_dir):

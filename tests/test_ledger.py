@@ -364,6 +364,68 @@ class RecordTest(LedgerTestCase):
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_invalid_verdict")
 
+    def test_record_rejects_non_dict_verdict_element(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.record(
+            started["session"], {"verdicts": ["not-a-dict"]}, check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_bad_input")
+
+    def test_record_rejects_non_string_verdict_id(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {"verdicts": [{"id": 123, "verdict": "PASS"}]},
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_bad_input")
+
+    def test_record_rejects_reviewer_missing_name(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "PASS"}],
+                "reviewers": [{"status": "ACTIVE"}],
+            },
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_bad_input")
+
+    def test_record_rejects_verdicts_not_a_list(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.record(
+            started["session"], {"verdicts": "PASS"}, check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_bad_input")
+
+    def test_rejected_batch_leaves_hunks_file_unchanged(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": "r0"}]},
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        hunks = (
+            Path(started["snapshot"]) / "ledger" / status["active_generation"] / "hunks.jsonl"
+        )
+        before = hunks.read_bytes()
+
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": "working:does-not-exist.py#9", "verdict": "PASS"}]},
+            check=False,
+        )
+        self.record(
+            started["session"], {"verdicts": ["not-a-dict"]}, check=False
+        )
+
+        self.assertEqual(hunks.read_bytes(), before)
+
     def test_finding_verdict_requires_finding_record(self) -> None:
         started, ids = self.prepared()
         proc, refused = self.record(
