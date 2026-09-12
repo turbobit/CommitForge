@@ -16,6 +16,15 @@
   해당 snapshot에 대한 소유 증명이며 `release-snapshot`에만 사용
 - `clean`은 이전과 같이 이 snapshot을 삭제하지 않음. 관련 문서의 정리 안내를
   `release-snapshot` 기준으로 수정
+- VS Code·Cursor용 에디터 확장(`editor-extension/`) 추가. 워크스페이스의
+  설치 상태(project·global)와 lock·snapshot·경고를 상태바와 사이드바 트리
+  뷰로 보여주고, 명령과 옵션을 골라 확인 후 Claude Code 터미널로 전송. 확장은
+  `.claude/` 아래에 직접 쓰지 않고 항상 번들된 `install.py`/`uninstall.py`를
+  실행해 CLI 설치와 결과가 동일하게 유지됨
+- `install.py`가 설치 시 `.claude/.commitforge-install.json` 마커(버전·범위·
+  Python 경로·core 경로)를 기록하고 `uninstall.py`가 제거. 해시 대조만으로는
+  구분할 수 없던 설치본 버전을 마커로 표시할 수 있게 되어 CLI 단독 사용자와
+  에디터 확장 모두에 도움
 
 ## 1.15.0 — 2026-09-11
 

@@ -76,6 +76,17 @@ Claude Code를 열고 목적에 맞는 명령을 실행합니다.
 
 Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. 전체 설치 방식은 [설치](#설치)를 참고하십시오.
 
+### 에디터 확장
+
+VS Code나 Cursor를 쓴다면 확장으로 설치·상태 확인·명령 실행을 GUI에서 할 수 있습니다.
+
+```bash
+cd editor-extension
+npm install && npm run package
+```
+
+생성된 `commitforge.vsix`를 에디터에서 설치합니다. 자세한 내용은 [editor-extension/README.md](editor-extension/README.md)를 참고하십시오.
+
 ## 문서 바로가기
 
 - [설치](#설치)
@@ -88,6 +99,7 @@ Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. �
 - [동시 세션·Diff 보존·복구](#동시-세션-안전성)
 - [안전 경계와 권한](#안전상-하지-않는-작업)
 - [검증·제거·개발](#검증)
+- [에디터 확장](editor-extension/README.md)
 
 ## 설치
 

@@ -2,24 +2,66 @@
   "name": "commitforge",
   "displayName": "CommitForge",
   "description": "Claude Code용 Atomic Git Assistant를 설치·관리하고 명령을 실행합니다",
-  "version": "0.0.0",
+  "version": "1.16.0",
   "publisher": "commitforge",
   "license": "MIT",
-  "engines": { "vscode": "^1.94.0" },
-  "categories": ["SCM Providers", "Other"],
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
   "main": "./dist/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
-      { "command": "commitforge.refresh", "title": "CommitForge: 상태 새로고침", "icon": "$(refresh)" },
-      { "command": "commitforge.focusView", "title": "CommitForge: 뷰 열기" },
-      { "command": "commitforge.run", "title": "CommitForge: 명령 실행", "icon": "$(play)" },
-      { "command": "commitforge.cleanLock", "title": "CommitForge: lock 해제(clean)", "icon": "$(unlock)" },
-      { "command": "commitforge.install", "title": "CommitForge: 설치", "icon": "$(cloud-download)" },
-      { "command": "commitforge.upgrade", "title": "CommitForge: 업그레이드", "icon": "$(arrow-up)" },
-      { "command": "commitforge.reinstall", "title": "CommitForge: 재설치", "icon": "$(sync)" },
-      { "command": "commitforge.uninstall", "title": "CommitForge: 제거", "icon": "$(trash)" },
-      { "command": "commitforge.verify", "title": "CommitForge: 설치 검증", "icon": "$(check)" },
+      {
+        "command": "commitforge.refresh",
+        "title": "CommitForge: 상태 새로고침",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "commitforge.focusView",
+        "title": "CommitForge: 뷰 열기"
+      },
+      {
+        "command": "commitforge.run",
+        "title": "CommitForge: 명령 실행",
+        "icon": "$(play)"
+      },
+      {
+        "command": "commitforge.cleanLock",
+        "title": "CommitForge: lock 해제(clean)",
+        "icon": "$(unlock)"
+      },
+      {
+        "command": "commitforge.install",
+        "title": "CommitForge: 설치",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "commitforge.upgrade",
+        "title": "CommitForge: 업그레이드",
+        "icon": "$(arrow-up)"
+      },
+      {
+        "command": "commitforge.reinstall",
+        "title": "CommitForge: 재설치",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "commitforge.uninstall",
+        "title": "CommitForge: 제거",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "commitforge.verify",
+        "title": "CommitForge: 설치 검증",
+        "icon": "$(check)"
+      },
       {
         "command": "commitforge.revealSnapshots",
         "title": "CommitForge: 스냅샷 폴더 열기",
@@ -36,7 +78,12 @@
       ]
     },
     "views": {
-      "commitforge": [{ "id": "commitforge.view", "name": "상태" }]
+      "commitforge": [
+        {
+          "id": "commitforge.view",
+          "name": "상태"
+        }
+      ]
     },
     "menus": {
       "view/title": [
@@ -52,8 +99,14 @@
         }
       ],
       "commandPalette": [
-        { "command": "commitforge.upgrade", "when": "false" },
-        { "command": "commitforge.reinstall", "when": "false" }
+        {
+          "command": "commitforge.upgrade",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.reinstall",
+          "when": "false"
+        }
       ],
       "view/item/context": [
         {
@@ -145,8 +198,9 @@
     }
   },
   "scripts": {
+    "sync-version": "node scripts/sync-version.mjs",
     "sync-payload": "node scripts/sync-payload.mjs",
-    "build": "npm run sync-payload && node esbuild.mjs",
+    "build": "npm run sync-version && npm run sync-payload && node esbuild.mjs",
     "watch": "node esbuild.mjs --watch",
     "pretest": "npm run sync-payload",
     "test": "vitest run",
