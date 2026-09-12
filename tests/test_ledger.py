@@ -630,5 +630,87 @@ class CoverageTest(LedgerTestCase):
         self.assertIsInstance(status["unknown_count"], int)
 
 
+class GateTest(LedgerTestCase):
+    def prepared(self) -> tuple[dict, list[str]]:
+        # Two independent entries (as in CoverageTest.prepared) so that
+        # recording a verdict for only ids[0] leaves a genuine pending
+        # entry; a single-entry fixture would make "record the only id"
+        # and "cover everything" indistinguishable.
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        (self.tmp / "extra.txt").write_text("fresh\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def test_incomplete_ledger_blocks_verify_review(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+        self.assertGreater(refused["pending_count"], 0)
+
+    def test_complete_ledger_passes_verify_review(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger"]["complete"])
+
+    def test_unknown_verdict_blocks_verify_review(self) -> None:
+        started, ids = self.prepared()
+        verdicts = [{"id": identifier, "verdict": "PASS"} for identifier in ids[1:]]
+        verdicts.append({"id": ids[0], "verdict": "UNKNOWN"})
+        self.record(started["session"], {"verdicts": verdicts})
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_unknown")
+
+    def test_missing_ledger_blocks_verify_review(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_missing")
+
+    def test_allow_unledgered_passes_with_bypass_marker(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger", "--allow-unledgered",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger_bypassed"])
+        self.assertGreater(verified["ledger"]["pending_count"], 0)
+
+    def test_finish_enforces_the_same_gate(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        proc, refused = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only", "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+        self.assertTrue(Path(started["snapshot"]).exists())
+
+
 if __name__ == "__main__":
     unittest.main()

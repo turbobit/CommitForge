@@ -1183,6 +1183,58 @@ def review_invariants(
     }
 
 
+def ledger_gate(
+    ctx: dict[str, Path],
+    snapshot: Path,
+    *,
+    allow_unledgered: bool,
+) -> dict[str, Any]:
+    """Compare the machine-owned denominator against recorded verdicts.
+
+    Imported lazily: ledger.py imports guard.py, so a module-level import here
+    would be circular.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import ledger
+
+    ledger_dir = snapshot / ledger.LEDGER_DIR_NAME
+    if not (ledger_dir / ledger.RUN_NAME).is_file():
+        if allow_unledgered:
+            return {"complete": False, "reason": "ledger_missing", "pending_count": 0}
+        raise GuardError(
+            "리뷰 원장이 없어 커버리지를 확인할 수 없습니다.",
+            reason="ledger_missing",
+            ledger_dir=str(ledger_dir),
+        )
+
+    data = ledger.read_run(ledger_dir)
+    summary = ledger.coverage(ctx, ledger_dir, data)
+
+    if allow_unledgered:
+        return summary
+    if not summary["fingerprint_matches_current"]:
+        raise GuardError(
+            "원장의 활성 세대가 현재 저장소 상태와 다릅니다. advance가 누락되었습니다.",
+            reason="ledger_stale",
+            generation=summary["generation"],
+        )
+    if summary["unknown_count"]:
+        raise GuardError(
+            "UNKNOWN 판정이 남아 있어 완료할 수 없습니다.",
+            reason="ledger_unknown",
+            unknown_count=summary["unknown_count"],
+            unknown=summary["unknown"],
+        )
+    if summary["pending_count"]:
+        raise GuardError(
+            "미판정 hunk가 남아 있어 완료할 수 없습니다.",
+            reason="ledger_incomplete",
+            pending_count=summary["pending_count"],
+            pending=summary["pending"],
+        )
+    return summary
+
+
 def cmd_verify_review(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
@@ -1202,6 +1254,10 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
         raise GuardError(
             "/cr 불변 조건을 충족하지 못했습니다: " + ", ".join(failed)
         )
+    if args.require_ledger:
+        summary = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
+        result["ledger"] = summary
+        result["ledger_bypassed"] = bool(args.allow_unledgered) and not summary["complete"]
     emit(result)
 
 
@@ -1291,6 +1347,12 @@ def cmd_finish(args: argparse.Namespace) -> None:
                 + ", ".join(failed)
             )
 
+    ledger_result = None
+    ledger_bypassed = False
+    if args.require_ledger:
+        ledger_result = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
+        ledger_bypassed = bool(args.allow_unledgered) and not ledger_result["complete"]
+
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
     )
@@ -1312,6 +1374,8 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "worktree_clean": not bool(dirty),
             "review_invariants": review_result,
             "snapshot_audit": audit_result,
+            "ledger": ledger_result,
+            "ledger_bypassed": ledger_bypassed,
         }
     )
 
@@ -1841,6 +1905,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow only this branch change when the snapshot began on main/master",
     )
     finish.add_argument("--keep-snapshot", action="store_true")
+    finish.add_argument("--require-ledger", action="store_true")
+    finish.add_argument("--allow-unledgered", action="store_true")
 
     verify_review = sub.add_parser(
         "verify-review",
@@ -1860,6 +1926,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-branch",
         help="Allow only this branch change when the snapshot began on main/master",
     )
+    verify_review.add_argument("--require-ledger", action="store_true")
+    verify_review.add_argument("--allow-unledgered", action="store_true")
 
     audit = sub.add_parser(
         "audit-snapshot",
