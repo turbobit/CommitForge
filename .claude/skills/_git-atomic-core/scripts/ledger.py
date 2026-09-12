@@ -9,6 +9,7 @@ agent writes to it; reviewer subagents have no Bash tool and cannot.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -97,15 +98,43 @@ def write_run(ledger_dir: Path, data: dict[str, Any]) -> None:
     os.replace(tmp, ledger_dir / RUN_NAME)
 
 
+def split_range_expression(expression: str) -> tuple[str, str, str]:
+    """Split a range expression into (left, separator, right).
+
+    The triple-dot symmetric-difference form (`A...B`) is checked before the
+    plain two-dot form (`A..B`) since `..` is a substring of `...` and would
+    otherwise split in the wrong place. Returns `("", "", "")` when neither
+    separator is present.
+    """
+    triple_at = expression.find("...")
+    if triple_at != -1:
+        return expression[:triple_at], "...", expression[triple_at + 3 :]
+    double_at = expression.find("..")
+    if double_at != -1:
+        return expression[:double_at], "..", expression[double_at + 2 :]
+    return expression, "", ""
+
+
 def validate_scopes(raw: list[str]) -> list[str]:
     scopes = []
     for value in raw:
         if value == "working":
             scopes.append(value)
             continue
-        if value.startswith("range:") and ".." in value[len("range:") :]:
-            scopes.append(value)
-            continue
+        if value.startswith("range:"):
+            expression = value[len("range:") :]
+            left, sep, right = split_range_expression(expression)
+            # Both sides must be present and neither may start with `-`: an
+            # empty side (`..HEAD`, `A..`) is legal git shorthand for HEAD but
+            # is rejected here rather than resolved, and a leading `-` would
+            # let the expression be parsed as a git option (e.g.
+            # `--output=<path>`) instead of a revision, letting `git diff`
+            # exit 0 having diffed nothing and, in the `--output` case,
+            # written outside the ledger directory. Both must fail closed at
+            # validation time, before any git subprocess ever sees the value.
+            if sep and left and right and not left.startswith("-") and not right.startswith("-"):
+                scopes.append(value)
+                continue
         raise guard.GuardError(
             f"알 수 없는 scope입니다: {value}", reason="ledger_scope_invalid"
         )
@@ -303,8 +332,25 @@ def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]
 
     The snapshot only captures working state, so `--base`, `--range`, `pr` and
     the period modes need their denominator computed here instead.
+
+    `validate_scopes` already rejects a leading `-` on either side, but that
+    check runs at `init` time against the raw string. This still resolves
+    both sides with `git rev-parse --verify <side>^{commit}` before ever
+    calling `git diff`, so a side that cannot be resolved to a commit fails
+    closed here too, and the range only ever reaches `git diff` once both
+    ends are known-good commit ids.
     """
     expression = spec[len("range:") :]
+    left, _sep, right = split_range_expression(expression)
+    for side in (left, right):
+        try:
+            guard.run_git(["rev-parse", "--verify", f"{side}^{{commit}}"], cwd=ctx["root"])
+        except guard.GuardError as exc:
+            raise guard.GuardError(
+                f"커밋 범위를 해석하지 못했습니다: {expression}",
+                reason="ledger_range_unresolved",
+                range=expression,
+            ) from exc
     try:
         diff = guard.run_git(
             ["diff", "--binary", "--full-index", "--no-ext-diff", expression],
@@ -316,7 +362,12 @@ def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]
             reason="ledger_range_unresolved",
             range=expression,
         ) from exc
-    return parse_diff_entries(diff, "range")
+    # A distinct source per range expression (rather than the shared literal
+    # "range") keeps ids from two declared range scopes disjoint even when
+    # they touch the same path at the same hunk index; the digest is a pure
+    # function of the expression so a re-run of `inventory` is idempotent.
+    source = f"range@{hashlib.sha256(expression.encode('utf-8')).hexdigest()[:8]}"
+    return parse_diff_entries(diff, source)
 
 
 def fingerprint_short(ctx: dict[str, Path]) -> str:

@@ -264,7 +264,10 @@ class InventoryRangeScopeTest(LedgerTestCase):
             "--scope", "working", "--scope", f"range:{spec}",
         )
         _, built = self.ledger("inventory", "--session", started["session"])
-        ranged = [entry for entry in built["entries"] if entry["source"] == "range"]
+        ranged = [
+            entry for entry in built["entries"]
+            if entry["source"].startswith("range@")
+        ]
         self.assertTrue(any(entry["path"] == "ranged.txt" for entry in ranged))
 
     def test_invalid_range_fails_closed(self) -> None:
@@ -275,6 +278,53 @@ class InventoryRangeScopeTest(LedgerTestCase):
         proc, refused = self.ledger("inventory", "--session", started["session"], check=False)
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_range_unresolved")
+
+    def test_range_scope_rejects_option_injection_via_output_flag(self) -> None:
+        started = self.begin()
+        target = self.tmp / "pwned.txt"
+        proc, refused = self.ledger(
+            "init", "--session", started["session"],
+            "--scope", f"range:--output={target}..HEAD",
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_scope_invalid")
+        self.assertFalse(target.exists())
+
+    def test_range_scope_rejects_leading_dash_option(self) -> None:
+        started = self.begin()
+        proc, refused = self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "range:-p..HEAD",
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_scope_invalid")
+
+    def test_two_range_scopes_produce_disjoint_ids(self) -> None:
+        base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "shared.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "shared.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: shared v1"], self.tmp)
+        mid = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "shared.txt").write_text("two\n", encoding="utf-8")
+        run(["git", "add", "shared.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: shared v2"], self.tmp)
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+
+        first_spec = f"{base}..{mid}"
+        second_spec = f"{mid}..{head}"
+
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"],
+            "--scope", f"range:{first_spec}", "--scope", f"range:{second_spec}",
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ranged = [entry for entry in built["entries"] if entry["path"] == "shared.txt"]
+        self.assertEqual(len(ranged), 2)
+        ids = [entry["id"] for entry in ranged]
+        self.assertEqual(len(ids), len(set(ids)))
 
 
 if __name__ == "__main__":
