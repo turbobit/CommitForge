@@ -20,7 +20,18 @@ export function isWriteCommand(name: string): boolean {
 
 /** sendText에서 개행은 Enter다. 명령이 절반만 전송되는 것을 막는다. */
 export function sanitizeFreeText(input: string): string {
-  return input.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  const collapsed = input.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+  // freeText는 quote()를 거치지 않고 다른 토큰들과 공백으로만 이어붙는 산문이다.
+  // 통째로 quote()로 감싸면 여러 단어가 하나의 토큰이 되어 뜻이 바뀌므로 그럴 수
+  // 없다. 하지만 cr_edit_gate.py(exact_fix_requested)는 /cr의 전체 인자 문자열을
+  // shlex.split()으로 재파싱하는데, 산문에 홑따옴표가 홀수 개(예: "o'brien")만
+  // 있어도 "닫는 따옴표 없음"으로 전체 파싱이 깨져 뒤에 오는 --fix까지 인식되지
+  // 않는다. 산문 안에서 따옴표의 짝을 맞추는 것은 사용자 입력을 검열하는 셈이라
+  // 신뢰할 수 없으므로, 홑따옴표·큰따옴표·백슬래시를 백슬래시로 이스케이프해
+  // shlex 입장에서 이 문자들이 항상 '따옴표 열기'가 아니라 '리터럴 문자'가 되게
+  // 만든다. POSIX 이스케이프 규칙상 이러면 홀짝과 무관하게 항상 안전하게
+  // 파싱된다.
+  return collapsed.replace(/[\\'"]/g, "\\$&");
 }
 
 // 브랜치명·경로·ref·semver가 전부 여기 들어간다. 이 집합 밖의 문자가 하나라도

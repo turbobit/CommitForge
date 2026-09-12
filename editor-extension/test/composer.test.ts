@@ -16,6 +16,18 @@ const cca = parseSkillFile(
   "cca",
 );
 
+const cr = parseSkillFile(
+  [
+    "---",
+    "name: cr",
+    "description: 코드 리뷰를 실행한다.",
+    'argument-hint: "[clean|today] [추가 맥락] [--fix] [--strict]"',
+    "---",
+    "본문",
+  ].join("\n"),
+  "cr",
+);
+
 describe("compose", () => {
   it("옵션이 없으면 명령만 낸다", () => {
     expect(compose(cca, { options: [] })).toBe("/cca");
@@ -192,6 +204,37 @@ describe("compose ↔ 실제 Python shlex.split 왕복", () => {
     for (const value of cases) {
       const composed = compose(cca, { options: [{ name: "--base", value }] });
       expect(shlexSplit(python, composed)).toEqual(["/cca", "--base", value]);
+    }
+  });
+
+  // cr_edit_gate.py의 exact_fix_requested()는 /cr의 전체 인자 문자열(모드 +
+  // freeText + 옵션)을 한 번에 shlex.split()한다. freeText는 quote()를 거치지
+  // 않는 산문이라 홑따옴표가 하나만 있어도 예전에는 "No closing quotation"으로
+  // 파싱 자체가 깨졌고, --fix가 뒤에 있어도 인식되지 못했다.
+  it("freeText에 홑따옴표·큰따옴표·백슬래시·짝이 맞는 따옴표가 있어도 shlex 파싱이 깨지지 않고 --fix가 살아남는다", async (ctx) => {
+    const python = (await spawnProbe("python3"))
+      ? "python3"
+      : (await spawnProbe("python"))
+        ? "python"
+        : null;
+    if (!python) {
+      console.warn("[skip] 이 환경에서는 python3/python을 찾지 못해 shlex 왕복 테스트를 건너뜁니다");
+      ctx.skip();
+      return;
+    }
+
+    const freeTexts = [
+      "o'brien의 코드",
+      '그 "기능" 부분만',
+      "경로\\처리 확인",
+      '"짝이 맞는" 따옴표 프롬프트',
+      "it's a \"quoted\" phrase",
+    ];
+
+    for (const freeText of freeTexts) {
+      const composed = compose(cr, { freeText, options: [{ name: "--fix" }] });
+      expect(() => shlexSplit(python, composed)).not.toThrow();
+      expect(shlexSplit(python, composed)).toContain("--fix");
     }
   });
 });
