@@ -330,3 +330,171 @@ describe("buildTree - 잠금 보유 중", () => {
     expect(labels(lockNode!)).toEqual(["session abc123", "12분 경과", "이 호스트"]);
   });
 });
+
+// 피드백 1: "설치" 그룹 행 자체가 결론(어느 범위를 실제로 쓰는지)을 말해야
+// 하고, 정상인 반대쪽이 있으면 "미설치"가 문제로 보이면 안 된다.
+describe("buildTree - 설치 그룹 행: project/global 중 하나만 있으면 된다", () => {
+  const missingProject: InstallReport = { ...baseReport, state: "missing", installedVersion: null };
+  const missingGlobal: InstallReport = {
+    ...baseReport,
+    scope: "global",
+    state: "missing",
+    installedVersion: null,
+  };
+  const okGlobal: InstallReport = { ...baseReport, scope: "global" };
+
+  it("project 미설치 + global 정상 → 그룹 행이 global 사용 중이라 말한다", () => {
+    const nodes = buildTree(state({ project: missingProject, global: okGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).toBe("global 사용 중");
+  });
+
+  it("project 미설치 + global 정상 → project 행이 문제로 보이지 않는다(색이 죽고, 없어도 된다는 단서가 붙는다)", () => {
+    const nodes = buildTree(state({ project: missingProject, global: okGlobal }));
+    const group = findChild(nodes, "설치")!;
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    expect(projectNode.description).toContain("없어도 됨");
+    expect(projectNode.iconPath).toMatchObject({ color: { id: "disabledForeground" } });
+  });
+
+  it("project 정상 + global 미설치 → 그룹 행이 project 사용 중이라 말하고, global 행이 문제로 보이지 않는다", () => {
+    const nodes = buildTree(state({ project: baseReport, global: missingGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).toBe("project 사용 중");
+    const globalNode = group.children.find((n) => n.label === "global")!;
+    expect(globalNode.description).toContain("없어도 됨");
+    expect(globalNode.iconPath).toMatchObject({ color: { id: "disabledForeground" } });
+  });
+
+  it("둘 다 미설치 → 설치를 권한다", () => {
+    const nodes = buildTree(state({ project: missingProject, global: missingGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).toBe("설치 필요");
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    const globalNode = group.children.find((n) => n.label === "global")!;
+    // 둘 다 미설치일 때는 "없어도 됨" 단서를 붙이지 않는다 — 실제로 할 일이다.
+    expect(projectNode.description).not.toContain("없어도 됨");
+    expect(globalNode.description).not.toContain("없어도 됨");
+  });
+
+  it("둘 다 정상 → project를 우선해 쓰고 있음이 분명하다(statusBar.ts와 같은 규칙)", () => {
+    const nodes = buildTree(state({ project: baseReport, global: okGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).toBe("project 사용 중");
+  });
+
+  it("각 범위 행에 tooltip이 붙어 project/global이 무엇을 뜻하는지 설명한다", () => {
+    const nodes = buildTree(state({ project: baseReport, global: missingGlobal }));
+    const group = findChild(nodes, "설치")!;
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    const globalNode = group.children.find((n) => n.label === "global")!;
+    expect(projectNode.tooltip).toContain("이 저장소에서만");
+    expect(globalNode.tooltip).toContain("모든 프로젝트");
+  });
+});
+
+// 피드백 2: 잠금 자식 3개(session/경과 시간/호스트)에 tooltip이 있어야
+// 전체 세션 ID·실제 생성 시각·호스트명을 알 수 있다.
+describe("buildTree - 잠금 자식 tooltip", () => {
+  it("session 노드는 전체 세션 ID를 tooltip에 담는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "3641b138-43ed-4d2f-9b1a-000000000000", created_at: null },
+          lockAgeSeconds: 30,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const sessionNode = lockNode.children.find((n) => String(n.label).startsWith("session"))!;
+    expect(sessionNode.tooltip).toContain("3641b138-43ed-4d2f-9b1a-000000000000");
+  });
+
+  it("경과 시간 노드는 실제 생성 시각(created_at)을 tooltip에 담는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: "2026-09-11T00:00:00Z" },
+          lockAgeSeconds: 4000,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const ageNode = lockNode.children.find((n) => String(n.label).endsWith("경과"))!;
+    expect(ageNode.tooltip).toContain("2026-09-11T00:00:00Z");
+  });
+
+  it("이 호스트 노드는 호스트명을 tooltip에 담는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 30,
+          lockOwnerHostname: "mac.local",
+          lockOwnerSameHost: true,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const hostNode = lockNode.children.find((n) => n.label === "이 호스트")!;
+    expect(hostNode.tooltip).toContain("mac.local");
+  });
+
+  it("다른 호스트 노드는 실제 호스트명과 경고를 tooltip에 담는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 30,
+          lockOwnerHostname: "other-machine.local",
+          lockOwnerSameHost: false,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const hostNode = lockNode.children.find((n) => n.label === "다른 호스트")!;
+    expect(hostNode.tooltip).toContain("other-machine.local");
+    expect(hostNode.tooltip).toContain("해제(clean)하면 안 됩니다");
+  });
+});
+
+// 피드백 2: 스냅샷 자식 항목은 눌렀을 때 열려야 하고, 라벨이 읽을 수 있어야
+// 한다(전체 경로가 아니라 디렉터리 이름).
+describe("buildTree - 스냅샷 자식 항목", () => {
+  it("라벨은 디렉터리 이름이고 전체 경로는 description에 남는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          snapshots: ["/Users/turbobit/dev/kcmi/.git/claude-atomic-snapshots/abc123"],
+        },
+      }),
+    );
+    const snapshotsNode = findChild(nodes, "스냅샷")!;
+    const snapshotNode = snapshotsNode.children[0]!;
+    expect(snapshotNode.label).toBe("abc123");
+    expect(snapshotNode.description).toBe(
+      "/Users/turbobit/dev/kcmi/.git/claude-atomic-snapshots/abc123",
+    );
+  });
+
+  it("commitforge.revealSnapshots를 그 스냅샷 경로로 호출하는 command를 가진다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          snapshots: ["/repo/.git/claude-atomic-snapshots/abc123"],
+        },
+      }),
+    );
+    const snapshotsNode = findChild(nodes, "스냅샷")!;
+    const snapshotNode = snapshotsNode.children[0]!;
+    expect(snapshotNode.resourcePath).toBe("/repo/.git/claude-atomic-snapshots/abc123");
+    expect(snapshotNode.command?.command).toBe("commitforge.revealSnapshots");
+    expect(snapshotNode.command?.arguments?.[0]).toBe(snapshotNode);
+  });
+});

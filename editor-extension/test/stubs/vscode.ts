@@ -26,6 +26,11 @@ export class ThemeColor {
 export class TreeItem {
   description?: string;
   iconPath?: unknown;
+  contextValue?: string;
+  /** 실제 vscode.TreeItem과 같은 타입: string | MarkdownString | undefined. */
+  tooltip?: string;
+  /** 실제 vscode.Command와 같은 형태({ command, title, tooltip?, arguments? }). */
+  command?: { command: string; title: string; tooltip?: string; arguments?: unknown[] };
   constructor(
     public label: string,
     public collapsibleState?: number,

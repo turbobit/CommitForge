@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { displayedVersion, type InstallReport } from "../core/detect";
+import { displayedVersion, primaryInstall, type InstallReport } from "../core/detect";
 import type { StateStore, WorkspaceState } from "../state";
 
 const STATE_LABEL: Record<InstallReport["state"], string> = {
@@ -16,11 +16,6 @@ function humanAge(seconds: number): string {
   return `${Math.floor(seconds / 3600)}시간`;
 }
 
-/** project 설치를 우선하고, 없으면 global을 본다. */
-function primary(state: WorkspaceState): InstallReport {
-  return state.project.state === "missing" ? state.global : state.project;
-}
-
 export function statusText(state: WorkspaceState | null): {
   text: string;
   tooltip: string;
@@ -29,7 +24,7 @@ export function statusText(state: WorkspaceState | null): {
     return { text: "$(sync~spin) CommitForge", tooltip: "CommitForge 상태를 읽는 중입니다" };
   }
 
-  const install = primary(state);
+  const install = primaryInstall(state.project, state.global);
   const tooltipLines = [
     `project: ${STATE_LABEL[state.project.state]}`,
     `global: ${STATE_LABEL[state.global.state]}`,

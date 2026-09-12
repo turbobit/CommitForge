@@ -57,6 +57,21 @@ export function displayedVersion(report: InstallReport): string | null {
   return report.installedVersion ?? report.bundleVersion;
 }
 
+/**
+ * CommitForge는 project·global 어느 한쪽만 있어도 명령을 쓸 수 있다 —
+ * project 설치를 우선하고, 없으면 global을 본다. "지금 실제로 명령을
+ * 제공하는 쪽"이 어디인지 판정을 여기 한 곳에 모아, statusBar.ts와
+ * treeView.ts가 각자 계산해 서로 다른 결론(한쪽은 project를, 다른 쪽은
+ * global을 "사용 중"이라 표시)을 보여주는 모순을 막는다.
+ *
+ * `WorkspaceState`가 아니라 `InstallReport` 두 개를 받는 것은 `core/`가
+ * vscode를 import하지 않는다는 제약 때문이다 — `WorkspaceState`는
+ * vscode.EventEmitter를 쓰는 state.ts에 있다.
+ */
+export function primaryInstall(project: InstallReport, global: InstallReport): InstallReport {
+  return project.state === "missing" ? global : project;
+}
+
 const MARKER_NAME = ".commitforge-install.json";
 const LIFECYCLE_SCRIPT = "session_lifecycle.py";
 

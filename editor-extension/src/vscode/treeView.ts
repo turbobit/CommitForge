@@ -1,7 +1,8 @@
 import * as vscode from "vscode";
 import { basename, join } from "node:path";
-import { displayedVersion, type InstallReport, type Scope } from "../core/detect";
+import { displayedVersion, primaryInstall, type InstallReport, type Scope } from "../core/detect";
 import type { StateStore, WorkspaceState } from "../state";
+import type { GuardStatus } from "../core/guard";
 
 const STATE_ICON: Record<InstallReport["state"], string> = {
   missing: "circle-outline",
@@ -64,6 +65,10 @@ interface NodeOptions {
   scope?: Scope;
   /** "[Finder에서 열기]" 등 OS 파일 탐색기로 열 때 쓰는 절대 경로. */
   resourcePath?: string;
+  /** 마우스를 올렸을 때 보여줄 설명. 잘린 값의 전체 내용이나 판단 근거를 담는다. */
+  tooltip?: string;
+  /** 항목 자체를 클릭했을 때 실행할 명령. 자식 항목(세션·스냅샷 등)에 동작을 붙일 때 쓴다. */
+  command?: vscode.Command;
 }
 
 export class Node extends vscode.TreeItem {
@@ -85,6 +90,8 @@ export class Node extends vscode.TreeItem {
     if (options.icon) this.iconPath = new vscode.ThemeIcon(options.icon, options.color);
     if (options.description) this.description = options.description;
     if (options.contextValue) this.contextValue = options.contextValue;
+    if (options.tooltip) this.tooltip = options.tooltip;
+    if (options.command) this.command = options.command;
   }
 }
 
@@ -94,17 +101,39 @@ function formatVersionBadge(report: InstallReport): string {
   return known ? `v${known}` : "?";
 }
 
+/** 각 범위(project/global)가 무엇을 뜻하는지 — 트리에서 헷갈리지 않도록. */
+const SCOPE_MEANING: Record<Scope, string> = {
+  project: "이 저장소에서만 명령을 제공합니다.",
+  global: "모든 프로젝트에서 명령을 제공합니다.",
+};
+
+/**
+ * 설치 행의 tooltip. `redundant`(이 범위는 미설치지만 다른 범위가 이미
+ * 있어 없어도 되는 경우)일 때는 그 사실을 한 줄 더 덧붙인다 — 피드백 1:
+ * "미설치"가 마치 할 일이 남은 것처럼 보이지 않도록.
+ */
+function scopeTooltip(scope: Scope, redundant: boolean): string {
+  const base = `${scope}: ${SCOPE_MEANING[scope]}`;
+  return redundant ? `${base}\n\n다른 범위가 이미 설치돼 있어 지금은 없어도 됩니다.` : base;
+}
+
 /**
  * 설치 상태별 상세 항목. corePathOk·hooksRegistered가 거짓이거나 파일 목록에
  * 항목이 있을 때만 채워진다 (§5.1 판정 근거를 그대로 보여준다). 목록이 길면
  * 앞 5개만 보여준다 — 전체 목록은 Output 채널(검증 버튼)에서 확인한다.
+ *
+ * `otherInstalled`는 반대쪽 범위(project↔global)가 미설치가 아닌지를
+ * 나타낸다. 이 범위가 미설치이고 반대쪽이 있으면 "없어도 됨"임을 설명과
+ * 색(disabledForeground)으로 드러낸다 — CommitForge는 둘 중 하나만 있으면
+ * 되기 때문이다(피드백 1).
  */
-function installNode(report: InstallReport): Node {
+function installNode(report: InstallReport, otherInstalled: boolean): Node {
   // statusBar.ts와 같은 규칙(displayedVersion, spec §5.1)을 쓴다 — 해시가
   // 판정 근거이므로 ok는 번들 버전을, version-mismatch는 마커 버전(없으면
   // "알 수 없음"에 해당하는 "?")을 보여준다. 두 위젯이 같은 입력에 다른
   // 버전 번호를 보여주는 모순을 막는다.
   const version = report.state === "missing" ? "" : formatVersionBadge(report);
+  const redundant = report.state === "missing" && otherInstalled;
 
   const details: string[] = [];
   if (!report.corePathOk && report.state !== "missing") {
@@ -116,24 +145,127 @@ function installNode(report: InstallReport): Node {
   for (const path of report.missingFiles.slice(0, 5)) details.push(`누락: ${path}`);
   for (const path of report.mismatchedFiles.slice(0, 5)) details.push(`불일치: ${path}`);
 
+  const description = redundant
+    ? `${STATE_LABEL[report.state]} · 없어도 됨`
+    : `${version} ${STATE_LABEL[report.state]}`.trim();
+
   return new Node(report.scope, {
     children: details.map((detail) => new Node(detail)),
     icon: STATE_ICON[report.state],
-    description: `${version} ${STATE_LABEL[report.state]}`.trim(),
+    description,
+    color: redundant ? new vscode.ThemeColor("disabledForeground") : undefined,
     contextValue: INSTALL_CONTEXT[report.state],
     scope: report.scope,
+    tooltip: scopeTooltip(report.scope, redundant),
   });
+}
+
+/**
+ * "설치" 그룹 행 자체가 결론을 말한다: project·global 중 하나만 있으면
+ * 되므로, 어느 쪽이 실제로 명령을 제공하는지(primaryInstall, statusBar.ts와
+ * 공유하는 규칙) 보여준다. 둘 다 미설치일 때만 설치를 권한다(피드백 1).
+ */
+function installGroupNode(project: InstallReport, global: InstallReport): Node {
+  const primary = primaryInstall(project, global);
+  const bothMissing = primary.state === "missing";
+
+  const description = bothMissing ? "설치 필요" : `${primary.scope} 사용 중`;
+  const tooltip = bothMissing
+    ? "project 또는 global 중 하나만 설치하면 됩니다. 지금은 둘 다 미설치입니다."
+    : `project 또는 global 중 하나만 있으면 됩니다. 지금은 ${primary.scope}을(를) 사용합니다.`;
+
+  return new Node("설치", {
+    children: [
+      installNode(project, global.state !== "missing"),
+      installNode(global, project.state !== "missing"),
+    ],
+    icon: "package",
+    description,
+    tooltip,
+  });
+}
+
+/**
+ * 잠금 보유 중일 때 자식 3개(session·경과 시간·호스트)에 tooltip을 붙인다.
+ * 잘린 라벨만으로는 전체 세션 ID·실제 시각·호스트명을 알 수 없어(피드백 2)
+ * 각각의 전체 값과 의미를 tooltip에 담는다.
+ */
+function lockChildNodes(guard: GuardStatus): Node[] {
+  const lock = guard.lockOwner;
+  if (!lock) return [];
+
+  const session = lock.session ?? "?";
+  // false만 "다른 호스트"로 취급한다 — null(알 수 없음)은 기존 라벨 규칙과
+  // 동일하게 "이 호스트"로 본다.
+  const sameHost = guard.lockOwnerSameHost !== false;
+  const hostname = guard.lockOwnerHostname ?? (sameHost ? guard.currentHostname : "알 수 없음");
+
+  const ageNode = new Node(
+    `${guard.lockAgeSeconds !== null ? humanAge(guard.lockAgeSeconds) : "0초"} 경과`,
+    {
+      tooltip: lock.created_at
+        ? `잠금 생성 시각: ${lock.created_at}\n\n1시간 이상 지나면 이전 세션이 비정상 종료됐을 가능성이 있습니다.`
+        : "잠금이 생성된 시각을 확인할 수 없습니다.",
+    },
+  );
+
+  const hostNode = new Node(sameHost ? "이 호스트" : "다른 호스트", {
+    tooltip: sameHost
+      ? `잠금을 쥔 호스트: ${hostname}\n\n이 컴퓨터와 같은 호스트입니다.`
+      : `잠금을 쥔 호스트: ${hostname}\n\n이 컴퓨터(${guard.currentHostname})와 다른 머신입니다. ` +
+        "다른 세션이 실행 중일 수 있으니 여기서 해제(clean)하면 안 됩니다.",
+  });
+
+  return [
+    new Node(`session ${session}`, {
+      tooltip: `Claude Code 세션 식별자입니다.\n전체 값: ${session}`,
+    }),
+    ageNode,
+    hostNode,
+  ];
+}
+
+/**
+ * guard.recovery(guard.py recovery_details())의 cleanHint·reclaimHint는
+ * 사용자에게 그대로 보여줄 가치가 있는 한국어 문장이다 — 잠금 그룹 행의
+ * tooltip으로 노출한다. reclaimHint(`begin --reclaim-stale`)는 같은
+ * 호스트의 오래된 잠금에만 뜻이 있으므로 다른 호스트일 때는 뺀다.
+ */
+function lockGroupTooltip(guard: GuardStatus): string | undefined {
+  if (!guard.lockOwner) return undefined;
+  const lines: string[] = [];
+  if (guard.recovery?.cleanHint) lines.push(guard.recovery.cleanHint);
+  if (guard.recovery?.reclaimHint && guard.lockOwnerSameHost !== false) {
+    lines.push(guard.recovery.reclaimHint);
+  }
+  return lines.length > 0 ? lines.join("\n\n") : undefined;
+}
+
+/**
+ * 스냅샷 자식 항목. 전체 경로는 라벨로 쓰면 잘려서 못 알아보므로(피드백 2)
+ * 디렉터리 이름만 라벨로 쓰고 전체 경로는 description·tooltip에 둔다.
+ * 클릭하면 commitforge.revealSnapshots가 바로 이 스냅샷 폴더를 연다 —
+ * extension.ts:114가 `node.resourcePath`만 읽으므로, 이 노드 자신을
+ * 인자로 넘기면 된다.
+ */
+function snapshotNode(path: string): Node {
+  const node = new Node(basename(path), {
+    description: path,
+    tooltip: `스냅샷 경로: ${path}\n\n클릭하면 이 폴더를 엽니다.`,
+    resourcePath: path,
+  });
+  node.command = {
+    command: "commitforge.revealSnapshots",
+    title: "스냅샷 폴더 열기",
+    arguments: [node],
+  };
+  return node;
 }
 
 export function buildTree(state: WorkspaceState | null): Node[] {
   if (!state) return [new Node("상태를 읽는 중입니다", { icon: "sync~spin" })];
 
-  const nodes: Node[] = [
-    new Node("설치", {
-      children: [installNode(state.project), installNode(state.global)],
-      icon: "package",
-    }),
-  ];
+  const nodes: Node[] = [installGroupNode(state.project, state.global)];
 
   if (!state.isGitRepo) return nodes;
 
@@ -160,15 +292,7 @@ export function buildTree(state: WorkspaceState | null): Node[] {
   }
 
   const lock = guard.lockOwner;
-  const lockChildren = lock
-    ? [
-        new Node(`session ${lock.session ?? "?"}`),
-        new Node(
-          `${guard.lockAgeSeconds !== null ? humanAge(guard.lockAgeSeconds) : "0초"} 경과`,
-        ),
-        new Node(guard.lockOwnerSameHost === false ? "다른 호스트" : "이 호스트"),
-      ]
-    : [];
+  const lockChildren = lockChildNodes(guard);
   const lockLabel = lock ? "보유 중" : "보유자 없음";
   nodes.push(
     new Node("잠금", {
@@ -176,6 +300,7 @@ export function buildTree(state: WorkspaceState | null): Node[] {
       icon: lock ? "lock" : "unlock",
       description: stale ? `${lockLabel} (오래된 값)` : lockLabel,
       color: staleColor,
+      tooltip: lockGroupTooltip(guard),
       // lock 유무와 무관하게 항상 붙인다 — [해제(clean)] 버튼(commitforge.
       // cleanLock)은 guard.py clean을 직접 부르지 않고 항상 /cr clean을
       // 터미널로 보낸다(spec §4.2, §6.3).
@@ -185,7 +310,7 @@ export function buildTree(state: WorkspaceState | null): Node[] {
 
   nodes.push(
     new Node("스냅샷", {
-      children: guard.snapshots.map((path) => new Node(path)),
+      children: guard.snapshots.map(snapshotNode),
       icon: "archive",
       description: `${guard.snapshots.length}개`,
       color: staleColor,
