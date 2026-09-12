@@ -393,6 +393,143 @@ describe("buildTree - 설치 그룹 행: project/global 중 하나만 있으면 
   });
 });
 
+// 리뷰 재현: project 미설치 + global corrupt(또는 misconfigured)일 때
+// installGroupNode가 primary.state가 "missing"인지만 보고 그 외를 전부
+// "사용 중"으로 뭉개던 버그. 손상된 쪽을 실제로 쓸 수 있다고 말하면 안
+// 되고, 반대쪽의 "없어도 됨" 배지도 붙으면 안 된다.
+describe("buildTree - 설치 그룹 행: 손상된 설치를 사용 중이라고 말하지 않는다", () => {
+  const missingProject: InstallReport = { ...baseReport, state: "missing", installedVersion: null };
+
+  it("project 미설치 + global corrupt → 그룹 행이 문제를 드러낸다", () => {
+    const corruptGlobal: InstallReport = {
+      ...baseReport,
+      scope: "global",
+      state: "corrupt",
+      missingFiles: ["file.md"],
+    };
+    const nodes = buildTree(state({ project: missingProject, global: corruptGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).not.toBe("global 사용 중");
+    expect(group.description).toContain("손상");
+  });
+
+  it("project 미설치 + global corrupt → project 행에 '없어도 됨'이 붙지 않는다", () => {
+    const corruptGlobal: InstallReport = {
+      ...baseReport,
+      scope: "global",
+      state: "corrupt",
+      missingFiles: ["file.md"],
+    };
+    const nodes = buildTree(state({ project: missingProject, global: corruptGlobal }));
+    const group = findChild(nodes, "설치")!;
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    expect(projectNode.description).not.toContain("없어도 됨");
+  });
+
+  it("project 미설치 + global misconfigured → 그룹 행이 문제를 드러내고 project 행에 '없어도 됨'이 붙지 않는다", () => {
+    const misconfiguredGlobal: InstallReport = {
+      ...baseReport,
+      scope: "global",
+      state: "misconfigured",
+      corePathOk: false,
+    };
+    const nodes = buildTree(state({ project: missingProject, global: misconfiguredGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).not.toBe("global 사용 중");
+    expect(group.description).toContain("설정 불완전");
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    expect(projectNode.description).not.toContain("없어도 됨");
+  });
+
+  // 정책: version-mismatch는 파일이 일관되게 있고 hook·core 경로도 정상이라
+  // 명령 자체는 동작한다(버전만 다르다) — statusBar.ts도 이 상태를 "설치됨"
+  // 계열로 다루며 lock 등 후속 정보를 이어서 보여준다. 그러므로 group 행은
+  // 이 범위를 "사용 중"으로 인정하고, 반대쪽 미설치에는 "없어도 됨"이 붙는다.
+  it("project 미설치 + global version-mismatch → 그룹 행이 global 사용 중이라 말하고 project는 없어도 됨", () => {
+    const versionMismatchGlobal: InstallReport = {
+      ...baseReport,
+      scope: "global",
+      state: "version-mismatch",
+      installedVersion: "1.14.0",
+      mismatchedFiles: ["file.md"],
+    };
+    const nodes = buildTree(state({ project: missingProject, global: versionMismatchGlobal }));
+    const group = findChild(nodes, "설치")!;
+    expect(group.description).toBe("global 사용 중");
+    const projectNode = group.children.find((n) => n.label === "project")!;
+    expect(projectNode.description).toContain("없어도 됨");
+  });
+});
+
+// 리뷰 재현: guard.py의 reclaim_refusal()은 same_host를 알 수 없을 때
+// (null) "owner_host_unknown"으로 --reclaim-stale 자체를 거부한다. 그런데
+// 잠금 그룹 tooltip은 lockOwnerSameHost !== false(= true 또는 null)일 때
+// reclaimHint를 보여줘 "회수할 수 있다"고 잘못 안내했다. 호스트가 확실히
+// 같을 때(true)만 보여줘야 한다.
+describe("buildTree - 잠금 그룹 tooltip: 호스트 불명일 때 회수 안내를 보여주지 않는다", () => {
+  const recovery = {
+    cwd: "/repo",
+    statusArgv: [],
+    abortArgv: [],
+    cleanHint: "정리하려면 /cr clean을 실행하세요.",
+    cleanArgv: [],
+    reclaimHint: "오래된 잠금이면 --reclaim-stale로 회수할 수 있습니다.",
+    snapshot: null,
+    autoSnapshotLookup: false,
+    requiresOwnerInactiveConfirmation: false,
+  };
+
+  it("lockOwnerSameHost가 true면 회수 안내를 보여준다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 4000,
+          lockOwnerSameHost: true,
+          recovery,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    expect(lockNode.tooltip).toContain("--reclaim-stale로 회수할 수 있습니다");
+  });
+
+  it("lockOwnerSameHost가 null(호스트 불명)이면 회수 안내를 보여주지 않는다 — guard.py가 owner_host_unknown으로 거부한다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 4000,
+          lockOwnerSameHost: null,
+          recovery,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    expect(lockNode.tooltip).not.toContain("--reclaim-stale로 회수할 수 있습니다");
+    // cleanHint는 호스트 불명 여부와 무관하게 계속 보여준다.
+    expect(lockNode.tooltip).toContain("정리하려면 /cr clean을 실행하세요.");
+  });
+
+  it("lockOwnerSameHost가 false(다른 호스트)면 회수 안내를 보여주지 않는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 4000,
+          lockOwnerSameHost: false,
+          recovery,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    expect(lockNode.tooltip).not.toContain("--reclaim-stale로 회수할 수 있습니다");
+  });
+});
+
 // 피드백 2: 잠금 자식 3개(session/경과 시간/호스트)에 tooltip이 있어야
 // 전체 세션 ID·실제 생성 시각·호스트명을 알 수 있다.
 describe("buildTree - 잠금 자식 tooltip", () => {
