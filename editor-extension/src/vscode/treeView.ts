@@ -43,6 +43,10 @@ const INSTALL_CONTEXT: Record<InstallReport["state"], string> = {
 
 const LOCK_CONTEXT = "commitforge.node.lock";
 const SNAPSHOTS_CONTEXT = "commitforge.node.snapshots";
+/** 값 복사(commitforge.copyValue)만 필요한 잠금 자식(session·호스트)의 contextValue. */
+const LOCK_VALUE_CONTEXT = "commitforge.node.lockValue";
+/** 폴더 열기·경로 복사가 모두 필요한 스냅샷 자식 항목의 contextValue. */
+const SNAPSHOT_ITEM_CONTEXT = "commitforge.node.snapshotItem";
 
 /** guard.py의 SNAPSHOT_DIR_NAME 상수와 같다 (scripts/guard.py:33). */
 const SNAPSHOT_DIR_NAME = "claude-atomic-snapshots";
@@ -69,12 +73,20 @@ interface NodeOptions {
   tooltip?: string;
   /** 항목 자체를 클릭했을 때 실행할 명령. 자식 항목(세션·스냅샷 등)에 동작을 붙일 때 쓴다. */
   command?: vscode.Command;
+  /**
+   * 우클릭 메뉴의 "값 복사"(commitforge.copyValue)가 클립보드에 넣을 전체
+   * 텍스트. 잘린 라벨과 달리 자르지 않은 원본 값이다(세션 ID, 호스트명,
+   * 스냅샷 경로 등). 이 필드가 없으면(undefined) 그 노드에는 복사 메뉴가
+   * 뜨지 않는다 — contextValue로 구분한다.
+   */
+  copyText?: string;
 }
 
 export class Node extends vscode.TreeItem {
   readonly children: Node[];
   readonly scope?: Scope;
   readonly resourcePath?: string;
+  readonly copyText?: string;
 
   constructor(label: string, options: NodeOptions = {}) {
     const children = options.children ?? [];
@@ -87,6 +99,7 @@ export class Node extends vscode.TreeItem {
     this.children = children;
     this.scope = options.scope;
     this.resourcePath = options.resourcePath;
+    this.copyText = options.copyText;
     if (options.icon) this.iconPath = new vscode.ThemeIcon(options.icon, options.color);
     if (options.description) this.description = options.description;
     if (options.contextValue) this.contextValue = options.contextValue;
@@ -214,11 +227,17 @@ function lockChildNodes(guard: GuardStatus): Node[] {
       ? `잠금을 쥔 호스트: ${hostname}\n\n이 컴퓨터와 같은 호스트입니다.`
       : `잠금을 쥔 호스트: ${hostname}\n\n이 컴퓨터(${guard.currentHostname})와 다른 머신입니다. ` +
         "다른 세션이 실행 중일 수 있으니 여기서 해제(clean)하면 안 됩니다.",
+    // 우클릭 "값 복사"용. 라벨은 "이 호스트"/"다른 호스트"로 잘려 보이므로
+    // 실제 호스트명을 복사할 수 있게 한다(피드백: 세션 ID·호스트명 복사 불가).
+    contextValue: LOCK_VALUE_CONTEXT,
+    copyText: hostname,
   });
 
   return [
     new Node(`session ${session}`, {
       tooltip: `Claude Code 세션 식별자입니다.\n전체 값: ${session}`,
+      contextValue: LOCK_VALUE_CONTEXT,
+      copyText: session,
     }),
     ageNode,
     hostNode,
@@ -253,6 +272,9 @@ function snapshotNode(path: string): Node {
     description: path,
     tooltip: `스냅샷 경로: ${path}\n\n클릭하면 이 폴더를 엽니다.`,
     resourcePath: path,
+    // 우클릭 메뉴의 "폴더 열기"·"경로 복사" 둘 다 이 contextValue로 노출된다.
+    contextValue: SNAPSHOT_ITEM_CONTEXT,
+    copyText: path,
   });
   node.command = {
     command: "commitforge.revealSnapshots",

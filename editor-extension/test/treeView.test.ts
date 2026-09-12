@@ -498,3 +498,70 @@ describe("buildTree - 스냅샷 자식 항목", () => {
     expect(snapshotNode.command?.arguments?.[0]).toBe(snapshotNode);
   });
 });
+
+// 우클릭 메뉴 "값 복사"(commitforge.copyValue)는 copyText가 있는 노드에만
+// contextValue로 노출된다. 잠금 자식 중 session·호스트만 복사 대상이다
+// (경과 시간은 복사할 값이 없다).
+describe("buildTree - 값 복사(copyText)와 그 contextValue", () => {
+  it("session 노드는 전체 세션 ID를 copyText로 담고 commitforge.node.lockValue를 받는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "3641b138-43ed-4d2f-9b1a-000000000000", created_at: null },
+          lockAgeSeconds: 30,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const sessionNode = lockNode.children.find((n) => String(n.label).startsWith("session"))!;
+    expect(sessionNode.copyText).toBe("3641b138-43ed-4d2f-9b1a-000000000000");
+    expect(sessionNode.contextValue).toBe("commitforge.node.lockValue");
+  });
+
+  it("호스트 노드는 실제 호스트명을 copyText로 담고 commitforge.node.lockValue를 받는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 30,
+          lockOwnerHostname: "other-machine.local",
+          lockOwnerSameHost: false,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const hostNode = lockNode.children.find((n) => n.label === "다른 호스트")!;
+    expect(hostNode.copyText).toBe("other-machine.local");
+    expect(hostNode.contextValue).toBe("commitforge.node.lockValue");
+  });
+
+  it("경과 시간 노드에는 copyText·contextValue가 없다(복사할 값이 없다)", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc", created_at: null },
+          lockAgeSeconds: 30,
+        },
+      }),
+    );
+    const lockNode = findChild(nodes, "잠금")!;
+    const ageNode = lockNode.children.find((n) => String(n.label).endsWith("경과"))!;
+    expect(ageNode.copyText).toBeUndefined();
+    expect(ageNode.contextValue).toBeUndefined();
+  });
+
+  it("스냅샷 자식은 전체 경로를 copyText로 담고 commitforge.node.snapshotItem을 받는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: { ...idleGuard, snapshots: ["/repo/.git/claude-atomic-snapshots/abc123"] },
+      }),
+    );
+    const snapshotsNode = findChild(nodes, "스냅샷")!;
+    const snapshotNode = snapshotsNode.children[0]!;
+    expect(snapshotNode.copyText).toBe("/repo/.git/claude-atomic-snapshots/abc123");
+    expect(snapshotNode.contextValue).toBe("commitforge.node.snapshotItem");
+  });
+});

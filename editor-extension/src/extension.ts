@@ -95,6 +95,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("commitforge.send.ccf", () => runShortcut(store, context, "ccf")),
     vscode.commands.registerCommand("commitforge.send.cf", () => runShortcut(store, context, "cf")),
     vscode.commands.registerCommand("commitforge.send.cca", () => runShortcut(store, context, "cca")),
+    // 트리 우클릭 메뉴의 "값 복사". 노드에 copyText가 있을 때만 메뉴 자체가
+    // 뜨므로(contextValue로 구분, package.json) 여기서는 그대로 복사만 한다.
+    vscode.commands.registerCommand("commitforge.copyValue", async (node?: Node) => {
+      if (!node?.copyText) return;
+      await vscode.env.clipboard.writeText(node.copyText);
+      void vscode.window.showInformationMessage(`복사했습니다: ${node.copyText}`);
+    }),
     // 트리의 project/global 행에서 호출되면 VS Code가 그 TreeItem(Node)을
     // 첫 인자로 넘긴다. 이미 범위를 아는 상태이므로 QuickPick으로 다시
     // 묻지 않는다. 명령 팔레트에서 인자 없이 호출됐을 때만 묻는다.

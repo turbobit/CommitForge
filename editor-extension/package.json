@@ -89,6 +89,10 @@
       {
         "command": "commitforge.send.cca",
         "title": "CommitForge: 리뷰·수정·검증·commit 전체 실행 (/cca)"
+      },
+      {
+        "command": "commitforge.copyValue",
+        "title": "CommitForge: 값 복사"
       }
     ],
     "submenus": [
@@ -158,6 +162,10 @@
         },
         {
           "command": "commitforge.send.cca",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.copyValue",
           "when": "false"
         }
       ],
@@ -255,6 +263,76 @@
           "command": "commitforge.cleanLock",
           "when": "view == commitforge.view && viewItem == commitforge.node.lock",
           "group": "inline@1"
+        },
+        {
+          "command": "commitforge.install",
+          "when": "view == commitforge.view && viewItem == commitforge.node.install",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.upgrade",
+          "when": "view == commitforge.view && viewItem == commitforge.node.upgrade",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.reinstall",
+          "when": "view == commitforge.view && viewItem == commitforge.node.reinstall",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.verify",
+          "when": "view == commitforge.view && viewItem == commitforge.node.installed",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.verify",
+          "when": "view == commitforge.view && viewItem == commitforge.node.upgrade",
+          "group": "1_commitforge@2"
+        },
+        {
+          "command": "commitforge.verify",
+          "when": "view == commitforge.view && viewItem == commitforge.node.reinstall",
+          "group": "1_commitforge@2"
+        },
+        {
+          "command": "commitforge.uninstall",
+          "when": "view == commitforge.view && viewItem == commitforge.node.installed",
+          "group": "1_commitforge@2"
+        },
+        {
+          "command": "commitforge.uninstall",
+          "when": "view == commitforge.view && viewItem == commitforge.node.upgrade",
+          "group": "1_commitforge@3"
+        },
+        {
+          "command": "commitforge.uninstall",
+          "when": "view == commitforge.view && viewItem == commitforge.node.reinstall",
+          "group": "1_commitforge@3"
+        },
+        {
+          "command": "commitforge.revealSnapshots",
+          "when": "view == commitforge.view && viewItem == commitforge.node.snapshots",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.cleanLock",
+          "when": "view == commitforge.view && viewItem == commitforge.node.lock",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.copyValue",
+          "when": "view == commitforge.view && viewItem == commitforge.node.lockValue",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.revealSnapshots",
+          "when": "view == commitforge.view && viewItem == commitforge.node.snapshotItem",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.copyValue",
+          "when": "view == commitforge.view && viewItem == commitforge.node.snapshotItem",
+          "group": "1_commitforge@2"
         }
       ]
     },
