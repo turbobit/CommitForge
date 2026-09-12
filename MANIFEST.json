@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 145,
-  "total_bytes": 1249659,
+  "total_bytes": 1251653,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package-lock.json",
-      "size": 196536,
-      "sha256": "821095dda51ca7d01f3b7779f1969cd4db2cb5741cc9e597246b7a23f7323811"
+      "size": 196538,
+      "sha256": "80f2fcc393167326de700e5d235c35119783dc6a3d8ddd7c66e55aa98b22be52"
     },
     {
       "path": "editor-extension/package.json",
@@ -397,8 +397,8 @@
     },
     {
       "path": "editor-extension/scripts/sync-version.mjs",
-      "size": 945,
-      "sha256": "33766f042fc2edf74b1b0657d8c629faecb51d6931bf1dd0d0c9a4a53103fb6a"
+      "size": 1603,
+      "sha256": "01271a905e4778abb63bc789817ae9e103f185b13c751c088ad881545eebe2a2"
     },
     {
       "path": "editor-extension/src/core/catalog.ts",
@@ -587,8 +587,8 @@
     },
     {
       "path": "editor-extension/test/sync-version.test.ts",
-      "size": 1305,
-      "sha256": "c38f2448c20036ee0c46e9387a7d4ba029df7c0b6466ec8c6011bd85f7de4e5a"
+      "size": 2639,
+      "sha256": "70f15233a38bc1ae9691544f65b1c9897a086ff18257c7668f72073dfec96445"
     },
     {
       "path": "editor-extension/test/terminal.test.ts",
