@@ -48,11 +48,14 @@ CommitForge를 VS Code와 Cursor에서 설치·관리하고 명령을 실행합�
 | `CommitForge: lock 해제(clean)` | `guard.py clean`을 직접 부르지 않고 `/cr clean`을 터미널로 보냅니다 |
 
 `CommitForge: 업그레이드`, `CommitForge: 재설치`는 내부적으로 설치와 같은
-동작(`install.py`가 백업 후 덮어씀)을 하는 별칭 명령이며, 트리 인라인 버튼의
-tooltip을 상태에 맞게 보여주기 위해서만 존재합니다. `CommitForge: 스냅샷 폴더
-열기`도 트리의 스냅샷 행(경로)이 있어야 동작하는 명령입니다. 셋 다 인자 없이
-팔레트에서 실행하면 아무 일도 하지 않으므로, `package.json`의
-`commandPalette`에서 `when: false`로 숨겨 팔레트에는 나타나지 않습니다.
+동작(`install.py`가 백업 후 덮어씀)을 하는 별칭 명령입니다. 인자 없이(팔레트에서)
+실행해도 범위(project/global)를 묻는 QuickPick이 뜨고 실제로 설치를
+수행하지만, 명령을 나눈 이유는 트리 인라인 버튼의 tooltip을 상태에 맞게
+보여주기 위해서일 뿐이라 팔레트에 "설치"가 사실상 중복 노출되는 것을 막으려고
+`package.json`의 `commandPalette`에서 `when: false`로 숨겨 팔레트에는 나타나지
+않습니다. `CommitForge: 스냅샷 폴더 열기`는 트리의 스냅샷 행(경로)이 있어야
+동작하는 명령이라 인자 없이 팔레트에서 실행하면 아무 일도 하지 않으므로 같은
+방식으로 숨겼습니다.
 
 ## 트리 뷰 (사이드바)
 
