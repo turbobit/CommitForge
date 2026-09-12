@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 132,
-  "total_bytes": 1165525,
+  "file_count": 134,
+  "total_bytes": 1176134,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -396,6 +396,11 @@
       "sha256": "e4a6d69623c1752912cbc4a78bada29610b1c80f7e45b144a6cd87071d83a216"
     },
     {
+      "path": "editor-extension/src/core/coalesce.ts",
+      "size": 1131,
+      "sha256": "f935954fa3edb2649e1ac5a92036710956fd98d041bf4ba7c2c1af24ec5b5bee"
+    },
+    {
       "path": "editor-extension/src/core/composer.ts",
       "size": 3392,
       "sha256": "c8349b2e773c40be9d398cd71b669c661ee6acf814e4a007e73208e11a3c3a90"
@@ -427,8 +432,8 @@
     },
     {
       "path": "editor-extension/src/state.ts",
-      "size": 3907,
-      "sha256": "0d209166c9b8d79d086462a03169c731d0f6d03c8d1240be15c289ee19b10c2d"
+      "size": 4218,
+      "sha256": "fa05355d18b85bf94f98563b0a4d8798fce9061491e22729b9ba937e70c0ada6"
     },
     {
       "path": "editor-extension/src/vscode/installer.ts",
@@ -447,13 +452,18 @@
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
-      "size": 1894,
-      "sha256": "25bdbe4ef4dd42a1c1e8b703876b2b49507dc94dc5763e9fdf650d4247b387f2"
+      "size": 3709,
+      "sha256": "c686664b2a0df0152a28c478a3fb2e634c0294da8ab7f00bdee09cf1e8ec45f7"
     },
     {
       "path": "editor-extension/test/catalog.test.ts",
       "size": 9743,
       "sha256": "192cacef321f5b67d185f1c0971e117352353387ef49ddf01b9b9ced18dcf9a4"
+    },
+    {
+      "path": "editor-extension/test/coalesce.test.ts",
+      "size": 1791,
+      "sha256": "2186d1d4d43dacc076c69b544f794a5802f6742b6b6739ac3bd431d8e55d1967"
     },
     {
       "path": "editor-extension/test/composer.test.ts",
@@ -522,8 +532,8 @@
     },
     {
       "path": "editor-extension/test/stubs/vscode.ts",
-      "size": 1817,
-      "sha256": "c691495000b57c5032d0df7a747840c6da5a751c1408b740b63902ee0b27afee"
+      "size": 2088,
+      "sha256": "8bbf79be011b562f4da0e200e6aefa80997b37ee0ee6e28a6e5b3bf92e6a26e9"
     },
     {
       "path": "editor-extension/test/sync-payload.test.ts",
@@ -537,8 +547,8 @@
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
-      "size": 3310,
-      "sha256": "7ddfa3562a33b2bea01d514ef12cb185f5e1a38499f742f07e573c9d528290d1"
+      "size": 8600,
+      "sha256": "9f3f330abd82fb368f94a007346a8472e02f92d2a9f4a3907d17165db4fce786"
     },
     {
       "path": "editor-extension/tsconfig.json",
