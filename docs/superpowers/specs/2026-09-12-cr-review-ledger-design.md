@@ -57,7 +57,7 @@
 
 ```
 ledger/
-  .lock                            flock 대상
+  .lock/                           디렉터리 기반 배타 잠금 (mkdir 원자성)
   run.json                         실행 메타. 원자적 교체(write-temp-rename).
   gen-01-<fp8>/
     inventory.jsonl                기계 생성. 분모. 불변.
@@ -200,6 +200,21 @@ ledger.py report    --session S
 
 `verdicts[].id`가 inventory에 존재하지 않으면 거부한다. 분모는 기계가 만들고 id는 대조되므로 **"전부 검토했다"고 주장해 게이트를 통과할 방법이 없다.** `verdict: FINDING`은 대응하는 finding 레코드를 요구한다.
 
+### 6.4 guard.py 재사용
+
+`ledger.py`는 소유권 판정 로직을 **재구현하지 않고 `guard.py`를 import해 재사용한다.**
+
+```python
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import guard
+```
+
+`guard.py`는 모든 실행 코드가 `if __name__ == "__main__"` 아래에 있어 import 부작용이 없다. 재사용 대상은 `repo_context`, `safe_session`, `resolve_owned_review_context`, `owned_snapshots`, `validate_snapshot`, `repository_fingerprint`, `read_json`, `emit`, `GuardError`다.
+
+특히 `resolve_owned_review_context`는 worktree lock의 owner에서 token을 해석하고 `owned_snapshots`로 스냅샷을 좁힌다. `/ccf`는 lock 없이 스냅샷만 만들어 token이 다르므로 이 경로에서 자동으로 배제된다. §8.4의 요구가 재사용만으로 충족된다.
+
+보안 관련 판정을 복제하면 두 구현이 갈라질 때 조용히 약한 쪽이 뚫린다. 복제하지 않는 것이 이 결정의 핵심이다.
+
 ## 7. 게이트
 
 `guard.py verify-review --require-ledger`로 옵트인한다. 플래그 방식이므로 같은 명령을 쓰는 `/cpr`는 영향을 받지 않는다.
@@ -253,7 +268,9 @@ teammate 결과는 lead가 수신 즉시 기록한다. 컨텍스트 절약은 �
 
 정책에만 의존하지 않는다.
 
-1. **`flock`** — 모든 변경 계열 명령이 `ledger/.lock`에 배타 락을 건다. 병렬 호출에서도 append가 섞이지 않는다.
+1. **디렉터리 잠금** — 모든 변경 계열 명령이 `ledger/.lock`을 `mkdir`로 생성해 배타 잠금을 얻는다. 병렬 호출에서도 append가 섞이지 않는다.
+
+   `fcntl.flock`은 POSIX 전용이라 쓰지 않는다. CI 매트릭스에 `windows-latest`가 포함되며, `guard.py`의 `acquire_lock`도 같은 이유로 `lock_dir.mkdir(mode=0o700)`의 원자성을 쓴다. 동일 패턴을 따른다.
 2. **호출마다 소유권 검증** — session+token이 스냅샷 marker와 불일치하면 거부한다.
 3. **부분 쓰기 내성** — 레코드 1건을 개행 포함 단일 `write()`로 append하고, 리더는 파싱 불가한 **마지막 줄 1개만** 허용해 경고 후 무시한다. 크래시로 잘린 줄이 원장 전체를 무효화하지 않는다.
 
