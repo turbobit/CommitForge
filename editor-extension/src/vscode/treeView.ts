@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { basename, join } from "node:path";
-import type { InstallReport, Scope } from "../core/detect";
+import { displayedVersion, type InstallReport, type Scope } from "../core/detect";
 import type { StateStore, WorkspaceState } from "../state";
 
 const STATE_ICON: Record<InstallReport["state"], string> = {
@@ -88,16 +88,23 @@ export class Node extends vscode.TreeItem {
   }
 }
 
+/** "v1.15.0" 또는(설치 버전을 알 수 없으면) "?"로 표시한다. */
+function formatVersionBadge(report: InstallReport): string {
+  const known = displayedVersion(report);
+  return known ? `v${known}` : "?";
+}
+
 /**
  * 설치 상태별 상세 항목. corePathOk·hooksRegistered가 거짓이거나 파일 목록에
  * 항목이 있을 때만 채워진다 (§5.1 판정 근거를 그대로 보여준다). 목록이 길면
  * 앞 5개만 보여준다 — 전체 목록은 Output 채널(검증 버튼)에서 확인한다.
  */
 function installNode(report: InstallReport): Node {
-  const version =
-    report.state === "missing"
-      ? ""
-      : `v${report.installedVersion ?? report.bundleVersion}`;
+  // statusBar.ts와 같은 규칙(displayedVersion, spec §5.1)을 쓴다 — 해시가
+  // 판정 근거이므로 ok는 번들 버전을, version-mismatch는 마커 버전(없으면
+  // "알 수 없음"에 해당하는 "?")을 보여준다. 두 위젯이 같은 입력에 다른
+  // 버전 번호를 보여주는 모순을 막는다.
+  const version = report.state === "missing" ? "" : formatVersionBadge(report);
 
   const details: string[] = [];
   if (!report.corePathOk && report.state !== "missing") {

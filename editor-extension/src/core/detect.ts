@@ -34,6 +34,29 @@ export interface InstallReport {
   warnings: string[];
 }
 
+/**
+ * spec §5.1: 해시 대조가 판정의 근거이고 마커는 표시용이다. "설치된 버전"으로
+ * 어떤 번호를 보여줄지는 상태에 따라 다르다:
+ *
+ * - `ok`: 파일 해시가 번들과 일치한다고 이미 보증했으므로 번들 버전을 보여준다.
+ *   마커가 낡았거나(구버전 마커) 손으로 편집됐어도 무시한다 — 해시가 근거다.
+ * - `version-mismatch`: 마커가 있으면 마커의 버전을 보여주고, 마커가 없으면
+ *   설치 버전을 알 길이 없으므로 `null`을 돌려준다. 번들 버전을 대신
+ *   보여주면 "번들 버전이 곧 설치 버전"이라는 잘못된 인상을 준다.
+ * - 그 외(`missing`/`misconfigured`/`corrupt`): spec이 규정하지 않으므로
+ *   기존 동작(마커 우선, 없으면 번들 버전)을 유지한다.
+ *
+ * statusBar.ts와 treeView.ts가 같은 규칙을 따르도록 여기 한 곳에 모은다 —
+ * 예전에는 두 파일이 각자 계산해 트리와 상태바가 같은 입력에 다른 버전
+ * 번호를 보여주는 모순이 있었다.
+ */
+export function displayedVersion(report: InstallReport): string | null {
+  if (report.state === "missing") return null;
+  if (report.state === "ok") return report.bundleVersion;
+  if (report.state === "version-mismatch") return report.installedVersion;
+  return report.installedVersion ?? report.bundleVersion;
+}
+
 const MARKER_NAME = ".commitforge-install.json";
 const LIFECYCLE_SCRIPT = "session_lifecycle.py";
 

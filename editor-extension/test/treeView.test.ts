@@ -109,6 +109,34 @@ describe("buildTree - 설치 상태 5가지", () => {
     expect(labels(node)).toContain("불일치: file.md");
   });
 
+  // spec §5.1: 마커 없음 + 해시 불일치 → 설치 버전은 "알 수 없음"으로
+  // 표시한다. statusBar.ts는 이 경우 "?"를 쓴다 — 트리도 번들 버전을
+  // 설치 버전인 양 보여주면 안 된다.
+  it("version-mismatch + 마커 없음: 번들 버전이 아니라 알 수 없음 표시", () => {
+    const report: InstallReport = {
+      ...baseReport,
+      state: "version-mismatch",
+      installedVersion: null,
+      mismatchedFiles: ["file.md"],
+    };
+    const node = install(report);
+    expect(node.description).toBe("? 버전 다름");
+  });
+
+  // spec §5.1: 마커 있음 + 해시 일치 + 마커 버전 ≠ 번들 버전 → `정상`
+  // 판정이며 배지는 해시가 보증하는 번들 버전을 따른다(statusBar.ts와
+  // 동일 규칙). 마커가 낡았다고 트리가 그 낡은 버전을 보여주면 안 된다.
+  it("ok + 낡은 마커: 마커 버전이 아니라 번들 버전 표시", () => {
+    const report: InstallReport = {
+      ...baseReport,
+      state: "ok",
+      installedVersion: "1.14.0",
+      bundleVersion: "1.15.0",
+    };
+    const node = install(report);
+    expect(node.description).toBe("v1.15.0 정상");
+  });
+
   it("misconfigured: 경고 아이콘과 설정 불완전, corePathOk/hooksRegistered 상세", () => {
     const report: InstallReport = {
       ...baseReport,

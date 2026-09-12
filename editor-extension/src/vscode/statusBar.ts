@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import type { InstallReport } from "../core/detect";
+import { displayedVersion, type InstallReport } from "../core/detect";
 import type { StateStore, WorkspaceState } from "../state";
 
 const STATE_LABEL: Record<InstallReport["state"], string> = {
@@ -58,7 +58,10 @@ export function statusText(state: WorkspaceState | null): {
   }
 
   if (install.state === "version-mismatch") {
-    const installed = install.installedVersion ? `v${install.installedVersion}` : "?";
+    // spec §5.1: 마커가 없으면 설치 버전은 알 수 없다 — displayedVersion이
+    // 이 규칙을 treeView.ts와 공유한다.
+    const known = displayedVersion(install);
+    const installed = known ? `v${known}` : "?";
     return {
       text: `$(warning) CommitForge ${installed} → v${install.bundleVersion}`,
       tooltip,
