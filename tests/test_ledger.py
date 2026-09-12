@@ -461,28 +461,39 @@ class RecordTest(LedgerTestCase):
 
     def test_concurrent_records_do_not_lose_entries(self) -> None:
         # `cmd_record` reads stdin before taking the lock, so feeding the
-        # processes with `communicate()` in a loop serialized them completely:
-        # each one exited before the next received any input, and the test
-        # passed identically with `LedgerLock` deleted. Write and close every
-        # stdin first, so all four are contending for the lock at once, and
-        # only then wait.
+        # processes with `communicate(input=...)` in a loop serialized them
+        # completely: each one exited before the next received any input, and
+        # the test passed identically with `LedgerLock` deleted. Every process
+        # gets its whole batch from a file that already exists at spawn time,
+        # so all four reach the lock at once.
+        #
+        # The payloads live outside the repository under review: an untracked
+        # file inside it would become an inventory entry of its own.
         started, ids = self.prepared()
+        payload_dir = Path(tempfile.mkdtemp(prefix="cca-ledger-batch-"))
+        self.addCleanup(shutil.rmtree, payload_dir, ignore_errors=True)
+
+        handles = []
+        for index in range(4):
+            batch = payload_dir / f"batch-{index}.json"
+            batch.write_text(
+                json.dumps(
+                    {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": f"r{index}"}]}
+                ),
+                encoding="utf-8",
+            )
+            handle = batch.open("rb")
+            handles.append(handle)
+            self.addCleanup(handle.close)
+
         processes = [
             subprocess.Popen(
                 [sys.executable, str(LEDGER), "record", "--session", started["session"]],
-                cwd=self.tmp, text=True, stdin=subprocess.PIPE,
+                cwd=self.tmp, text=True, stdin=handle,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
-            for _ in range(4)
+            for handle in handles
         ]
-        for index, proc in enumerate(processes):
-            assert proc.stdin is not None
-            proc.stdin.write(
-                json.dumps(
-                    {"verdicts": [{"id": ids[0], "verdict": "PASS", "reviewer": f"r{index}"}]}
-                )
-            )
-            proc.stdin.close()
         for proc in processes:
             out, err = proc.communicate(timeout=60)
             self.assertEqual(proc.returncode, 0, f"stdout={out}\nstderr={err}")

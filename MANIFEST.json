@@ -3,7 +3,7 @@
   "version": "1.17.0",
   "reproducible": true,
   "file_count": 149,
-  "total_bytes": 1572893,
+  "total_bytes": 1573351,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -692,8 +692,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 73105,
-      "sha256": "5f199d92f17a281e378c99579482f97054620c721b1cef1cae7a5dc290999326"
+      "size": 73563,
+      "sha256": "0226aafaa4405e0da4d36c9a7a8527a2d3f9d02f5678f646cdb25cc0e9e74c47"
     },
     {
       "path": "tests/test_package.py",
