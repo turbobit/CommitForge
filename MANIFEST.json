@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 142,
-  "total_bytes": 1232824,
+  "file_count": 144,
+  "total_bytes": 1238160,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -437,13 +437,18 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 6498,
-      "sha256": "ec5f27970fa6001084f38cb6bdfe6e82a85a10d8aeeb9fad7598b5fd8063ab34"
+      "size": 6756,
+      "sha256": "8afed755469265b9076703580a118b1f7eb2864ac1c45462504cc051fc82128f"
     },
     {
       "path": "editor-extension/src/state.ts",
       "size": 4218,
       "sha256": "fa05355d18b85bf94f98563b0a4d8798fce9061491e22729b9ba937e70c0ada6"
+    },
+    {
+      "path": "editor-extension/src/vscode/guardErrorLog.ts",
+      "size": 1380,
+      "sha256": "a1697ae44eddcb5ff4ec4cb0ed1089228ffe9d931643ff47d609e9a886c5f6a8"
     },
     {
       "path": "editor-extension/src/vscode/installer.ts",
@@ -524,6 +529,11 @@
       "path": "editor-extension/test/guard.test.ts",
       "size": 4443,
       "sha256": "00b14f2389deba782c7a94d8264ea5d829484f528d620727350e32f305446343"
+    },
+    {
+      "path": "editor-extension/test/guardErrorLog.test.ts",
+      "size": 3698,
+      "sha256": "8b9e256ad87f5b9c134c2d0df0ad4ea52d911f7dbc7c3bb729150d6e706d3b80"
     },
     {
       "path": "editor-extension/test/install-integration.test.ts",
