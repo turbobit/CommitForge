@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 134,
-  "total_bytes": 1176134,
+  "file_count": 139,
+  "total_bytes": 1198731,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -382,8 +382,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 5357,
-      "sha256": "d13611b710147fb0ea6bcb111d750b4df918bd0d16554f3b48fc24921ed67276"
+      "size": 5885,
+      "sha256": "8abcc3c074628faedeb7400a1326a4e674d2d7046ebbade7d36de3f984147c49"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -402,8 +402,8 @@
     },
     {
       "path": "editor-extension/src/core/composer.ts",
-      "size": 3392,
-      "sha256": "c8349b2e773c40be9d398cd71b669c661ee6acf814e4a007e73208e11a3c3a90"
+      "size": 3876,
+      "sha256": "906edff79acba7dae33fd9c1a39dc8ccfa76685ebc8b39daaf627a28acce1109"
     },
     {
       "path": "editor-extension/src/core/detect.ts",
@@ -427,8 +427,8 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 5978,
-      "sha256": "53d77d9a77eddc25ed8bf9cdbe6580da5eac745ddaa0ef2ae05fd3009368b190"
+      "size": 6498,
+      "sha256": "ec5f27970fa6001084f38cb6bdfe6e82a85a10d8aeeb9fad7598b5fd8063ab34"
     },
     {
       "path": "editor-extension/src/state.ts",
@@ -441,9 +441,19 @@
       "sha256": "0d60ed71c804e3b0ab6076b0999d867fb425f5739c153611f01500c68d3057b6"
     },
     {
+      "path": "editor-extension/src/vscode/quickPick.ts",
+      "size": 11130,
+      "sha256": "f490dc1e291b0e9c0742b4a7d3e28b094499737e89a0787c01d729976cd61d3d"
+    },
+    {
       "path": "editor-extension/src/vscode/statusBar.ts",
       "size": 3729,
       "sha256": "6e4add4765780d69500889adbef18431a09116826b0b21654acc0cee3e81fd0b"
+    },
+    {
+      "path": "editor-extension/src/vscode/terminal.ts",
+      "size": 3663,
+      "sha256": "e60d3c2b1b9b8934b1fb1d156364f31af4ac68bd47ff2f60501d71c1fb2d5930"
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
@@ -467,8 +477,8 @@
     },
     {
       "path": "editor-extension/test/composer.test.ts",
-      "size": 4821,
-      "sha256": "a07d01c7e953349c80ab01e0c0763c39a958ca23990d0da8e4f56791982761ce"
+      "size": 5234,
+      "sha256": "103358eb73664676517c2c8cdef755878f255caf828fd4c19d32f435ae8f5f1f"
     },
     {
       "path": "editor-extension/test/debounce.test.ts",
@@ -516,6 +526,11 @@
       "sha256": "c3c3e442ecbc3f82c88af04dd00eb7260b43f44d0e782414f3bba5c8854a46d2"
     },
     {
+      "path": "editor-extension/test/lockWarning.test.ts",
+      "size": 1641,
+      "sha256": "387c1ef6f7be7936f0fee757c352693d85ac3f0ecd995fcb911df80cd5edd46f"
+    },
+    {
       "path": "editor-extension/test/payload.test.ts",
       "size": 4036,
       "sha256": "94a845ae456b4726f11c9b9fddf98e14cf75dc15d753a6e69843255f5def64b6"
@@ -524,6 +539,11 @@
       "path": "editor-extension/test/python.test.ts",
       "size": 2728,
       "sha256": "c43aa3fc3c4e055cbf13c757878a81c3a1bb43fa965b126781e12143d3d553ca"
+    },
+    {
+      "path": "editor-extension/test/quickPick.test.ts",
+      "size": 2953,
+      "sha256": "8231e99cdfa13283a39fa6bcd011ee0ce2c56a70786588ac6a565913d8d55c63"
     },
     {
       "path": "editor-extension/test/statusText.test.ts",
@@ -539,6 +559,11 @@
       "path": "editor-extension/test/sync-payload.test.ts",
       "size": 3607,
       "sha256": "6c9b26c80e5c1c9d424bf264a8ae392d618eda20bd1209361abad82f862d604f"
+    },
+    {
+      "path": "editor-extension/test/terminal.test.ts",
+      "size": 1265,
+      "sha256": "3f4bd364dfc9633f1d220237621e9d061e13ec89ea9418590e9db5063582fdbe"
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
