@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 144,
-  "total_bytes": 1238160,
+  "total_bytes": 1239335,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -337,8 +337,8 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 20378,
-      "sha256": "e01dc79e8e6420afe1b87371881c21e43e2b174b63b0f8e48a3140ac93fc4fb3"
+      "size": 21553,
+      "sha256": "6ff6e004815dd9b36e5c10e237ff169a94f7ade6e5f88d27a3524efd4fd45e41"
     },
     {
       "path": "QUALITY-REPORT.md",
