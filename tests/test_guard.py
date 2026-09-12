@@ -998,6 +998,34 @@ class GuardIntegrationTest(unittest.TestCase):
         )
         shutil.rmtree(sibling, ignore_errors=True)
 
+    def test_ledger_subdirectory_survives_audit_and_finish(self) -> None:
+        _, started = self.guard("begin", "--session", "session-ledger")
+        snapshot = Path(started["snapshot"])
+
+        generation = snapshot / "ledger" / "gen-01-abcdef12"
+        generation.mkdir(parents=True)
+        (generation / "inventory.jsonl").write_text("{}\n", encoding="utf-8")
+        (snapshot / "ledger" / "run.json").write_text("{}", encoding="utf-8")
+
+        _, audited = self.guard(
+            "audit-snapshot",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        )
+        self.assertTrue(audited["ok"])
+
+        _, finished = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            "--review-only",
+            "--source-read-only",
+        )
+        self.assertTrue(finished["snapshot_removed"])
+        self.assertFalse(snapshot.exists())
+
 
 if __name__ == "__main__":
     unittest.main()
