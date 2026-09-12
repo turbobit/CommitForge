@@ -31,6 +31,9 @@ STAGES = ("init", "inventory", "review", "fix", "verify", "done")
 TERMINAL_VERDICTS = ("PASS", "FINDING", "N_A")
 VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 
+GENERATION_PREFIX = "gen"
+INVENTORY_NAME = "inventory.jsonl"
+
 
 class LedgerLock:
     """Directory-based exclusive lock.
@@ -111,6 +114,118 @@ def validate_scopes(raw: list[str]) -> list[str]:
     return scopes
 
 
+def decode_path(raw: str) -> str:
+    """Undo git's C-style quoting for paths with special characters."""
+    if not raw.startswith('"'):
+        return raw
+    return json.loads(raw)
+
+
+def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
+    """Split a git diff into hunk, binary and meta entries.
+
+    Every changed file yields at least one entry. A file whose diff carries no
+    `@@` hunk is a mode or rename change and becomes a `meta` entry, so it can
+    never disappear from the denominator.
+    """
+    entries: list[dict[str, Any]] = []
+    state: dict[str, Any] = {"path": None, "index": 0, "saw_hunk": False, "binary": False}
+
+    def flush() -> None:
+        path = state["path"]
+        if path is None:
+            return
+        if state["binary"]:
+            kind = "binary"
+        elif not state["saw_hunk"]:
+            kind = "meta"
+        else:
+            kind = None
+        if kind is not None:
+            entries.append(
+                {
+                    "id": f"{source}:{path}#0",
+                    "kind": kind,
+                    "source": source,
+                    "path": path,
+                    "header": "",
+                }
+            )
+        state.update({"path": None, "index": 0, "saw_hunk": False, "binary": False})
+
+    for raw_line in diff.split(b"\n"):
+        line = raw_line.decode("utf-8", "replace")
+        if line.startswith("diff --git "):
+            flush()
+            remainder = line[len("diff --git ") :]
+            state["path"] = (
+                decode_path(remainder.split(" b/", 1)[-1])
+                if " b/" in remainder
+                else remainder
+            )
+            continue
+        if state["path"] is None:
+            continue
+        if line.startswith("GIT binary patch") or line.startswith("Binary files "):
+            state["binary"] = True
+            continue
+        if line.startswith("@@"):
+            state["saw_hunk"] = True
+            state["index"] += 1
+            entries.append(
+                {
+                    "id": f"{source}:{state['path']}#{state['index']}",
+                    "kind": "hunk",
+                    "source": source,
+                    "path": state["path"],
+                    "header": line.strip(),
+                }
+            )
+    flush()
+    return entries
+
+
+def untracked_record(path: str) -> dict[str, Any]:
+    return {
+        "id": f"untracked:{path}#0",
+        "kind": "untracked",
+        "source": "untracked",
+        "path": path,
+        "header": "",
+    }
+
+
+def untracked_entries(snapshot: Path) -> list[dict[str, Any]]:
+    raw = (snapshot / "untracked.z").read_bytes()
+    return [
+        untracked_record(chunk.decode("utf-8", "replace"))
+        for chunk in raw.split(b"\0")
+        if chunk
+    ]
+
+
+def working_scope_entries(snapshot: Path) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    entries.extend(parse_diff_entries((snapshot / "staged.diff").read_bytes(), "staged"))
+    entries.extend(parse_diff_entries((snapshot / "working.diff").read_bytes(), "working"))
+    entries.extend(untracked_entries(snapshot))
+    return entries
+
+
+def fingerprint_short(ctx: dict[str, Path]) -> str:
+    return guard.repository_fingerprint(ctx["root"])["fingerprint"][:8]
+
+
+def generation_name(iteration: int, short: str) -> str:
+    return f"{GENERATION_PREFIX}-{iteration:02d}-{short}"
+
+
+def write_inventory(gen_dir: Path, entries: list[dict[str, Any]]) -> None:
+    with (gen_dir / INVENTORY_NAME).open("w", encoding="utf-8", newline="\n") as stream:
+        for entry in entries:
+            stream.write(json.dumps(entry, ensure_ascii=True, sort_keys=True) + "\n")
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     scopes = validate_scopes(args.scope)
     _, _, ledger_dir, resolved_token = resolve_ledger(args.session, args.token)
@@ -145,6 +260,29 @@ def cmd_status(args: argparse.Namespace) -> None:
     )
 
 
+def cmd_inventory(args: argparse.Namespace) -> None:
+    ctx, snapshot, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    with LedgerLock(ledger_dir):
+        data = read_run(ledger_dir)
+        name = data["active_generation"] or generation_name(
+            data["iteration"], fingerprint_short(ctx)
+        )
+        gen_dir = ledger_dir / name
+        gen_dir.mkdir(mode=0o700, exist_ok=True)
+
+        entries: list[dict[str, Any]] = []
+        for scope in data["scopes"]:
+            if scope == "working":
+                entries.extend(working_scope_entries(snapshot))
+        write_inventory(gen_dir, entries)
+
+        data["active_generation"] = name
+        data["stage"] = "inventory"
+        write_run(ledger_dir, data)
+
+    guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -158,12 +296,16 @@ def build_parser() -> argparse.ArgumentParser:
     status.add_argument("--session", required=True)
     status.add_argument("--token")
 
+    inventory = sub.add_parser("inventory", help="Build the machine-owned denominator")
+    inventory.add_argument("--session", required=True)
+    inventory.add_argument("--token")
+
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
-    handlers = {"init": cmd_init, "status": cmd_status}
+    handlers = {"init": cmd_init, "status": cmd_status, "inventory": cmd_inventory}
     try:
         handlers[args.command](args)
     except guard.GuardError as exc:

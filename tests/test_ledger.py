@@ -119,5 +119,77 @@ class LedgerFoundationTest(LedgerTestCase):
         self.assertEqual(refused["reason"], "ledger_scope_invalid")
 
 
+class InventoryWorkingScopeTest(LedgerTestCase):
+    def init_ledger(self) -> dict:
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        return started
+
+    def ids_by_kind(self, payload: dict) -> dict[str, list[str]]:
+        grouped: dict[str, list[str]] = {}
+        for entry in payload["entries"]:
+            grouped.setdefault(entry["kind"], []).append(entry["id"])
+        return grouped
+
+    def test_text_change_produces_hunk_entries(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertTrue(built["ok"])
+        grouped = self.ids_by_kind(built)
+        self.assertIn("hunk", grouped)
+        self.assertTrue(
+            any(entry.startswith("working:tracked.txt#") for entry in grouped["hunk"])
+        )
+
+    def test_untracked_file_produces_untracked_entry(self) -> None:
+        (self.tmp / "new.txt").write_text("fresh\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertEqual(grouped["untracked"], ["untracked:new.txt#0"])
+
+    def test_binary_change_produces_binary_entry(self) -> None:
+        target = self.tmp / "blob.bin"
+        target.write_bytes(bytes(range(256)))
+        run(["git", "add", "blob.bin"], self.tmp)
+        run(["git", "commit", "-m", "test: binary"], self.tmp)
+        target.write_bytes(bytes(range(255, -1, -1)))
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertEqual(grouped["binary"], ["working:blob.bin#0"])
+
+    def test_mode_only_change_produces_meta_entry(self) -> None:
+        if sys.platform.startswith("win"):
+            self.skipTest("Windows는 실행 비트를 추적하지 않는다")
+        run(["git", "update-index", "--chmod=+x", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: chmod"], self.tmp)
+        run(["git", "update-index", "--chmod=-x", "tracked.txt"], self.tmp)
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertEqual(grouped["meta"], ["staged:tracked.txt#0"])
+
+    def test_inventory_is_written_to_active_generation(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        generation = built["generation"]
+        self.assertTrue(generation.startswith("gen-01-"))
+        path = Path(started["snapshot"]) / "ledger" / generation / "inventory.jsonl"
+        self.assertTrue(path.is_file())
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line]
+        self.assertEqual(len(lines), built["total"])
+
+    def test_inventory_is_idempotent(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, first = self.ledger("inventory", "--session", started["session"])
+        _, second = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(first["total"], second["total"])
+        self.assertEqual(first["generation"], second["generation"])
+
+
 if __name__ == "__main__":
     unittest.main()
