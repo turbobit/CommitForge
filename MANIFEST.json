@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 145,
-  "total_bytes": 1254058,
+  "total_bytes": 1272144,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -337,8 +337,8 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 21553,
-      "sha256": "6ff6e004815dd9b36e5c10e237ff169a94f7ade6e5f88d27a3524efd4fd45e41"
+      "size": 23952,
+      "sha256": "213b140adad9ebb2658890eb5a9d565fcde4d6b781f0e93a257e03d1b5341284"
     },
     {
       "path": "QUALITY-REPORT.md",
@@ -372,8 +372,8 @@
     },
     {
       "path": "editor-extension/README.md",
-      "size": 7385,
-      "sha256": "d3cba845fe012d4099247f800c8b2a4edca62444a3e357be39a29bed630a87e3"
+      "size": 8811,
+      "sha256": "0eb99733b7e8ab3852c84c43cafc016c9d7d18abbe96286f5cf8eea67aaa886c"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -417,8 +417,8 @@
     },
     {
       "path": "editor-extension/src/core/detect.ts",
-      "size": 9621,
-      "sha256": "b2ffb4dd1a6a005f17751e4f516888a48a9bd5d8ce31c066c47219592b84b0e3"
+      "size": 10447,
+      "sha256": "ad275cb7e53d6c5e31846e399d37167f7b1019dd7460fb26a3bcd0c12daf231c"
     },
     {
       "path": "editor-extension/src/core/guard.ts",
@@ -462,8 +462,8 @@
     },
     {
       "path": "editor-extension/src/vscode/statusBar.ts",
-      "size": 3899,
-      "sha256": "5538dbfe1a110d9e4a28d47b262596ba286b8ce6babe3372607d1cb46819a25c"
+      "size": 3742,
+      "sha256": "916fc99e6e849726328d357868a9dca1aee7be817588cc8100d3fc3a3425f259"
     },
     {
       "path": "editor-extension/src/vscode/terminal.ts",
@@ -472,8 +472,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 9362,
-      "sha256": "bc0464b1c3e0ab92a60e687b8c0a560347d75288c36140c6eb12ef2e33520174"
+      "size": 15215,
+      "sha256": "9c1afd22b8ed2c5a035790f4c68f8c7317e85c11def17a3683ce454991983288"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
@@ -577,8 +577,8 @@
     },
     {
       "path": "editor-extension/test/stubs/vscode.ts",
-      "size": 2088,
-      "sha256": "8bbf79be011b562f4da0e200e6aefa80997b37ee0ee6e28a6e5b3bf92e6a26e9"
+      "size": 2400,
+      "sha256": "0e972efb8951ffc18d6b6cef0f06376e3e3db02add440605799c32569af12106"
     },
     {
       "path": "editor-extension/test/sync-payload.test.ts",
@@ -597,8 +597,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 12416,
-      "sha256": "c8918d164d66ab4cfe8da3fe53eb7819cfabf18c0d58521103653550ad21a5b6"
+      "size": 19843,
+      "sha256": "728d195c7d3bd5246311fc38c73469b6235123fbc180f99c5fbb63a7d4b01b0b"
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
