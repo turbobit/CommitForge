@@ -589,6 +589,21 @@ CommitForge가 설치되지 않은 임시 git 저장소를 새 창에서 엽니�
   숨는다
 - 다중 루트 워크스페이스를 열면 사용할 폴더를 한 번 QuickPick으로 묻고,
   창을 다시 열면 다시 묻지 않는다
-- guard.py 스크립트를 일시적으로 다른 이름으로 옮기고 `CommitForge: 상태
-  새로고침`을 실행하면, 실패를 알리는 경고가 뜨되 트리에는 마지막으로 성공한
-  잠금·스냅샷 정보가 `(오래된 값)` 표시와 함께 남아 있다(회색 아이콘)
+- guard.py의 **stderr 실패**를 재현한다. 파일을 옮기거나 지우면 안 된다 —
+  `state.ts`는 `exists(guardScript)`가 거짓이면 guard 실행 자체를 건너뛰어
+  `guard = null, guardError = null`이 되고, 잠금·스냅샷 노드가 경고 한 줄
+  없이 그냥 사라진다(파일이 없으면 해시 대조 대상에서도 빠져 설치 상태가
+  `손상`으로 뒤집힌다). 대신 파일 내용은 그대로 두고 **읽기 권한만** 잠깐
+  제거해 Python이 파일을 열지 못하게 한다(해시는 파일 바이트만 보므로 설치
+  상태는 영향받지 않고, `access()`는 존재 여부만 확인하므로 guard 실행
+  자체는 그대로 시도된다):
+  1. `chmod 000 .claude/skills/_git-atomic-core/scripts/guard.py`
+     (global scope로 테스트 중이면 해당 설치 경로의 같은 파일)
+  2. `CommitForge: 상태 새로고침`을 실행한다
+  3. 확인: 트리의 `잠금`·`스냅샷` 노드에 마지막으로 성공한 정보가
+     `(오래된 값)` 표시와 회색 아이콘으로 남아 있다
+  4. 확인: Output 채널(`CommitForge`)에 `Permission denied`가 포함된
+     stderr가 찍힌다(spec §8, guardErrorLog.ts)
+  5. 확인: `설치` 섹션의 상태는 여전히 `정상`이다(파일 내용을 건드리지
+     않았으므로 해시 대조는 깨지지 않는다)
+  6. 끝나면 반드시 권한을 복구한다: `chmod 644 .claude/skills/_git-atomic-core/scripts/guard.py`
