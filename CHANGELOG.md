@@ -4,9 +4,18 @@
 
 - `/cr`에 리뷰 원장을 도입했다. `ledger.py`가 Guard 스냅샷과 커밋 범위에서 hunk
   분모를 기계 생성하고, 판정·finding·reviewer 상태를 디스크에 적재한다
-- `guard.py verify-review`와 `finish`에 `--require-ledger`를 추가했다. 미판정
-  hunk나 `UNKNOWN`이 남으면 완료를 차단한다. `--allow-unledgered`는 명시적
-  탈출구이며 우회 사실이 출력에 남는다
+- `guard.py verify-review`와 `finish`가 **스냅샷에 원장이 있으면 flag 없이도**
+  커버리지를 검사한다. 미판정 hunk, `UNKNOWN`, 빈 분모, 어긋난 fingerprint가
+  있으면 완료를 차단한다. `--require-ledger`는 "원장이 아예 없으면 추가로
+  실패한다"는 의미이며, `--allow-unledgered`는 명시적 탈출구로 우회 사실이
+  출력에 남는다. 원장을 만들지 않는 `/cpr`·`/cca`는 영향이 없다
+- `ledger.py init`은 재실행해도 파괴적이지 않다. scope를 합집합으로 더하고
+  `iteration`·기록된 판정을 보존한다. 커밋 범위는 계산된 뒤에 선언한다
+- `inventory`는 2세대 이후 live working tree에서 분모를 만들고, 이미 만들어진
+  세대를 다른 id 집합으로 덮어쓰지 않는다(`ledger_inventory_conflict`)
+- 모든 diff 수집을 `diff.noprefix`·`diff.mnemonicPrefix` 설정과 무관하게
+  `a/`·`b/` prefix가 붙도록 고정하고, 경로는 `+++`/`---` 헤더에서 읽어
+  공백을 포함한 경로도 정확히 식별한다
 - 대규모 diff 리뷰에서 컨텍스트 압축으로 변경 원장이 유실되어도 미검토 hunk가
   침묵 통과하지 않는다. 커버리지 판정 근거가 대화 기억에서 디스크로 옮겨졌다
 

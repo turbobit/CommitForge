@@ -50,6 +50,11 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 검토했는지 `ledger.py status`와 `report`로 사후 분석할 수 있다. `finish`는
 스냅샷과 함께 원장을 삭제한다.
 
+`record`·`inventory`·`advance`가 강제 종료되면 `ledger/.lock` 디렉터리가 남아
+이후 모든 변경 명령이 `ledger_lock_timeout`으로 실패한다. 해당 실행이 더 이상
+진행 중이 아님을 확인했으면 이 디렉터리만 삭제하면 복구된다 (`rmdir
+<snapshot>/ledger/.lock`). 원장 데이터 파일은 지우지 않는다.
+
 ## Lock 없는 snapshot (`/ccf`)
 
 `/ccf`는 `guard.py snapshot`으로 lock 없이 Diff snapshot만 만든다. 구성은 위와

@@ -831,6 +831,39 @@ git worktree add ../repo-feature-b -b feature/b
 
 실패, 중단, 불확실한 dirty 상태면 lock만 해제하고 snapshot은 보존합니다.
 
+## 리뷰 원장
+
+`/cr`은 검토해야 할 hunk 목록(커버리지의 분모)을 모델의 대화 기억이 아니라
+디스크에 둡니다. 긴 리뷰에서 context가 compact되면 모델은 자신이 무엇을
+빠뜨렸는지 알 수 없고, 잊힌 hunk가 차단이 아니라 조용한 통과가 되기 때문입니다.
+
+원장은 snapshot 안의 `ledger/` 하위 디렉터리에 있고 snapshot의 소유권·정리
+수명을 그대로 물려받습니다. 워킹트리에는 아무것도 쓰지 않습니다.
+
+```text
+<git-dir>/claude-atomic-snapshots/<snapshot>/ledger/
+  run.json                  실행 메타 (stage, iteration, 선언된 scope)
+  gen-01-<fp8>/
+    inventory.jsonl         기계가 만든 분모
+    hunks.jsonl             hunk별 PASS/FINDING/N_A/UNKNOWN 판정
+    findings.jsonl          finding 본문
+    reviewers.json          reviewer별 상태
+```
+
+`ledger.py`가 `init`(scope 선언), `inventory`(분모 생성), `record`(판정 기록),
+`status`·`report`(재개와 보고), `advance`(`--fix` 이후 새 세대)를 제공합니다.
+분모는 기계가 만들고 `record`는 분모에 없는 id를 거부하므로 "전부 검토했다"고
+주장해 통과할 수 없습니다.
+
+`guard.py verify-review`와 `finish`는 **snapshot에 원장이 있으면 flag 없이도**
+커버리지를 검사하고, 미판정 hunk·`UNKNOWN`·빈 분모·어긋난 fingerprint가 있으면
+실패합니다. 원장을 만들지 않는 `/cpr`·`/cca`는 영향을 받지 않습니다.
+`--allow-unledgered`가 유일한 탈출구이며, 사용하면 우회 사유와 미판정 수가
+결과와 최종 보고에 강제로 표시됩니다.
+
+`abort`와 `--keep-snapshot`은 원장을 보존하므로 차단된 실행의 진행 상황을
+사후 분석할 수 있습니다.
+
 ## 장애 복구
 
 상태 확인:
@@ -991,6 +1024,7 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │       └── scripts/
 │           ├── cr_edit_gate.py
 │           ├── guard.py
+│           ├── ledger.py
 │           ├── reviewer_triggers.py
 │           ├── report_validator.py
 │           ├── baseline.py

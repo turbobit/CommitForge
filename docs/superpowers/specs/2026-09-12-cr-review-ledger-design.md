@@ -124,19 +124,37 @@ id = <source>:<path>#<n>           예: working:src/auth.py#3
 - `working` — 스냅샷의 `staged.diff`·`working.diff`·`untracked.z`에서 파생
 - `range:<A>..<B>` — `ledger.py`가 `git diff <A>..<B>`를 직접 실행해 파생
 
-`run.json`에 선언된 모든 scope의 inventory가 채워져야 게이트를 통과한다.
+**구현된 규칙(§7과 일치).** 게이트는 scope별 비어있지 않음이 아니라 **활성 세대
+inventory 전체가 비어 있지 않음**을 요구한다. 총 개수가 0이면
+`ledger_empty_inventory`로 차단한다. scope별 검사를 택하지 않은 이유는 두
+가지다. 첫째, 선언은 됐지만 실제로 아무것도 바뀌지 않은 scope(깨끗한 working
+tree와 함께 선언된 `working`)가 정상적으로 존재하며 이를 실패로 만들면 `/cr pr`
+같은 흔한 실행이 항상 차단된다. 둘째, 침묵 PASS를 만드는 조건은 "분모가 0"이지
+"어떤 scope가 0"이 아니다.
+
+선언되지 않은 scope는 분모에 들어가지 않으므로 게이트에도 보이지 않는다.
+따라서 SKILL.md는 §2에서 범위를 계산한 직후 `init`으로 그 scope를 선언하고
+`inventory`를 실행하도록 순서를 고정한다. `init`은 파괴적이지 않고 scope를
+합집합으로 더하며, 분모를 넓히면 활성 세대를 해제해 다음 `inventory`가 다시
+만들게 한다.
 
 ### 5.4 세대 전이
 
 `--fix`로 fingerprint가 바뀌면 `ledger.py advance`가 새 세대를 만든다. 기존 정책인 "수정 후 이전 reviewer 결과를 모두 무효화한다"가 그대로 구현된다.
 
 - 이전 세대는 불변 이력이 된다. 별도 `STALE` 마킹 로직이 필요 없다. 활성 세대가 아니면 이력이다.
-- **2세대 이후의 inventory는 스냅샷이 아니라 live `git diff`에서 만든다.** 스냅샷은 수정 전 원본이므로 수정 후의 분모가 될 수 없다.
+- **2세대 이후의 inventory는 스냅샷이 아니라 live `git diff`에서 만든다.** 스냅샷은 수정 전 원본이므로 수정 후의 분모가 될 수 없다. 이는 `advance`뿐 아니라 `iteration > 1`에서 실행되는 `inventory` 재실행에도 동일하게 적용된다.
+- **이미 만들어진 세대의 분모는 다른 내용으로 대체되지 않는다.** 같은 id 집합이 다시 나오면 멱등이고, 다르면 `ledger_inventory_conflict`로 거부한다. 분모를 옮기는 수단은 `advance`(수정 후)와 `init`의 scope 추가(활성 세대 해제 후 재생성)뿐이다.
 - 활성 세대의 fingerprint가 현재 저장소 fingerprint와 다르면 게이트는 실패한다. `advance` 없이 수정이 일어났다는 뜻이다.
 
 ### 5.5 재개 계약
 
 컴팩트 이후 모델이 자신의 진행 상황을 되찾는 경로다. Guard `begin` 직후 SKILL.md가 `ledger.py status`를 호출한다.
+
+커버리지는 세대 전체에 대해 평평하게 집계하고, scope는 그 안의 내역으로 둔다.
+`by_verdict`를 scope마다 복제하면 게이트가 읽는 값이 두 곳에 생겨 갈라진다.
+`reviewers`는 상태별 개수가 아니라 **이름 → 상태** 맵이다. 어떤 reviewer가
+`UNKNOWN`인지 알아야 재개할 수 있고, 개수만으로는 알 수 없다.
 
 ```json
 {
@@ -145,15 +163,23 @@ id = <source>:<path>#<n>           예: working:src/auth.py#3
   "stage": "review",
   "iteration": 1,
   "active_generation": "gen-01-ab12cd34",
+  "scopes_declared": ["working"],
+  "complete": false,
   "fingerprint_matches_current": true,
-  "scopes": [
-    {"scope": "working", "total": 214, "covered": 137,
-     "by_verdict": {"PASS": 120, "FINDING": 17, "N_A": 0, "UNKNOWN": 0},
-     "pending_sample": ["working:src/auth.py#8", "..."]}
-  ],
-  "reviewers": {"ACTIVE": 12, "N_A": 3, "UNKNOWN": 0}
+  "generation": "gen-01-ab12cd34",
+  "total": 214,
+  "pending": ["working:src/auth.py#8", "..."],
+  "pending_count": 77,
+  "unknown": [],
+  "unknown_count": 0,
+  "by_verdict": {"PASS": 120, "FINDING": 17, "N_A": 0, "UNKNOWN": 0},
+  "scopes": [{"source": "working", "total": 214, "covered": 137}],
+  "reviewers": {"cca-security-reviewer": "ACTIVE", "cca-ux-accessibility-reviewer": "N_A"}
 }
 ```
+
+`pending`·`unknown`은 상위 20개 표본이며 정확한 수는 `pending_count`·
+`unknown_count`에 있다.
 
 재개 규칙:
 
@@ -175,6 +201,7 @@ id = <source>:<path>#<n>           예: working:src/auth.py#3
 
 ```bash
 ledger.py init      --session S --scope working [--scope range:<A>..<B>]
+                    # 재실행 시 scope를 합집합으로 더하고 진행 상황을 보존한다
 ledger.py inventory --session S
 ledger.py record    --session S          # stdin JSON
 ledger.py status    --session S
@@ -217,17 +244,36 @@ import guard
 
 ## 7. 게이트
 
-`guard.py verify-review --require-ledger`로 옵트인한다. 플래그 방식이므로 같은 명령을 쓰는 `/cpr`는 영향을 받지 않는다.
+게이트는 **원장의 존재로 무장한다.** `<snapshot>/ledger/run.json`이 있으면
+`verify-review`와 `finish`가 flag와 무관하게 검사한다. 플래그 옵트인은 §3의
+원칙("모델이 기억하기를 기대하지 않는다")과 모순된다. 게이트를 켜는 지시가
+컴팩터가 먹는 바로 그 SKILL.md에 있기 때문이다. `/cpr`·`/cca`는 원장을 만들지
+않으므로 존재 기반 무장에서도 영향을 받지 않으며, 이는 플래그 방식이 주던 격리와
+동일하다.
+
+`--require-ledger`는 "원장이 아예 없으면 **추가로** 실패한다"는 의미로 남는다.
 
 | 조건 | 결과 |
 |---|---|
-| 원장 없음 | 실패 `ledger_missing` |
+| 원장 없음 | `--require-ledger`면 실패 `ledger_missing`, 아니면 검사 없음 |
 | 활성 세대 없음 (`inventory` 미실행) | 실패 `ledger_no_generation` |
 | 활성 세대 fingerprint ≠ 현재 | 실패 `ledger_stale` |
 | 활성 세대의 live inventory 개수 ≠ `run.json`에 기록된 개수 | 실패 `ledger_inventory_mismatch` |
+| 활성 세대 inventory 개수 = 0 | 실패 `ledger_empty_inventory` |
 | `UNKNOWN` 존재 | 실패 `ledger_unknown` |
 | 미판정 id 존재 | 실패 `ledger_incomplete` (개수·샘플 포함) |
 | 전부 terminal | 통과 + 커버리지 수치 |
+
+순서가 중요하다. 잘린 inventory(개수 0, 기록된 개수 2)는
+`ledger_inventory_mismatch`이지 `ledger_empty_inventory`가 아니다. 후자는 분모가
+실제로 비어 있게 만들어진 경우, 즉 리뷰 대상 scope가 선언되지 않은 경우다.
+
+`ledger.py`의 거부 사유도 함께 둔다.
+
+| 조건 | 결과 |
+|---|---|
+| 활성 세대에 이미 다른 id 집합의 inventory가 있음 | 실패 `ledger_inventory_conflict` |
+| `run.json`이 있으나 파싱 불가 | 실패 `ledger_corrupt` |
 
 `finish --review-only`도 동일 검사를 다시 수행한다. 기존 불변식이 `verify-review`와 `finish`에서 두 번 검사되는 패턴과 같다.
 
@@ -279,7 +325,7 @@ teammate 결과는 lead가 수신 즉시 기록한다. 컨텍스트 절약은 �
 
 | 파일 | 변경 |
 |---|---|
-| `skills/cr/SKILL.md` | `allowed-tools`에 `ledger.py` 추가. §0.5 재개(`status`), §1.5 `init`+`inventory`, §3 batch 수신 즉시 `record`, §4 `--fix` 후 `advance`, §6 `verify-review --require-ledger`, §7 커버리지 수치와 bypass 강제 표시 |
+| `skills/cr/SKILL.md` | `allowed-tools`에 `ledger.py` 추가. §1.5 `status`→`init --scope working`→(§2에서 범위 계산)→`init --scope range:<A>..<B>`→`inventory` 순서 고정, §3 batch 수신 즉시 `record`, §4 `--fix` 후 `guard.sh fingerprint`로 얻은 값으로 `advance`, §6 `finish` 이전에 `ledger.py report` 수집, §7 커버리지 수치와 bypass 강제 표시 |
 | `deep-review-protocol.md` §1 | 원장의 물리적 위치와 기록 명령 명시 |
 | `large-diff-review.md` | shard 종료 직후 `record`. §7의 미검토 hunk 확인을 `ledger.py status` 결과로 대체 |
 | `review-execution.md` | §3 finding 스키마가 원장 레코드임을 명시. lead 단독 writer 규칙과 cca-* Bash 미부여 불변조건 추가 |

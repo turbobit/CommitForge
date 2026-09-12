@@ -93,7 +93,7 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 - 있으면 `SOURCE_EDIT_ALLOWED=true`지만 현재 working hunk가 만든 확정적·국소 문제만 수정할 수 있다.
 - 첫 번째 위치 인자가 `release`, `emergency`, `learn`이면 `SOURCE_EDIT_ALLOWED=false`로 고정한다. 이 모드의 `--fix`는 오류로 보고하며 편집 권한을 열지 않는다.
 - 자연어의 “고쳐”, `fix`, `수정`은 `--fix`를 대신하지 않는다.
-- report output은 Guard 불변식 검증과 `finish`가 성공한 뒤 마지막에 생성한다.
+- report output은 Guard 불변식 검증과 `finish`가 성공한 뒤 마지막에 작성한다. 다만 재료가 되는 `ledger.py report` 출력은 **`finish` 이전에** 받아 보관한다. `finish`는 lock을 해제하고 snapshot을 삭제하므로 그 뒤에는 `ledger.py report`가 `owner_not_found`로 실패한다.
 
 결과 경계:
 
@@ -203,6 +203,19 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
 
 ## 1.5 리뷰 원장 초기화와 재개
 
+원장 명령은 다음 순서로만 실행한다. 순서가 정해져 있는 이유는 `init`은
+Guard `begin` 직후에 실행해야 컴팩트 이후 재개가 가능하고, 커밋 범위
+`<A>..<B>`는 §2에서 `period_range.py`·`git merge-base`·`pr_context.py`로
+계산되기 전에는 알 수 없기 때문이다.
+
+1. `status` — 재개 여부 판정 (아래, Guard `begin` 직후)
+2. `init --scope working` — 신규 실행이면 즉시 (아래, Guard `begin` 직후)
+3. §2에서 리뷰 범위를 계산한다
+4. `init --scope "range:<A>..<B>"` — 커밋 범위를 리뷰하는 모드에서만, §2 직후
+5. `inventory` — 모든 scope를 선언한 뒤 한 번 (§2 직후, 리뷰 시작 전)
+
+### 1.5.1 상태 확인과 재개
+
 Guard `begin` 직후 원장 상태를 먼저 확인한다.
 
 ```bash
@@ -210,20 +223,52 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" status \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
-- `exists`가 `false`면 신규 실행이다. `init`으로 scope를 선언한 뒤 `inventory`로 분모를 만든다.
+- `exists`가 `false`면 신규 실행이다. 아래 1.5.2로 진행한다.
 - `exists`가 `true`이고 `fingerprint_matches_current`가 `true`면 **처음부터 다시 리뷰하지 않는다.** `pending`에 남은 id만 이어서 검토한다. 컴팩트로 대화 기억을 잃었더라도 원장이 진행 상황의 정본이다.
 - `fingerprint_matches_current`가 `false`면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 말고 사용자에게 보고한다.
 
-scope는 실제 리뷰 대상과 일치해야 한다. 기본은 `working`이며, `--base`·`--range`·`pr`·`today`·`3days`·`weekly`는 해당 커밋 범위를 함께 선언한다.
+### 1.5.2 scope 선언
+
+scope는 **실제 리뷰 대상과 일치해야 한다.** 선언하지 않은 scope는 분모에
+들어가지 않으므로, 그 범위를 아무리 충실히 리뷰해도 종료 게이트에는 보이지
+않는다. working tree가 깨끗한 `pr`·`today`·`3days`·`weekly`·`--base`·`--range`
+실행에서 커밋 범위를 선언하지 않으면 분모가 0이 되고, 게이트는 이를
+`ledger_empty_inventory`로 차단한다.
+
+Guard `begin` 직후에는 아직 범위를 모르므로 `working`만 선언한다.
 
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
-  --session "$COMMITFORGE_SESSION_ID" --scope working --scope "range:<A>..<B>"
+  --session "$COMMITFORGE_SESSION_ID" --scope working
+```
+
+§2에서 `<A>..<B>`를 계산한 뒤, 커밋 범위를 리뷰하는 모드면 `init`을 한 번 더
+실행해 그 scope를 추가한다. `init`은 파괴적이지 않다. 기존 scope에 **합집합**으로
+더하며 `iteration`과 이미 기록한 판정을 보존한다. 이미 선언된 scope를 다시
+선언하면 아무 일도 일어나지 않는다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
+  --session "$COMMITFORGE_SESSION_ID" --scope "range:<A>..<B>"
+```
+
+### 1.5.3 분모 생성
+
+모든 scope를 선언한 뒤 `inventory`를 실행한다.
+
+```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" inventory \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
 `inventory`가 반환한 id 집합이 커버리지의 분모다. 이 목록을 직접 만들거나 수정하지 않는다.
+
+- `inventory`는 같은 결과를 다시 만들 때만 멱등하다. 이미 분모가 있는 세대에서
+  다른 id 집합이 나오면 `ledger_inventory_conflict`로 거부한다. 수정 후 분모를
+  바꾸는 유일한 방법은 §4의 `advance`다.
+- `inventory` 이후에 scope를 추가하면 활성 세대가 해제되므로 `inventory`를 다시
+  실행해 분모를 넓힌다. 넓어진 분모는 이전 분모의 상위집합이므로 이미 기록한
+  판정은 그대로 유효하다.
 
 ## 2. 변경 전체 스캔
 
@@ -294,7 +339,7 @@ baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppres
 - 설치되지 않은 agent 관점은 main agent가 직접 수행한다.
 - 적용 불가능한 관점도 `N/A`와 근거를 남긴다.
 - main agent가 모든 finding을 실제 코드와 diff로 재검증한다.
-- 모든 hunk와 삭제 동작이 `PASS`, `FINDING`, `N/A` 중 하나여야 한다.
+- 모든 hunk와 삭제 동작이 `PASS`, `FINDING`, `N_A` 중 하나여야 한다. 원장은 `N/A`를 받지 않고 `ledger_invalid_verdict`로 거부한다.
 - unreviewed hunk가 하나라도 있으면 완료로 처리하지 않는다.
 - reviewer batch 결과를 받을 때마다 **즉시** 원장에 기록한다. 다음 batch를 시작하기 전에 기록한다.
 
@@ -328,10 +373,22 @@ JSON
 4. 새 문제와 회귀가 없는지 검증한다.
 5. 새 fingerprint로 원장 세대를 전이한다. 생략하면 종료 게이트가 `ledger_stale`로 차단한다.
 
+`--fingerprint`에 넘길 값은 Guard가 계산한다. 직접 만들거나 `begin` 결과의 옛
+값을 재사용하지 않는다.
+
+```bash
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" fingerprint
+```
+
+결과의 `fingerprint` 필드를 그대로 넘긴다.
+
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" advance \
-  --session "$COMMITFORGE_SESSION_ID" --fingerprint "<새 fingerprint>"
+  --session "$COMMITFORGE_SESSION_ID" --fingerprint "<guard.sh fingerprint의 fingerprint 값>"
 ```
+
+`advance`는 새 세대의 분모를 snapshot이 아니라 live working tree에서 만든다.
+수정이 새로 만든 hunk도 분모에 들어간다.
 
 반복 상한까지 blocker가 남으면 실패로 종료하며 snapshot을 보존한다.
 
@@ -372,6 +429,19 @@ basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다�
 - `/cr`이 설명하지 못하는 working tree 변화가 없음
 - 원장의 모든 inventory id가 `PASS`·`FINDING`·`N_A` 중 하나를 가짐
 
+원장 게이트는 **snapshot에 원장이 있으면 flag와 무관하게 항상** 동작한다.
+`--require-ledger`는 "원장이 아예 없으면 추가로 실패한다"는 뜻이다. `/cr`은 항상
+원장을 만들므로 이 flag를 계속 붙이고, 원장을 만들지 않는 `/cpr`·`/cca`는 영향을
+받지 않는다.
+
+`finish` 직전에 최종 보고 재료를 받아 둔다. `finish` 이후에는 snapshot과 lock이
+사라져 실행할 수 없다.
+
+```bash
+python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" report \
+  --session "$COMMITFORGE_SESSION_ID"
+```
+
 정상 완료 시:
 
 ```bash
@@ -394,7 +464,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 
 - 시작/종료 HEAD와 staging 불변 여부
 - reviewer별 PASS/N/A/finding 수, unreviewed hunk 수
-- 원장 커버리지: 총 inventory 수, 판정별 분포, 활성 세대와 iteration
+- 원장 커버리지: 총 inventory 수, 판정별 분포, 활성 세대와 iteration. 수치는 `finish` 직전에 받아 둔 `ledger.py report`의 `coverage`에서 가져오며 기억으로 집계하지 않는다.
 - `--allow-unledgered`를 사용했다면 그 사실과 미판정 hunk 수·목록
 - 채택·기각한 중요 finding과 근거
 - 자동 수정 내용과 남은 blocker

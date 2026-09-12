@@ -63,10 +63,17 @@
 - reviewer별 PASS/N/A/finding 수
 - 조건부 reviewer별 trigger와 활성/N/A 근거
 - reviewer 실행·fallback·UNKNOWN 수와 중복 통합 수
-- hunk coverage: 전체/PASS/FINDING/N/A/미검토
+- hunk coverage: 전체/PASS/FINDING/N_A/미검토
 - 채택·기각한 finding과 근거
 - 원장 커버리지 수치는 `ledger.py report`의 `coverage`에서 가져온다. 기억으로
   집계하지 않는다. `--format json`·`sarif` 산출물도 같은 출력에서 만든다.
+- `ledger.py report`는 **Guard `finish` 이전에** 실행해 출력을 보관한다.
+  `finish`는 lock을 해제하고 snapshot을 삭제하므로 그 뒤에 실행하면
+  `owner_not_found`로 실패한다. `finish` 결과에는 커버리지 요약만 있고
+  `findings`가 없어 JSON/SARIF를 만들 수 없다. 보고문 자체는 `finish`가 성공한
+  뒤 이 보관된 출력으로 작성한다.
+- hunk 판정값은 `PASS`·`FINDING`·`N_A`다. 원장은 `N/A`를 `ledger_invalid_verdict`로
+  거부한다. reviewer 적용 여부를 뜻하는 산문의 `N/A`와 혼동하지 않는다.
 
 ## 수정 및 검증
 - 자동 수정 내용과 남은 blocker
@@ -215,7 +222,7 @@ snapshot 경로를 그대로 보고한다.
 - 품질 gate 결과
 - Breaking Change 여부
 - 회귀·배포·migration 주의사항
-- hunk coverage: 전체/PASS/FINDING/N/A/미검토 수
+- hunk coverage: 전체/PASS/FINDING/N_A/미검토 수
 - Architecture, Language/API, UX/A11y, Observability, Quality reviewer 결과
 - 조건부 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 결과
 - reviewer 실행·fallback·UNKNOWN 수와 finding fingerprint
