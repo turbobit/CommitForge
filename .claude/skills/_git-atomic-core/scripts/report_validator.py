@@ -26,6 +26,15 @@ FINDING_FIELDS = {
 SEVERITIES = {"CRITICAL", "MAJOR", "MINOR", "NOTE"}
 STATUSES = {"OPEN", "FIXED", "REJECTED", "N_A", "UNKNOWN", "BASELINED", "STALE"}
 
+# review-execution.md §3.6 adds these two. They stay out of FINDING_FIELDS
+# because that set is what every finding must carry, and a review that never
+# reached the verification step legitimately omits them -- but a value that IS
+# present has to be valid here for the same reason the ledger validates it at
+# write time.
+VERIFICATIONS = {"ISOLATED", "SELF", "UNVERIFIED"}
+CONFIDENCE_MIN = 1
+CONFIDENCE_MAX = 10
+
 
 def validate_json(payload: dict) -> None:
     if payload.get("schema") != "commitforge-review/v1":
@@ -47,6 +56,17 @@ def validate_json(payload: dict) -> None:
         for field in FINDING_FIELDS - {"blocking"}:
             if not isinstance(finding[field], str):
                 raise ValueError(f"finding {index} {field} 문자열 형식 오류")
+        verification = finding.get("verification")
+        if verification is not None and verification not in VERIFICATIONS:
+            raise ValueError(f"finding {index} verification 형식 오류")
+        confidence = finding.get("confidence")
+        if confidence is not None:
+            # `bool` subclasses `int`, so `True` would pass as the lowest
+            # confidence there is instead of failing as the type error it is.
+            if isinstance(confidence, bool) or not isinstance(confidence, int):
+                raise ValueError(f"finding {index} confidence 형식 오류")
+            if not CONFIDENCE_MIN <= confidence <= CONFIDENCE_MAX:
+                raise ValueError(f"finding {index} confidence 범위 오류")
 
 
 def validate_sarif(payload: dict) -> None:

@@ -26,3 +26,12 @@ Main agent가 제공한 manifest, lockfile, CI와 build diff를 읽기 전용으
 - license·배포 제약은 저장소 정책이 제공된 경우에만 판정
 
 offline diff만으로 취약점 존재나 package 평판을 단정하지 않는다. 외부 advisory 확인이 필요하면 검증 필요로 명시하고, 코드에서 확인되는 공급망 위험만 finding으로 반환한다.
+
+## 확신도
+
+각 finding에 `confidence`를 1~10으로 매긴다. 등급의 의미는
+`review-execution.md` §3.1의 공통 기준을 그대로 따르며, 이 관점에서 9~10은
+**manifest·CI 설정·image 참조에서 위험이 도입되는 지점을 정확히 짚을 수 있다**는 뜻이다. 5 이하는 추측이므로 보고하지 않는다.
+
+확신과 심각도는 다른 축이다. 확신이 모자라면 심각도를 낮추는 것이 아니라 보고하지
+않는 것이 맞다.

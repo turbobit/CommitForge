@@ -3,92 +3,92 @@
   "version": "1.17.0",
   "reproducible": true,
   "file_count": 151,
-  "total_bytes": 1609098,
+  "total_bytes": 1656956,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
-      "size": 1220,
-      "sha256": "3d7dc8bdb65b0621698a8a02993cfd9886db1d198682665b11fe1614cdfdd53b"
+      "size": 1735,
+      "sha256": "fbfcdcea33b8150bb4871b1f91a0c3d05b0abcc45a71e6ee290d114a34acf3d6"
     },
     {
       "path": ".claude/agents/cca-correctness-reviewer.md",
-      "size": 1720,
-      "sha256": "dbe60fb5c3cabbee9966424f2960bc2fdbd2d2f9684ca887da076573e6b9ce07"
+      "size": 4454,
+      "sha256": "2e244e8b693d0b79e1d86f9d1c74685b6d70e1c83fa2adba2167c49c3a6cc606"
     },
     {
       "path": ".claude/agents/cca-data-migration-reviewer.md",
-      "size": 1283,
-      "sha256": "3781a10b3daa17a00e255d207c4d548489c6ecdca2755b3adea4d581b782edd2"
+      "size": 1790,
+      "sha256": "96960efa7f4377e2c0ac5bb2f3266799651fc05801540766de13a3afd1bfd555"
     },
     {
       "path": ".claude/agents/cca-dependency-supply-chain-reviewer.md",
-      "size": 1345,
-      "sha256": "fc97d48a710fed9a56b8736f24b64a7b18c901543f9bbd9fbc20c797c6cd33f0"
+      "size": 1838,
+      "sha256": "3eaeeed8ab5016af7c13ab227ec95e3efb7d55368c75e5c082136897b74948aa"
     },
     {
       "path": ".claude/agents/cca-git-reviewer.md",
-      "size": 1623,
-      "sha256": "0ff3c3304340b10a0c179642ded4d830753b80600d42a607727897b498b98a99"
+      "size": 2122,
+      "sha256": "1f505a8e2f476505e2467b0ef6602e806ac27689e04fe4b699c62dffc29b1de7"
     },
     {
       "path": ".claude/agents/cca-language-api-reviewer.md",
-      "size": 1015,
-      "sha256": "ed893cac2fb6257f3c276618fb62dc19d7d994b6cfa598fd055a3e73cdeb7920"
+      "size": 1504,
+      "sha256": "b5ba20898b9f7cffb2edc5caffaff4f845d2e50156386a5bf79e0f088af67896"
     },
     {
       "path": ".claude/agents/cca-line-reviewer.md",
-      "size": 1472,
-      "sha256": "9740b1bffcb125ba053bd8ae7e8e8e46b518a86c0a5931d98242059e81a2043b"
+      "size": 1964,
+      "sha256": "3017048f1fb7a50de944e7ab9c86ce7de0ba8ef841f852e1b922b11d431feec8"
     },
     {
       "path": ".claude/agents/cca-observability-reviewer.md",
-      "size": 1124,
-      "sha256": "93227cf2e8c3dfc51ae167c322f41e5cbed5f725b338ea4339b5de7808171eff"
+      "size": 1620,
+      "sha256": "c3f071d799d7a5c59b1c94f336133a8d252ba3ae5e89eef208f88146fbbf2568"
     },
     {
       "path": ".claude/agents/cca-performance-reviewer.md",
-      "size": 4174,
-      "sha256": "e36f32ef55728e7ab760f04d72649db1c37f4dee085a2f0aaba4e1a5b27533ab"
+      "size": 6880,
+      "sha256": "666059c31a9ac9dc41d9a88ffd3524a8adba74a002a179b6a34776891be44cf8"
     },
     {
       "path": ".claude/agents/cca-privacy-governance-reviewer.md",
-      "size": 1257,
-      "sha256": "21dc2750136b69f6921fdce5ac3ba98d9ad1c36e4a047c2d7b5bbe19db3556e7"
+      "size": 1747,
+      "sha256": "e4964b8744d1b8bbd940bd5c8fc9d2bd5542cf3571cf80f029f7b4b82689321d"
     },
     {
       "path": ".claude/agents/cca-quality-reviewer.md",
-      "size": 1354,
-      "sha256": "65c005d2889e30b2f907969a4dbcaa8c278831b68287dee65ba0ddaaf60d38b5"
+      "size": 4192,
+      "sha256": "01d47284d4af7f22fa3c7a1bdf6b1b89d9d2ac874a77505697e2e040de59c5d3"
     },
     {
       "path": ".claude/agents/cca-release-deployment-reviewer.md",
-      "size": 1784,
-      "sha256": "2a50781a14ba994218fb212f7e3f126a65c06dc33a8038bb96ca484b547f6d74"
+      "size": 2273,
+      "sha256": "77c76a3722eec5e969877fdea62abe907d4ef56d0ae4269630944d98a88593af"
     },
     {
       "path": ".claude/agents/cca-reliability-recovery-reviewer.md",
-      "size": 1231,
-      "sha256": "2ac8ad82e9e710135cf755e0c06834f21bbc8879387d269b795ed562e8736ed3"
+      "size": 1721,
+      "sha256": "fe1ac4f7df2ed68cb3f2aaff3799a904d591a72a1956c5e59f006483d119868b"
     },
     {
       "path": ".claude/agents/cca-requirements-product-reviewer.md",
-      "size": 1280,
-      "sha256": "c85d2b9de5bb7524c178c7b744d593a8d66d9bcf3a6ea495b21a63cf53a37229"
+      "size": 1780,
+      "sha256": "8dd10d6a00a636048e0d280219562f8717cdbbea2a040dd8935a0aaa9e344ba0"
     },
     {
       "path": ".claude/agents/cca-security-reviewer.md",
-      "size": 1707,
-      "sha256": "13728658151941629b150a2c8295e7f79eeda25a7ac86c2ea058cdea75768afa"
+      "size": 5658,
+      "sha256": "3b5ee017c7f37ad75f4b7ee5320d0f9e4b9ec231394b329f5f349a76d338584b"
     },
     {
       "path": ".claude/agents/cca-testing-reviewer.md",
-      "size": 1725,
-      "sha256": "7435d9ea21a16b94c68b90f6d49a3da7d90a2a8360eea8b818e270a1eb79fcfa"
+      "size": 2226,
+      "sha256": "40422eecf059da3fbdf33e423da7d2061c89095a1e7c4ff435ec406e4da724b3"
     },
     {
       "path": ".claude/agents/cca-ux-accessibility-reviewer.md",
-      "size": 1135,
-      "sha256": "c16e0af0343dcfb24aec0a4e366db945a60bf59136b8fc6604c8890bbda2a011"
+      "size": 1622,
+      "sha256": "947a4e7785b014bc98052b9e2b46efcbb7ab80e85ff11854bc2be097c5331382"
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
@@ -177,18 +177,18 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
-      "size": 2124,
-      "sha256": "0e3d478f6cd93ba46b6bdb92e6862f22240207b80e6220f13a6547781761d670"
+      "size": 2448,
+      "sha256": "da0d90c72af23fc59ae241ed6ebb468bca2f101c807f64ce42307998589c08db"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 8041,
-      "sha256": "79556edbc40dd810f2ad1c9323cb397e0adccd2f5cb205271b8c1dcda846253a"
+      "size": 9740,
+      "sha256": "cb1eb6383178be497e5c4adb755c86e890bc14cc82cf2c4f9fe8a5aa08fea736"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 15838,
-      "sha256": "e1071efec96029c0db1ee678ec3e3e38ccb60af330ee5907f4c1fc273146331d"
+      "size": 21753,
+      "sha256": "538493033be430d0e1a9987469681918f9d805c5c925545eaffc4ad9b4b79167"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -197,8 +197,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-policy.md",
-      "size": 1251,
-      "sha256": "cdb717a8ce12475c2e71847f11812bcc51e4b2c885f089887306520662de15ae"
+      "size": 2070,
+      "sha256": "9f2afcbdc9c29dfa9a30982afdc7616c6b44bb84c23c3687118c265fccd4dbda"
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
@@ -232,8 +232,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 58561,
-      "sha256": "b959a0929c4fdb3e63f4c8ec2e014199a74c08842f4c202512db84d64f6b5ef1"
+      "size": 63003,
+      "sha256": "b7ef03f8d306be837bf3cd9c6db07a4ff20a01ba38df0b92b998aa99758c7d18"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -252,8 +252,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/report_validator.py",
-      "size": 3162,
-      "sha256": "759644ef53e541a7499f6f47794831e87271abfeb77fcc035a46178578309460"
+      "size": 4316,
+      "sha256": "27305ea31f3ec50717711294552e42f52022b42abafd536c0dba03be1dbbdae3"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
@@ -282,8 +282,8 @@
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 24993,
-      "sha256": "d2b37416e923b84d8c20415292bac0406edee868731101cc52588e2c6e303394"
+      "size": 25464,
+      "sha256": "01712ba44f8f2ded4836780d2d7b864abcf2df259de40fa695cab7d769d3a73a"
     },
     {
       "path": ".claude/skills/ccf/SKILL.md",
@@ -317,8 +317,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 31948,
-      "sha256": "382d5d15742cfc2a7327d4fb5789377f816137b4360a9472f6eac0edc611f217"
+      "size": 32706,
+      "sha256": "41ac359ee7038545e12733582e5dd8eb3a7de30359582f0dd5e47f921aebeac2"
     },
     {
       "path": ".gitattributes",
@@ -657,8 +657,8 @@
     },
     {
       "path": "examples/review.yml",
-      "size": 355,
-      "sha256": "b8f34d78a3f68165b2334a2bb153a7a4ec3b0afe1f3507025ab3f79ae25da18f"
+      "size": 379,
+      "sha256": "2ac4536a9b17152d56a0d128dcf493d707398acae17f9292662c2f01f6b7cc7d"
     },
     {
       "path": "install.ps1",
@@ -697,8 +697,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 82810,
-      "sha256": "81b0bec2dbea560a5f4d9f2fb131afb8a81a5212380faa37611a0953d250be7d"
+      "size": 93744,
+      "sha256": "05650037dae4feeb17caa2002f2ab9660755c62c8b353fb7a69aabcba1d4a245"
     },
     {
       "path": "tests/test_package.py",
@@ -727,8 +727,8 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 8170,
-      "sha256": "04a1fe55506650618fea5f4c4d1395a3e33c221a07f66fea728f0778399815fd"
+      "size": 10811,
+      "sha256": "f3e3dc97755750134ecfc08a2e67f24427c4f8114d4b12dc9a0bae9ac432f36b"
     },
     {
       "path": "tests/test_reviewer_triggers.py",

@@ -39,3 +39,12 @@ Main agent가 제공한 status, staged·unstaged diff, log, branch/HEAD 정보�
 ```
 
 심각도는 CRITICAL/MAJOR/MINOR/NOTE만 사용한다. Atomic Commit 계획도 번호 순서로 제시한다. 실제 diff에서 확인할 수 없는 내용을 추측하지 않는다.
+
+## 확신도
+
+각 finding에 `confidence`를 1~10으로 매긴다. 등급의 의미는
+`review-execution.md` §3.1의 공통 기준을 그대로 따르며, 이 관점에서 9~10은
+**diff에서 섞인 의도와 그것이 깨뜨리는 cherry-pick·revert·bisect 경로를 짚을 수 있다**는 뜻이다. 5 이하는 추측이므로 보고하지 않는다.
+
+확신과 심각도는 다른 축이다. 확신이 모자라면 심각도를 낮추는 것이 아니라 보고하지
+않는 것이 맞다.

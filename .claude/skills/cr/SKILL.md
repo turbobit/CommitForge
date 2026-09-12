@@ -343,6 +343,7 @@ python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" <changed-
 - 설치되지 않은 agent 관점은 main agent가 직접 수행한다.
 - 적용 불가능한 관점도 `N/A`와 근거를 남긴다.
 - main agent가 모든 finding을 실제 코드와 diff로 재검증한다.
+- `blocking_severity` 이상 finding은 `review-execution.md` §3.6의 격리 검증을 거친다. 탐지 추론을 넘기지 않고 finding 진술과 코드만으로 `confidence`를 다시 매기며, 임계값 미만은 `REJECTED`로 기록하되 삭제하지 않는다. Agent Team이나 subagent를 쓸 수 없어 lead가 직접 판정했으면 `SELF`로 기록하고 그 수를 최종 보고에 표시한다.
 - 모든 hunk와 삭제 동작이 `PASS`, `FINDING`, `N_A` 중 하나여야 한다. 원장은 `N/A`를 받지 않고 `ledger_invalid_verdict`로 거부한다.
 - unreviewed hunk가 하나라도 있으면 완료로 처리하지 않는다.
 - reviewer batch 결과를 받을 때마다 **즉시** 원장에 기록한다. 다음 batch를 시작하기 전에 기록한다.
@@ -476,10 +477,10 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 
 ## 7. 최종 보고
 
-한글로 다음을 보고한다.
+한글로 다음을 보고한다. 맨 앞에 `reporting.md`의 공통 판정(`통과`·`조건부 통과`·`차단`)과 한 줄 근거를 쓴다.
 
 - 시작/종료 HEAD와 staging 불변 여부
-- reviewer별 PASS/N/A/finding 수, unreviewed hunk 수
+- reviewer별 PASS/N/A/finding 수, unreviewed hunk 수, 격리 검증의 `ISOLATED`·`SELF`·`UNVERIFIED`·`REJECTED` 수. 검증 수치는 `ledger.py report`의 `verification`에서 가져오며 기억으로 집계하지 않고, `SELF`·`UNVERIFIED`가 있으면 그 이유도 적는다.
 - 원장 커버리지: 총 inventory 수, 판정별 분포, 활성 세대와 iteration. 수치는 `finish` 직전에 받아 둔 `ledger.py report`의 `coverage`에서 가져오며 기억으로 집계하지 않는다.
 - `--allow-unledgered`를 사용했다면 그 사실과 미판정 hunk 수·목록
 - 채택·기각한 중요 finding과 근거

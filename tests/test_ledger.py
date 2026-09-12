@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 import shutil
@@ -513,6 +514,264 @@ class RecordTest(LedgerTestCase):
         )
         lines = [line for line in hunks.read_text(encoding="utf-8").splitlines() if line.strip()]
         self.assertEqual(len(lines), 4)
+
+
+def load_script(path: Path):
+    spec = importlib.util.spec_from_file_location(path.stem, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+class FindingEnumAgreementTest(unittest.TestCase):
+    """The ledger writes findings, report_validator checks the exported report.
+
+    A value one accepts and the other refuses would make a recorded review
+    unexportable, so the two enums have to stay equal rather than merely
+    similar. This is the test the duplicated constants rely on.
+    """
+
+    def setUp(self) -> None:
+        self.ledger_mod = load_script(LEDGER)
+        self.validator = load_script(SCRIPTS / "report_validator.py")
+
+    def test_severities_agree(self) -> None:
+        self.assertEqual(
+            set(self.ledger_mod.FINDING_SEVERITIES), set(self.validator.SEVERITIES)
+        )
+
+    def test_statuses_agree(self) -> None:
+        self.assertEqual(
+            set(self.ledger_mod.FINDING_STATUSES), set(self.validator.STATUSES)
+        )
+
+    def test_verifications_agree(self) -> None:
+        self.assertEqual(
+            set(self.ledger_mod.VERIFICATIONS), set(self.validator.VERIFICATIONS)
+        )
+
+    def test_confidence_bounds_agree(self) -> None:
+        self.assertEqual(
+            (self.ledger_mod.CONFIDENCE_MIN, self.ledger_mod.CONFIDENCE_MAX),
+            (self.validator.CONFIDENCE_MIN, self.validator.CONFIDENCE_MAX),
+        )
+
+
+class FindingSchemaValidationTest(LedgerTestCase):
+    """review-execution.md §3's optional finding fields must be validated when present.
+
+    §3.6 lets `confidence` flip a finding to REJECTED and gates verification on
+    `severity`, so a misspelled value that recorded silently would read as
+    "field absent" and skip the gate it feeds.
+    """
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def payload(self, ids: list[str], **finding: object) -> dict:
+        return {
+            "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["cr-001"]}],
+            "findings": [{"id": "cr-001", **finding}],
+        }
+
+    def test_accepts_every_optional_field(self) -> None:
+        started, ids = self.prepared()
+        _, saved = self.record(
+            started["session"],
+            self.payload(
+                ids,
+                severity="CRITICAL",
+                status="OPEN",
+                verification="ISOLATED",
+                confidence=9,
+            ),
+        )
+        self.assertTrue(saved["ok"])
+        self.assertEqual(saved["recorded_findings"], 1)
+
+    def test_accepts_finding_without_any_optional_field(self) -> None:
+        started, ids = self.prepared()
+        _, saved = self.record(started["session"], self.payload(ids))
+        self.assertTrue(saved["ok"])
+        self.assertEqual(saved["recorded_findings"], 1)
+
+    def test_accepts_stale_status(self) -> None:
+        # §3 tells the lead to link a superseded finding as FIXED or STALE, so
+        # STALE must be in the allowed set or that documented path is unusable.
+        started, ids = self.prepared()
+        _, saved = self.record(started["session"], self.payload(ids, status="STALE"))
+        self.assertTrue(saved["ok"])
+
+    def test_accepts_boundary_confidence(self) -> None:
+        started, ids = self.prepared()
+        for value in (1, 10):
+            with self.subTest(confidence=value):
+                _, saved = self.record(
+                    started["session"], self.payload(ids, confidence=value)
+                )
+                self.assertTrue(saved["ok"])
+
+    def test_rejects_unknown_severity(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"], self.payload(ids, severity="BLOCKER"), check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_severity")
+
+    def test_rejects_unknown_status(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"], self.payload(ids, status="N/A"), check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_finding_status")
+
+    def test_rejects_unknown_verification(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"], self.payload(ids, verification="CHECKED"), check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_verification")
+
+    def test_rejects_out_of_range_confidence(self) -> None:
+        started, ids = self.prepared()
+        for value in (0, 11, -1):
+            with self.subTest(confidence=value):
+                proc, refused = self.record(
+                    started["session"], self.payload(ids, confidence=value), check=False
+                )
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(refused["reason"], "ledger_invalid_confidence")
+
+    def test_rejects_boolean_confidence(self) -> None:
+        # `True` is an int in Python and sits inside 1..10 as the *lowest*
+        # confidence, so accepting it would turn a type error into a silent
+        # "reject this finding".
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"], self.payload(ids, confidence=True), check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_confidence")
+
+    def test_rejects_non_integer_confidence(self) -> None:
+        started, ids = self.prepared()
+        for value in ("8", 8.5, []):
+            with self.subTest(confidence=value):
+                proc, refused = self.record(
+                    started["session"], self.payload(ids, confidence=value), check=False
+                )
+                self.assertNotEqual(proc.returncode, 0)
+                self.assertEqual(refused["reason"], "ledger_invalid_confidence")
+
+    def test_invalid_finding_field_discards_the_whole_batch(self) -> None:
+        # Same contract as an invalid verdict: a batch rejected for one bad
+        # field must not leave its sibling verdicts recorded.
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {
+                "verdicts": [
+                    {"id": ids[0], "verdict": "PASS", "reviewer": "cca-line-reviewer"},
+                    {"id": ids[0], "verdict": "FINDING", "finding_ids": ["cr-001"]},
+                ],
+                "findings": [{"id": "cr-001", "severity": "URGENT"}],
+            },
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_severity")
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(report["findings"], [])
+        self.assertEqual(report["coverage"]["by_verdict"]["PASS"], 0)
+
+
+class VerificationSummaryTest(LedgerTestCase):
+    """`report` must emit the §3.6 counts the skill is forbidden to tally from memory."""
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def test_counts_each_verification_path(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [
+                    {"id": ids[0], "verdict": "FINDING", "finding_ids": ["a", "b", "c"]}
+                ],
+                "findings": [
+                    {"id": "a", "verification": "ISOLATED", "confidence": 9},
+                    {"id": "b", "verification": "SELF", "confidence": 8},
+                    {"id": "c", "verification": "UNVERIFIED"},
+                ],
+            },
+        )
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(
+            report["verification"],
+            {"isolated": 1, "self": 1, "unverified": 1, "rejected": 0, "total": 3},
+        )
+
+    def test_missing_verification_counts_as_unverified(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["a"]}],
+                "findings": [{"id": "a"}],
+            },
+        )
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(report["verification"]["unverified"], 1)
+        self.assertEqual(report["verification"]["total"], 1)
+
+    def test_counts_rejected_findings(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["a", "b"]}],
+                "findings": [
+                    {"id": "a", "status": "REJECTED", "verification": "ISOLATED", "confidence": 4},
+                    {"id": "b", "status": "OPEN", "verification": "ISOLATED", "confidence": 9},
+                ],
+            },
+        )
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(report["verification"]["rejected"], 1)
+        self.assertEqual(report["verification"]["isolated"], 2)
+
+    def test_summary_total_matches_reported_findings(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["a", "b"]}],
+                "findings": [{"id": "a"}, {"id": "b", "verification": "SELF"}],
+            },
+        )
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(report["verification"]["total"], len(report["findings"]))
+
+    def test_empty_review_reports_zero_counts(self) -> None:
+        started, _ = self.prepared()
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertEqual(
+            report["verification"],
+            {"isolated": 0, "self": 0, "unverified": 0, "rejected": 0, "total": 0},
+        )
 
 
 class AdvanceTest(LedgerTestCase):

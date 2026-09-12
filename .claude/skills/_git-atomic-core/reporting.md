@@ -12,6 +12,26 @@
 수 없으면 추측하지 말고 `소요 시간: 측정 불가 (사유)`로 표시한다. Guard의
 `lock_age_seconds`를 실행 시간으로 대신 사용하지 않는다.
 
+## 공통 판정
+
+reviewer 파이프라인을 돌리는 `/cr`과 `/cca`는 세부 항목을 나열하기 전에 **한 줄
+판정**을 먼저 쓴다. 게이트 조건 목록은 근거이지 결론이 아니다. 읽는 사람이 "이대로
+진행해도 되는가"를 먼저 알 수 있어야 한다.
+
+| 판정 | 조건 |
+|---|---|
+| `통과` | 확인된 CRITICAL·MAJOR가 0이고 필수·활성 reviewer의 `UNKNOWN`이 0이다 |
+| `조건부 통과` | 차단 사유는 없으나 MINOR 또는 범위 밖으로 기록한 MAJOR가 남아 있다 |
+| `차단` | 확인된 CRITICAL·MAJOR가 남았거나, `UNKNOWN` 관점·미검토 hunk가 있거나, 필수 검증이 실패했다 |
+
+- 판정 뒤에 한 줄 근거를 붙인다. 예: `차단 — CRITICAL 1건(인증 우회), src/auth.py:42`
+- 판정은 게이트 결과에서 유도한다. 기억이나 인상으로 매기지 않는다. `/cr`은
+  `review-gates.md` §5의 완료 Gate, `/cca`는 §6의 Commit Gate가 근거다.
+- 원장을 쓰는 `/cr`에서 미판정 hunk가 있거나 `--allow-unledgered`를 사용했으면
+  `통과`로 쓰지 않는다.
+- `/ccr`·`/cfr`·`/cpr`은 commit 계획·PR 미리보기이므로 이 판정 대신 각 형식의
+  `차단 사유`와 `실행 전 차단 요소`를 사용한다.
+
 ## `/ccr`
 
 ```text
@@ -59,11 +79,17 @@
 - working tree 변경 요약
 - 분석 범위와 사용자 인자
 
+## 판정
+- `통과` | `조건부 통과` | `차단` 중 하나와 한 줄 근거
+
 ## 심층 리뷰
 - reviewer별 PASS/N/A/finding 수
 - 조건부 reviewer별 trigger와 활성/N/A 근거
 - reviewer 실행·fallback·UNKNOWN 수와 중복 통합 수
 - hunk coverage: 전체/PASS/FINDING/N_A/미검토
+- 격리 검증: `ISOLATED`·`SELF`·`UNVERIFIED` finding 수와 `REJECTED` 수.
+  `ledger.py report`의 `verification`에서 가져온다. `SELF`·`UNVERIFIED`가 있으면
+  그 이유도 적는다.
 - 채택·기각한 finding과 근거
 - 원장 커버리지 수치는 `ledger.py report`의 `coverage`에서 가져온다. 기억으로
   집계하지 않는다. `--format json`·`sarif` 산출물도 같은 출력에서 만든다.
@@ -223,6 +249,8 @@ snapshot 경로를 그대로 보고한다.
 - Breaking Change 여부
 - 회귀·배포·migration 주의사항
 - hunk coverage: 전체/PASS/FINDING/N_A/미검토 수
+- 격리 검증: `ISOLATED`·`SELF`·`UNVERIFIED` finding 수와 `REJECTED` 수.
+  `SELF`·`UNVERIFIED`가 있으면 그 이유도 적는다.
 - Architecture, Language/API, UX/A11y, Observability, Quality reviewer 결과
 - 조건부 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 결과
 - reviewer 실행·fallback·UNKNOWN 수와 finding fingerprint

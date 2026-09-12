@@ -4,6 +4,7 @@ required_reviewers:
 disabled_reviewers: []
 max_parallel: 4
 blocking_severity: MAJOR
+confidence_threshold: 8
 exclude:
   - vendor/**
   - generated/**

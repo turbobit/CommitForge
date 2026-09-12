@@ -26,6 +26,8 @@
 
 `findings`는 `review-execution.md` 공통 schema를 사용한다. `status`는 `OPEN`, `FIXED`, `REJECTED`, `N_A`, `UNKNOWN`, `BASELINED`, `STALE` 중 하나다.
 
+`confidence`와 `verification`은 선택 필드다. `review-execution.md` §3.6의 격리 검증을 거친 finding만 가지므로 없을 수 있지만, 있으면 `confidence`는 1~10 정수이고 `verification`은 `ISOLATED`, `SELF`, `UNVERIFIED` 중 하나다. `report_validator.py`가 두 조건을 모두 검사한다.
+
 ## SARIF
 
 - SARIF `2.1.0`

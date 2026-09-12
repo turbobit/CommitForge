@@ -45,6 +45,32 @@ REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
 # unsatisfiable in the structure the skill selects by default.
 REQUIRED_REVIEWER_ROLES = ("line", "correctness", "security")
 
+# review-execution.md §3's finding schema. Every field here is optional so a
+# reviewer that omits them still records, but a supplied value must be valid:
+# §3.6 lets `confidence` flip a finding to REJECTED and `blocking_severity`
+# gates on `severity`, so an unvalidated typo would read as "field absent" and
+# silently skip the very gate the field exists to feed. That is the same
+# failure the verdict and reviewer-status spellings are validated against.
+#
+# Each of these must stay equal to its `report_validator` counterpart: the
+# ledger is where a finding is written and the validator is where the exported
+# JSON/SARIF is checked, so a value accepted by one and refused by the other
+# would make a recorded review unexportable. `tests/test_ledger.py` asserts
+# they agree.
+FINDING_SEVERITIES = ("CRITICAL", "MAJOR", "MINOR", "NOTE")
+FINDING_STATUSES = (
+    "OPEN",
+    "FIXED",
+    "REJECTED",
+    "N_A",
+    "UNKNOWN",
+    "BASELINED",
+    "STALE",
+)
+VERIFICATIONS = ("ISOLATED", "SELF", "UNVERIFIED")
+CONFIDENCE_MIN = 1
+CONFIDENCE_MAX = 10
+
 GENERATION_PREFIX = "gen"
 FINGERPRINT_PREFIX_LEN = 8
 INVENTORY_NAME = "inventory.jsonl"
@@ -1047,13 +1073,15 @@ def cmd_report(args: argparse.Namespace) -> None:
     data = read_run(ledger_dir)
     summary = coverage(ctx, ledger_dir, data)
     generation = data.get("active_generation") or ""
+    findings = all_findings(ledger_dir, data)
     guard.emit(
         {
             "ok": True,
             "generation": generation,
             "iteration": data["iteration"],
             "coverage": summary,
-            "findings": all_findings(ledger_dir, data),
+            "verification": verification_summary(findings),
+            "findings": findings,
         }
     )
 
@@ -1231,6 +1259,81 @@ def _require_str_list_field(record: dict[str, Any], field: str, label: str) -> N
         )
 
 
+def _require_enum_field(
+    record: dict[str, Any],
+    field: str,
+    allowed: tuple[str, ...],
+    label: str,
+    reason: str,
+) -> None:
+    value = record.get(field)
+    if value is None:
+        return
+    if value not in allowed:
+        raise guard.GuardError(
+            f"{label} 항목의 {field} 값이 허용되지 않습니다: {value}",
+            reason=reason,
+            field=field,
+            id=record.get("id"),
+            allowed=list(allowed),
+        )
+
+
+def _require_confidence_field(record: dict[str, Any], label: str) -> None:
+    value = record.get("confidence")
+    if value is None:
+        return
+    # `bool` subclasses `int`, so `True` would pass an isinstance check and sit
+    # inside the range as 1 -- the lowest confidence there is. Accepting it
+    # would turn a type error into a silent "reject this finding".
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise guard.GuardError(
+            f"{label} 항목의 confidence는 정수여야 합니다: {value!r}",
+            reason="ledger_invalid_confidence",
+            field="confidence",
+            id=record.get("id"),
+        )
+    if not CONFIDENCE_MIN <= value <= CONFIDENCE_MAX:
+        raise guard.GuardError(
+            f"{label} 항목의 confidence는 "
+            f"{CONFIDENCE_MIN}~{CONFIDENCE_MAX} 범위여야 합니다: {value}",
+            reason="ledger_invalid_confidence",
+            field="confidence",
+            id=record.get("id"),
+            min=CONFIDENCE_MIN,
+            max=CONFIDENCE_MAX,
+        )
+
+
+def verification_summary(findings: list[dict[str, Any]]) -> dict[str, int]:
+    """Count how each reported finding was verified, per review-execution.md §3.6.
+
+    The skill must report ISOLATED/SELF/UNVERIFIED counts, and `cr/SKILL.md` §7
+    forbids tallying coverage numbers from memory -- so the numbers have to come
+    from here. Counts mirror the `findings` list exactly (one entry per recorded
+    finding per generation), which is why a finding re-recorded in a later
+    generation is counted in each: the summary and the list it summarizes must
+    never disagree.
+
+    A finding with no `verification` counts as UNVERIFIED. Absent and explicitly
+    unverified mean the same thing to the gate, and collapsing them keeps the
+    count honest for reviewers that never reached §3.6.
+    """
+    counts = {"isolated": 0, "self": 0, "unverified": 0, "rejected": 0, "total": 0}
+    for finding in findings:
+        counts["total"] += 1
+        value = finding.get("verification") or "UNVERIFIED"
+        if value == "ISOLATED":
+            counts["isolated"] += 1
+        elif value == "SELF":
+            counts["self"] += 1
+        else:
+            counts["unverified"] += 1
+        if finding.get("status") == "REJECTED":
+            counts["rejected"] += 1
+    return counts
+
+
 def cmd_record(args: argparse.Namespace) -> None:
     # Read the raw bytes and decode as UTF-8 explicitly. `json.load(sys.stdin)`
     # decodes with the locale codec, so the Korean finding text this package
@@ -1263,6 +1366,16 @@ def cmd_record(args: argparse.Namespace) -> None:
         _require_str_list_field(verdict, "finding_ids", "verdicts")
     for finding in findings:
         _require_str_field(finding, "id", "findings")
+        _require_enum_field(
+            finding, "severity", FINDING_SEVERITIES, "findings", "ledger_invalid_severity"
+        )
+        _require_enum_field(
+            finding, "status", FINDING_STATUSES, "findings", "ledger_invalid_finding_status"
+        )
+        _require_enum_field(
+            finding, "verification", VERIFICATIONS, "findings", "ledger_invalid_verification"
+        )
+        _require_confidence_field(finding, "findings")
     for reviewer in reviewers:
         _require_str_field(reviewer, "name", "reviewers")
         status = reviewer.get("status", "UNKNOWN")

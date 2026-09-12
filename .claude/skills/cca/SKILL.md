@@ -251,7 +251,7 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 - Agent가 설치되지 않았거나 실행할 수 없으면 main agent가 동일 관점을 직접 수행한다.
 - UI가 없으면 UX/A11y, 운영 동작이 없으면 Observability처럼 적용 불가능한 관점은 생략하지 말고 `N/A`와 근거를 반환한다.
 - reviewer가 반환한 내용을 사실로 가정하지 않는다.
-- main agent가 각 finding을 코드와 diff로 재현·검증한다.
+- main agent가 각 finding을 코드와 diff로 재현·검증하고, `blocking_severity` 이상은 `review-execution.md` §3.6의 격리 검증을 거친다. 탐지 추론을 넘기지 않고 finding 진술과 코드만으로 `confidence`를 다시 매기며, 임계값 미만은 `REJECTED`로 기록하되 삭제하지 않는다. 격리 실행이 불가능해 lead가 직접 판정했으면 `SELF`로 기록하고 그 수를 보고한다.
 - 중복 finding은 하나로 통합한다.
 - 범위 밖 기존 문제와 현재 변경이 만든 문제를 구분한다.
 - secret 후보 값은 출력하지 않고 마스킹한다.
@@ -493,7 +493,7 @@ snapshot은 삭제하지 않는다.
 
 `.claude/skills/_git-atomic-core/reporting.md`의 `/cca` 형식으로 한글 보고한다.
 
-포함: reviewer별 finding과 Gate, 채택/기각 finding, 자동 수정, 실행·생략 검증,
+포함: 공통 판정과 한 줄 근거, reviewer별 finding과 Gate, 격리 검증의 `ISOLATED`·`SELF`·`UNVERIFIED`·`REJECTED` 수, 채택/기각 finding, 자동 수정, 실행·생략 검증,
 commit hash·제목·목적·통계, 시작·최종 HEAD, breaking/migration/deployment,
 남은 변경·clean 여부, snapshot, lock 해제, push하지 않았음, 실패 복구 방법.
 

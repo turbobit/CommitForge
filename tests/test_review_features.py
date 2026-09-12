@@ -87,6 +87,69 @@ class ReviewFeatureTest(unittest.TestCase):
                 )
                 self.assertTrue(json.loads(result.stdout)["ok"])
 
+    def base_finding(self, **overrides: object) -> dict:
+        finding = {
+            "id": "reviewer:file:symbol:category",
+            "reviewer": "cca-correctness-reviewer",
+            "fingerprint": "abc",
+            "severity": "MAJOR",
+            "status": "OPEN",
+            "file": "src/example.py",
+            "line_or_hunk": "10",
+            "category": "correctness",
+            "evidence": "example",
+            "failure_scenario": "example",
+            "suggested_fix": "example",
+            "validation": "example",
+            "blocking": True,
+        }
+        finding.update(overrides)
+        return finding
+
+    def validate_report(self, finding: dict) -> subprocess.CompletedProcess[str]:
+        payload = {
+            "schema": "commitforge-review/v1",
+            "findings": [finding],
+        }
+        with tempfile.TemporaryDirectory(prefix="commitforge-report-") as temp:
+            path = Path(temp) / "report.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            return subprocess.run(
+                [sys.executable, str(CORE_SCRIPTS / "report_validator.py"), str(path)],
+                cwd=ROOT,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+
+    def test_verification_fields_are_optional(self) -> None:
+        # A review that never reached §3.6 legitimately omits both, so their
+        # absence must not fail the exported report.
+        result = self.validate_report(self.base_finding())
+        self.assertEqual(result.returncode, 0)
+
+    def test_valid_verification_fields_pass(self) -> None:
+        for verification in ("ISOLATED", "SELF", "UNVERIFIED"):
+            with self.subTest(verification=verification):
+                result = self.validate_report(
+                    self.base_finding(verification=verification, confidence=8)
+                )
+                self.assertEqual(result.returncode, 0)
+
+    def test_invalid_verification_is_rejected(self) -> None:
+        result = self.validate_report(self.base_finding(verification="CHECKED"))
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_out_of_range_confidence_is_rejected(self) -> None:
+        for value in (0, 11):
+            with self.subTest(confidence=value):
+                result = self.validate_report(self.base_finding(confidence=value))
+                self.assertNotEqual(result.returncode, 0)
+
+    def test_boolean_confidence_is_rejected(self) -> None:
+        result = self.validate_report(self.base_finding(confidence=True))
+        self.assertNotEqual(result.returncode, 0)
+
     def test_review_policy_and_large_diff_are_connected(self) -> None:
         for command in ("cr", "cca"):
             text = (

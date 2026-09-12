@@ -125,8 +125,13 @@ Agent Team 선택 시:
 2. `/cr` 기본 10개 또는 `/cca` 기본 11개 reviewer를 준비한다.
 3. `reviewer_triggers.py` 결과를 조건부 reviewer의 **최소 활성 집합**으로 사용한다.
 4. 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. 스크립트가 비활성이라고 판정해도 의미 근거가 있으면 생략하지 않는다.
-5. 기본 동시 실행 목표는 6개 agent다. 현재 Claude Code의 유효 concurrency 상한이 더 낮으면 그 값을 따른다.
-6. 고위험 또는 대형 diff이고 독립 reviewer가 충분하면 최대 8개까지 병렬 실행한다. 환경 상한을 초과하지 않는다.
+5. 동시 실행 수를 정한다. `.commitforge/review.yml`에 `max_parallel`이 있으면 **그
+   값이 상한이다.** 없으면 기본 동시 실행 목표는 6개 agent다. 어느 경우든 현재
+   Claude Code의 유효 concurrency 상한이 더 낮으면 그 값을 따른다.
+   `review-policy.md`의 "기본 4"는 `review.yml`을 **작성할 때 권장하는 값**이지
+   정책 파일이 없는 저장소의 기본값이 아니다.
+6. 고위험 또는 대형 diff이고 독립 reviewer가 충분하면 최대 8개까지 병렬 실행한다.
+   `max_parallel`이 지정돼 있으면 그 값을 넘지 않고, 환경 상한도 초과하지 않는다.
 7. 429, 일시적 제한, agent 시작 실패 또는 반복 timeout이 발생하면 다음 batch를 3~4개로 축소하고 실패 관점은 한 번만 재시도한다.
 8. 남은 reviewer는 축소된 batch로 이어서 실행하며 필수 관점을 생략하지 않는다.
 9. 수정 후 이전 결과를 폐기하고 fingerprint·trigger·활성 reviewer를 다시 계산한다.
@@ -142,7 +147,7 @@ Agent Team 선택 시:
   않은 실행에서 세 관점 중 하나라도 기록이 없으면 `ledger_reviewer_missing`,
   `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`와 `verify-review`가
   차단된다. 관점은 역할 키워드로 해석하므로 Agent Team의 묶음 teammate 이름도
-  그대로 인정된다. 기록 방법은 `cr/SKILL.md` §3.1을 따른다.
+  그대로 인정된다. 기록 방법은 이 문서 §3.5를 따른다.
 - reviewer `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. hunk 판정과 마찬가지로
   `N/A` 철자는 `ledger_invalid_reviewer_status`로 batch 전체가 거부된다.
 - `UNKNOWN`은 `N_A`가 아니다. 적용되지 않는다는 근거가 있을 때만 `N_A`다.
@@ -160,7 +165,9 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
   "reviewer": "cca-correctness-reviewer",
   "fingerprint": "현재 diff fingerprint",
   "severity": "CRITICAL|MAJOR|MINOR|NOTE",
-  "status": "OPEN|FIXED|REJECTED|N_A|UNKNOWN",
+  "status": "OPEN|FIXED|REJECTED|N_A|UNKNOWN|BASELINED|STALE",
+  "confidence": 8,
+  "verification": "ISOLATED|SELF|UNVERIFIED",
   "file": "relative/path",
   "line_or_hunk": "line 또는 hunk",
   "category": "stable-category",
@@ -175,6 +182,20 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
 규칙:
 
 - `id`는 같은 fingerprint에서 안정적이어야 한다.
+- `severity`와 `status`의 허용값은 `ledger.py`의 `FINDING_SEVERITIES`·
+  `FINDING_STATUSES`, `report_validator.py`의 `SEVERITIES`·`STATUSES`와 정확히
+  같아야 한다. 원장은 finding을 기록하는 곳이고 validator는 내보낸 JSON/SARIF를
+  검사하는 곳이라, 한쪽만 아는 값이 생기면 기록은 되지만 내보낼 수 없는 리뷰가
+  된다. `BASELINED`는 `baseline-and-suppressions.md`가 붙이는 상태이므로 이
+  목록에서 빠뜨리지 않는다.
+- `confidence`는 1~10 정수다. reviewer가 매기고 §3.6의 검증이 갱신한다.
+  5 이하는 reviewer가 애초에 보고하지 않는다. 등급 기준은 §3.1이다.
+- `verification`은 §3.6의 검증 경로를 기록한다. reviewer는 이 필드를 채우지 않고
+  lead가 검증 후에 쓴다.
+- `category`는 소문자 snake_case로 쓰고 같은 실행 안에서 일관되게 유지한다.
+  reviewer agent가 통제 어휘를 제시하면 그것을 따른다. 이 값은 `id`의 마지막
+  segment로 들어가고 그 `id`가 SARIF의 `ruleId`가 되므로 자유 문장이나 공백을
+  넣지 않는다.
 - secret·개인정보 값은 필드에 복사하지 않는다.
 - 정확한 위치가 없으면 finding이 아니라 조사 항목으로 분리한다.
 - 수정 후 fingerprint가 바뀌면 기존 finding을 새 결과로 덮지 않고 `FIXED` 또는 `STALE`로 연결한다.
@@ -186,6 +207,29 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
   반환하고, lead가 수신 즉시 적재한다.
 - `cca-*` reviewer agent에 Bash를 부여하지 않는다. 읽기 전용 경계이자 원장의
   단일 writer를 보장하는 조건이다.
+
+## 3.1 Confidence 등급 기준
+
+`confidence`는 모든 reviewer가 같은 자로 매겨야 한다. §3.6의 임계값
+(`confidence_threshold`, 기본 8)은 reviewer를 가리지 않고 적용되므로, reviewer마다
+기준이 다르면 같은 8이 어떤 관점에서는 확정이고 어떤 관점에서는 짐작이 되어
+임계값이 의미를 잃는다.
+
+| 등급 | 기준 |
+|---|---|
+| 9~10 | 문제가 발생하는 경로를 코드에서 끝까지 짚을 수 있다 |
+| 8 | 알려진 결함 패턴이고 도달 경로가 확인된다 |
+| 6~7 | 특정 조건·설정·입력에서만 성립한다 |
+| 5 이하 | 추측이다. **보고하지 않는다.** |
+
+- 관점별 reviewer는 이 표를 자기 영역의 용어로 구체화할 수 있지만 등급의 의미를
+  바꾸지 않는다. 예를 들어 Security의 9~10은 "공격 경로를 끝까지 짚을 수 있다"이고
+  Correctness의 9~10은 "실패하는 입력과 그 결과를 짚을 수 있다"이다.
+- **확신과 심각도는 다른 축이다.** 확신이 낮다고 심각도를 낮추지 않고, 심각도가
+  높다고 확신을 올리지 않는다. 확신이 모자라면 등급을 낮추는 것이 아니라 보고하지
+  않는 것이 맞다.
+- 6~7로 보고할 때는 성립 조건을 `evidence`에 명시한다. 조건을 적지 못하면 그것은
+  6~7이 아니라 5 이하다.
 
 ## 3.5 Reviewer 관점 기록
 
@@ -224,6 +268,63 @@ python3 "<absolute-CF_CORE>/scripts/ledger.py" record \
 JSON
 ```
 
+## 3.6 Finding 격리 검증
+
+탐지자가 자기 주장을 스스로 심사하면 이미 내린 결론을 정당화하는 쪽으로 기운다.
+그래서 검증은 **탐지와 분리된 단계**이며, 검증자는 그 finding이 어떻게 나왔는지
+모르는 상태에서 판정한다.
+
+### 대상
+
+`blocking_severity`(기본 `MAJOR`) 이상인 finding만 검증한다. 모든 finding을
+검증하면 reviewer 수만큼 비용이 곱해진다. 그 미만은 reviewer가 매긴 `confidence`를
+그대로 쓰고 `verification`은 `UNVERIFIED`다.
+
+### 입력 제한
+
+검증자에게 주는 것은 셋뿐이다.
+
+1. finding 진술(위치, category, severity, failure scenario)
+2. 해당 코드와 필요한 호출자
+3. 그 관점의 보고 제외 규칙과 precedent
+
+**탐지 단계의 추론 과정은 넘기지 않는다.** 근거 문단을 그대로 전달하면 격리가
+깨진다. 검증자는 "이 주장이 코드에서 성립하는가"만 새로 판정하고 `confidence`를
+1~10으로 반환한다.
+
+### 실행 형태
+
+환경에 따라 아래 순서로 강등한다. 가능한 가장 높은 단계를 쓴다.
+
+| 조건 | 형태 | `verification` |
+|---|---|---|
+| Agent Team 활성 | 탐지하지 않은 teammate에게 검증 task 배정 | `ISOLATED` |
+| subagent 실행 가능 | finding별 병렬 subagent | `ISOLATED` |
+| 둘 다 불가 | lead가 별도 pass로 판정 | `SELF` |
+
+`SELF` pass에서도 입력 제한은 유지한다. 탐지 근거를 다시 읽지 않고 finding 진술과
+코드만 새로 확인한다. 완전한 격리가 아니므로 **최종 보고에 `SELF`로 검증한 finding
+수를 표시한다.** 가장 약한 경로가 가장 강한 경로와 같아 보이게 보고하지 않는다.
+
+검증 자체를 완료하지 못하면 `UNVERIFIED`다. 조용히 통과시키지 않고 그 수를 보고한다.
+
+### 판정 반영
+
+- `confidence`가 임계값(`.commitforge/review.yml`의 `confidence_threshold`, 기본 8)
+  미만이면 `status`를 `REJECTED`로 바꾼다.
+- `REJECTED` finding을 **삭제하지 않는다.** baseline 처리와 같은 원칙이다.
+  기록은 남기고 상태만 바꾸며, 차단 판단에서만 제외한다.
+- `REJECTED`로 바뀌어 그 hunk에 남은 finding이 없으면 hunk 판정을 `FINDING`에서
+  `PASS`로 되돌릴 수 있다. 근거를 함께 기록한다.
+- 검증이 severity를 낮추자고 판단해도 자동 적용하지 않는다. §4와 같이 lead가 실제
+  영향으로 재판정한다.
+
+### 수정 후
+
+`cr/SKILL.md` §4의 `advance`로 세대를 전이하면 이전 검증 결과도 함께 무효다. 새
+세대의 finding은 다시 검증한다. 이전 세대의 `REJECTED`를 근거로 같은 finding을
+재검증 없이 기각하지 않는다.
+
 ## 4. 중복 제거
 
 - 같은 file/symbol, failure scenario, root cause는 하나로 통합한다.
@@ -238,5 +339,8 @@ JSON
 - fingerprint별 finding 변화
 - 중복 통합 수
 - budget 또는 agent 실패로 완료하지 못한 관점
+- §3.6 검증 결과: `ISOLATED`·`SELF`·`UNVERIFIED` finding 수와 `REJECTED` 수.
+  `ledger.py report`의 `verification`에서 가져온다. `SELF`와 `UNVERIFIED`가 있으면
+  그 이유를 함께 적는다.
 
 을 최종 보고에 포함한다.
