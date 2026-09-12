@@ -4,6 +4,7 @@ import { createStatusBar } from "./vscode/statusBar";
 import { createTreeView, type Node } from "./vscode/treeView";
 import { runInstaller } from "./vscode/installer";
 import { createWatchers } from "./vscode/watchers";
+import { createGuardErrorLog } from "./vscode/guardErrorLog";
 import { runCleanLock, runCommandFlow } from "./vscode/quickPick";
 import type { Scope } from "./core/detect";
 
@@ -73,6 +74,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     createStatusBar(store),
     createTreeView(store),
     createWatchers(store, folder),
+    // spec §8: guard.py status 실패의 stderr를 Output에 남긴다. 트리 경고
+    // 노드만으로는 이 표의 요구를 채우지 못한다.
+    createGuardErrorLog(store, output),
     vscode.commands.registerCommand("commitforge.refresh", () => store.refresh()),
     vscode.commands.registerCommand("commitforge.focusView", () =>
       vscode.commands.executeCommand("commitforge.view.focus"),
