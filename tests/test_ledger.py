@@ -553,7 +553,12 @@ class CoverageTest(LedgerTestCase):
         started = self.begin()
         self.ledger("init", "--session", started["session"], "--scope", "working")
         _, built = self.ledger("inventory", "--session", started["session"])
-        return started, [entry["id"] for entry in built["entries"]]
+        ids = [entry["id"] for entry in built["entries"]]
+        # Guard the fixture's own premise: several tests below record a
+        # verdict for ids[0] only and assert the rest stays pending. A
+        # one-entry inventory would make them vacuously pass.
+        self.assertGreater(len(ids), 1, f"fixture must yield >1 inventory entry: {ids}")
+        return started, ids
 
     def test_status_reports_incomplete_coverage(self) -> None:
         started, ids = self.prepared()
@@ -641,7 +646,12 @@ class GateTest(LedgerTestCase):
         started = self.begin()
         self.ledger("init", "--session", started["session"], "--scope", "working")
         _, built = self.ledger("inventory", "--session", started["session"])
-        return started, [entry["id"] for entry in built["entries"]]
+        ids = [entry["id"] for entry in built["entries"]]
+        # Guard the fixture's own premise: the blocking tests below record a
+        # verdict for ids[0] only and expect the gate to refuse on what is
+        # left. A one-entry inventory would make them vacuously pass.
+        self.assertGreater(len(ids), 1, f"fixture must yield >1 inventory entry: {ids}")
+        return started, ids
 
     def test_incomplete_ledger_blocks_verify_review(self) -> None:
         started, ids = self.prepared()
@@ -782,6 +792,379 @@ class GateTest(LedgerTestCase):
         )
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_inventory_mismatch")
+
+
+class AutoArmedGateTest(LedgerTestCase):
+    """The gate must arm on the ledger's presence, not on a remembered flag.
+
+    `--require-ledger` lived in the same SKILL.md a compaction eats, so a run
+    that forgot it reached a successful `finish` with an untouched ledger --
+    the exact inversion the ledger exists to remove.
+    """
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        (self.tmp / "extra.txt").write_text("fresh\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ids = [entry["id"] for entry in built["entries"]]
+        self.assertGreater(len(ids), 1, f"fixture must yield >1 inventory entry: {ids}")
+        return started, ids
+
+    def test_finish_without_require_ledger_blocks_on_incomplete_ledger(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+        self.assertTrue(Path(started["snapshot"]).exists())
+        self.assertTrue((Path(started["snapshot"]) / "ledger" / "run.json").is_file())
+
+    def test_verify_review_without_require_ledger_blocks_on_incomplete_ledger(self) -> None:
+        started, _ = self.prepared()
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+
+    def test_complete_ledger_passes_without_require_ledger(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"], "--source-read-only"
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger"]["complete"])
+        self.assertFalse(verified["ledger_bypassed"])
+
+    def test_allow_unledgered_still_works_on_the_auto_armed_path(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, finished = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only", "--allow-unledgered",
+        )
+        self.assertTrue(finished["ok"])
+        self.assertTrue(finished["ledger_bypassed"])
+        self.assertEqual(finished["ledger"]["bypassed_reason"], "ledger_incomplete")
+
+    def test_run_without_a_ledger_is_untouched(self) -> None:
+        # `/cpr` and `/cca` never create a ledger. Presence detection must
+        # leave those paths exactly as they were: no gate, no ledger keys.
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        _, finished = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only",
+        )
+        self.assertTrue(finished["ok"])
+        self.assertTrue(finished["snapshot_removed"])
+        self.assertIsNone(finished["ledger"])
+        self.assertFalse(finished["ledger_bypassed"])
+
+    def test_require_ledger_still_fails_when_no_ledger_exists(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        proc, refused = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only", "--require-ledger", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_missing")
+
+
+class EmptyInventoryGateTest(LedgerTestCase):
+    """A zero-entry denominator is vacuously complete and must not pass.
+
+    This is the normal shape of `/cr pr`, `/cr today|3days|weekly`, `--base`
+    and `--range`: the worktree is clean and everything reviewed lives in a
+    range scope. If that scope was never declared, the ledger certifies a
+    review of nothing.
+    """
+
+    def initialized(self) -> dict:
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(built["total"], 0)
+        return started
+
+    def test_empty_inventory_blocks_verify_review(self) -> None:
+        started = self.initialized()
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_empty_inventory")
+
+    def test_empty_inventory_blocks_finish_and_keeps_snapshot(self) -> None:
+        started = self.initialized()
+        proc, refused = self.guard(
+            "finish", "--session", started["session"],
+            "--review-only", "--source-read-only", check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_empty_inventory")
+        self.assertTrue(Path(started["snapshot"]).exists())
+
+    def test_declaring_the_range_scope_fills_the_denominator(self) -> None:
+        # The supported fix: declare the range once §2 has computed it. The
+        # second `init` merges instead of resetting.
+        base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "ranged.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "ranged.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: ranged"], self.tmp)
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+
+        started = self.initialized()
+        self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "working", "--scope", f"range:{base}..{head}",
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertGreater(built["total"], 0)
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": e["id"], "verdict": "PASS"} for e in built["entries"]]},
+        )
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"], "--source-read-only"
+        )
+        self.assertTrue(verified["ledger"]["complete"])
+
+    def test_allow_unledgered_reports_empty_inventory_bypass(self) -> None:
+        started = self.initialized()
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--allow-unledgered",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger_bypassed"])
+        self.assertEqual(verified["ledger"]["bypassed_reason"], "ledger_empty_inventory")
+
+
+class InventoryRerunTest(LedgerTestCase):
+    def multi_line_base(self) -> list[str]:
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "add", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: many lines"], self.tmp)
+        return lines
+
+    def test_rerun_after_advance_keeps_the_hunk_the_fix_created(self) -> None:
+        # `cmd_inventory` used to always read the snapshot, which froze the
+        # pre-fix state. Re-running it after `advance` collapsed the gen-02
+        # denominator back to the pre-fix set -- and rewrote inventory_totals
+        # to match, so the mismatch check never fired and the fix's own new
+        # hunk was never reviewed.
+        lines = self.multi_line_base()
+        lines[0] = "line1-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, first = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(first["total"], 1)
+
+        lines[-1] = "line20-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        _, fingerprint = self.guard("fingerprint")
+        _, advanced = self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+        self.assertEqual(advanced["total"], 2)
+
+        _, rebuilt = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(rebuilt["generation"], advanced["generation"])
+        self.assertEqual(rebuilt["total"], 2)
+        self.assertIn("working:tracked.txt#2", [e["id"] for e in rebuilt["entries"]])
+
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": "working:tracked.txt#1", "verdict": "PASS"}]},
+        )
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"], check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+
+    def test_rerun_with_a_moved_denominator_conflicts(self) -> None:
+        lines = self.multi_line_base()
+        lines[0] = "line1-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        self.ledger("inventory", "--session", started["session"])
+        _, fingerprint = self.guard("fingerprint")
+        self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+
+        lines[-1] = "line20-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        proc, refused = self.ledger(
+            "inventory", "--session", started["session"], check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_inventory_conflict")
+        self.assertGreater(refused["added_count"], 0)
+
+
+class InitMergeTest(LedgerTestCase):
+    def test_rerun_preserves_generation_and_unions_scopes(self) -> None:
+        base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "ranged.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "ranged.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: ranged"], self.tmp)
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": built["entries"][0]["id"], "verdict": "PASS"}]},
+        )
+
+        _, merged = self.ledger(
+            "init", "--session", started["session"], "--scope", f"range:{base}..{head}"
+        )
+        self.assertEqual(merged["scopes"], ["working", f"range:{base}..{head}"])
+        self.assertEqual(merged["scopes_added"], [f"range:{base}..{head}"])
+        # A widened denominator invalidates the active inventory.
+        self.assertEqual(merged["active_generation"], "")
+
+        _, rebuilt = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(rebuilt["generation"], built["generation"])
+        self.assertGreater(rebuilt["total"], built["total"])
+        # The verdict recorded before the merge survives the rebuild.
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["by_verdict"]["PASS"], 1)
+
+    def test_rerun_with_the_same_scope_is_a_no_op(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        _, again = self.ledger(
+            "init", "--session", started["session"], "--scope", "working"
+        )
+        self.assertEqual(again["scopes_added"], [])
+        self.assertEqual(again["active_generation"], built["generation"])
+
+    def test_rerun_after_advance_does_not_orphan_the_generation(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        self.ledger("inventory", "--session", started["session"])
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        _, fingerprint = self.guard("fingerprint")
+        _, advanced = self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": "working:tracked.txt#1", "verdict": "PASS"}]},
+        )
+
+        _, again = self.ledger(
+            "init", "--session", started["session"], "--scope", "working"
+        )
+        self.assertEqual(again["iteration"], 2)
+        self.assertEqual(again["active_generation"], advanced["generation"])
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["generation"], advanced["generation"])
+        self.assertEqual(status["by_verdict"]["PASS"], 1)
+
+    def test_corrupt_run_json_is_diagnosed_as_corrupt(self) -> None:
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        run_path = Path(started["snapshot"]) / "ledger" / "run.json"
+        run_path.write_text("{not json", encoding="utf-8")
+        proc, refused = self.ledger(
+            "status", "--session", started["session"], check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_corrupt")
+
+
+class DiffPrefixConfigTest(LedgerTestCase):
+    def test_noprefix_config_still_yields_the_real_path(self) -> None:
+        # `diff.noprefix=true` is a common global setting. It drops the
+        # `a/`/`b/` prefixes, and the `diff --git` header then reads as
+        # `diff --git tracked.txt tracked.txt`, which used to produce the id
+        # `working:tracked.txt tracked.txt#1`.
+        run(["git", "config", "diff.noprefix", "true"], self.tmp)
+        run(["git", "config", "diff.mnemonicPrefix", "true"], self.tmp)
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ids = [entry["id"] for entry in built["entries"]]
+        self.assertIn("working:tracked.txt#1", ids)
+
+    def test_noprefix_config_still_yields_the_real_path_in_a_range_scope(self) -> None:
+        run(["git", "config", "diff.noprefix", "true"], self.tmp)
+        base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "ranged.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "ranged.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: ranged"], self.tmp)
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"], "--scope", f"range:{base}..{head}"
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual([entry["path"] for entry in built["entries"]], ["ranged.txt"])
+
+    def test_path_containing_b_slash_keeps_a_distinct_id(self) -> None:
+        # `diff --git a/x b/y.txt b/x b/y.txt` has no unambiguous separator,
+        # so the header heuristic resolved it to `y.txt` -- colliding with a
+        # real `y.txt` so one verdict covered both entries.
+        nested = self.tmp / "x b"
+        nested.mkdir()
+        (nested / "y.txt").write_text("one\n", encoding="utf-8")
+        (self.tmp / "y.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "--", "x b/y.txt", "y.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: ambiguous paths"], self.tmp)
+        (nested / "y.txt").write_text("one\ntwo\n", encoding="utf-8")
+        (self.tmp / "y.txt").write_text("one\ntwo\n", encoding="utf-8")
+
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ids = [entry["id"] for entry in built["entries"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertIn("working:x b/y.txt#1", ids)
+        self.assertIn("working:y.txt#1", ids)
+
+    def test_rename_into_a_path_containing_b_slash_keeps_the_real_path(self) -> None:
+        # A rename has no content and therefore no `+++` line; its path comes
+        # from the `rename to` line rather than the ambiguous two-sided header.
+        nested = self.tmp / "x b"
+        nested.mkdir()
+        run(["git", "mv", "tracked.txt", "x b/renamed.txt"], self.tmp)
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        self.assertEqual(
+            [entry["id"] for entry in built["entries"]], ["staged:x b/renamed.txt#0"]
+        )
 
 
 if __name__ == "__main__":

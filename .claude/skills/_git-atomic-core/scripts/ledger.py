@@ -87,9 +87,42 @@ def resolve_ledger(
     return ctx, snapshot, snapshot / LEDGER_DIR_NAME, resolved_token
 
 
+def read_run_optional(ledger_dir: Path) -> dict[str, Any] | None:
+    """Load `run.json`, or None when it does not exist.
+
+    `guard.read_json` swallows `JSONDecodeError` and returns None, which makes
+    "the file is not there" and "the file is there but unreadable" look
+    identical. Both fail closed, but the second is a corrupted ledger and must
+    be diagnosed as `ledger_corrupt` so a caller is not told to run `init` on a
+    ledger that already exists and holds verdicts.
+    """
+    path = ledger_dir / RUN_NAME
+    if not path.is_file():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise guard.GuardError(
+            "원장 run.json을 읽을 수 없습니다.", reason="ledger_corrupt", path=str(path)
+        ) from exc
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise guard.GuardError(
+            "원장 run.json을 해석할 수 없습니다.", reason="ledger_corrupt", path=str(path)
+        ) from exc
+    if not isinstance(data, dict) or not data:
+        raise guard.GuardError(
+            "원장 run.json의 형식이 올바르지 않습니다.",
+            reason="ledger_corrupt",
+            path=str(path),
+        )
+    return data
+
+
 def read_run(ledger_dir: Path) -> dict[str, Any]:
-    data = guard.read_json(ledger_dir / RUN_NAME)
-    if not data:
+    data = read_run_optional(ledger_dir)
+    if data is None:
         raise guard.GuardError("원장이 초기화되지 않았습니다.", reason="ledger_missing")
     return data
 
@@ -226,6 +259,16 @@ def extract_b_path(remainder: str) -> str:
             if quote_at != -1:
                 b_token = remainder[quote_at:]
             else:
+                # Prefixes are forced on for every diff this module reads, so
+                # a non-rename header is exactly `a/<P> b/<P>`. That is
+                # solvable without guessing where the a-token ends, which is
+                # what makes a path containing the literal " b/" resolve
+                # correctly instead of colliding with a shorter one.
+                if remainder.startswith("a/"):
+                    half = (len(remainder) - 5) // 2
+                    candidate = remainder[2 : 2 + half]
+                    if half > 0 and remainder == f"a/{candidate} b/{candidate}":
+                        return candidate
                 idx = remainder.rfind(" b/")
                 if idx == -1:
                     return remainder
@@ -243,15 +286,52 @@ def extract_b_path(remainder: str) -> str:
         return remainder
 
 
+def unified_header_path(token: str, prefix: str) -> str | None:
+    """Decode a `--- <token>` / `+++ <token>` path, or None for `/dev/null`.
+
+    Unlike the `diff --git` header, which packs both sides onto one line with
+    no unambiguous separator, these lines carry exactly one token terminated
+    by end-of-line. A path containing the literal `" b/"` therefore reads back
+    exactly, where the two-sided header can only guess.
+
+    git appends a single TAB terminator to an unquoted name that contains a
+    space, so `patch(1)` can find the end of the field. That TAB is not part
+    of the path. A name that really ended in a TAB would have been C-quoted
+    instead (a TAB is a control character), so stripping one trailing TAB from
+    an unquoted token is unambiguous.
+    """
+    if token.startswith('"'):
+        end = _quoted_token_end(token, 0)
+        path = decode_git_quoted(token[1:end] if end != -1 else token[1:])
+    else:
+        path = token[:-1] if token.endswith("\t") else token
+    if path == "/dev/null":
+        return None
+    return path[len(prefix) :] if path.startswith(prefix) else path
+
+
 def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
     """Split a git diff into hunk, binary and meta entries.
 
     Every changed file yields at least one entry. A file whose diff carries no
     `@@` hunk is a mode or rename change and becomes a `meta` entry, so it can
     never disappear from the denominator.
+
+    The path comes from the file's `+++` line when it has one, falling back to
+    its `---` line for a deletion and to the `diff --git` header for the
+    rename-, mode- and binary-only changes that carry neither. Both fallbacks
+    are exact for every path the `+++` line would have resolved; only the
+    header is a heuristic, and reaching it requires a path that git could not
+    quote and a change with no content at all.
     """
     entries: list[dict[str, Any]] = []
-    state: dict[str, Any] = {"path": None, "index": 0, "saw_hunk": False, "binary": False}
+    state: dict[str, Any] = {
+        "path": None,
+        "index": 0,
+        "saw_hunk": False,
+        "binary": False,
+        "minus_path": None,
+    }
 
     def flush() -> None:
         path = state["path"]
@@ -273,7 +353,15 @@ def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
                     "header": "",
                 }
             )
-        state.update({"path": None, "index": 0, "saw_hunk": False, "binary": False})
+        state.update(
+            {
+                "path": None,
+                "index": 0,
+                "saw_hunk": False,
+                "binary": False,
+                "minus_path": None,
+            }
+        )
 
     for raw_line in diff.split(b"\n"):
         line = raw_line.decode("utf-8", "replace")
@@ -286,6 +374,27 @@ def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
             continue
         if line.startswith("GIT binary patch") or line.startswith("Binary files "):
             state["binary"] = True
+            continue
+        # Only before the first `@@`: inside a hunk, an added line whose
+        # content begins with `++ ` renders as `+++ ` and must not be mistaken
+        # for a file header.
+        # A rename carries no content and therefore no `+++` line, but its
+        # `rename to` line is a single EOL-terminated token, which is exact
+        # where the two-sided `diff --git` header is a heuristic.
+        if not state["saw_hunk"] and line.startswith("rename to "):
+            resolved = unified_header_path(line[len("rename to ") :], "")
+            if resolved is not None:
+                state["path"] = resolved
+            continue
+        if not state["saw_hunk"] and line.startswith("--- "):
+            state["minus_path"] = unified_header_path(line[4:], "a/")
+            continue
+        if not state["saw_hunk"] and line.startswith("+++ "):
+            resolved = unified_header_path(line[4:], "b/")
+            if resolved is None:
+                resolved = state["minus_path"]
+            if resolved is not None:
+                state["path"] = resolved
             continue
         if line.startswith("@@"):
             state["saw_hunk"] = True
@@ -356,7 +465,7 @@ def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]
             ) from exc
     try:
         diff = guard.run_git(
-            ["diff", "--binary", "--full-index", "--no-ext-diff", expression],
+            guard.diff_argv("--binary", "--full-index", "--no-ext-diff", expression),
             cwd=ctx["root"],
         )
     except guard.GuardError as exc:
@@ -387,7 +496,9 @@ def live_scope_entries(ctx: dict[str, Path], scopes: list[str]) -> list[dict[str
         entries.extend(
             parse_diff_entries(
                 guard.run_git(
-                    ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"],
+                    guard.diff_argv(
+                        "--cached", "--binary", "--full-index", "--no-ext-diff"
+                    ),
                     cwd=ctx["root"],
                 ),
                 "staged",
@@ -396,7 +507,7 @@ def live_scope_entries(ctx: dict[str, Path], scopes: list[str]) -> list[dict[str
         entries.extend(
             parse_diff_entries(
                 guard.run_git(
-                    ["diff", "--binary", "--full-index", "--no-ext-diff"],
+                    guard.diff_argv("--binary", "--full-index", "--no-ext-diff"),
                     cwd=ctx["root"],
                 ),
                 "working",
@@ -562,20 +673,52 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
 
 
 def cmd_init(args: argparse.Namespace) -> None:
+    """Create the ledger, or merge newly declared scopes into an existing one.
+
+    `init` is not destructive. The range scope of a `/cr pr|today|--base|
+    --range` run is only known after the range has been computed, which
+    happens after the ledger must already exist for resume-after-compaction to
+    work, so declaring a scope late is the normal path rather than an error. A
+    re-run that reset `iteration` and `active_generation` would orphan gen-02
+    and every verdict recorded in it -- it fails closed, but it throws away
+    completed work, and a post-compaction model re-reading SKILL.md is exactly
+    who would do it.
+
+    Scopes are therefore unioned, never replaced, and progress is preserved.
+    Declaring a scope that is already present is a no-op. Adding a genuinely
+    new scope widens the denominator, so the active generation's inventory is
+    no longer the whole truth: `active_generation` is cleared so the next
+    `inventory` rebuilds it. The gate reads that as `ledger_no_generation`
+    until it does, and the rebuilt inventory is a superset of the old one, so
+    verdicts already recorded in that generation stay valid.
+    """
     scopes = validate_scopes(args.scope)
     _, _, ledger_dir, resolved_token = resolve_ledger(args.session, args.token)
     ledger_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
     with LedgerLock(ledger_dir):
-        data = {
-            "session": guard.safe_session(args.session),
-            "token": resolved_token,
-            "stage": "init",
-            "iteration": 1,
-            "active_generation": "",
-            "scopes": scopes,
-        }
+        existing = read_run_optional(ledger_dir)
+        if existing is None:
+            data: dict[str, Any] = {
+                "session": guard.safe_session(args.session),
+                "token": resolved_token,
+                "stage": "init",
+                "iteration": 1,
+                "active_generation": "",
+                "scopes": scopes,
+            }
+            added = list(scopes)
+        else:
+            data = dict(existing)
+            declared = list(data.get("scopes") or [])
+            added = [scope for scope in scopes if scope not in declared]
+            data["session"] = guard.safe_session(args.session)
+            data["token"] = resolved_token
+            data["scopes"] = declared + added
+            if added and data.get("active_generation"):
+                data["active_generation"] = ""
+                data["stage"] = "init"
         write_run(ledger_dir, data)
-    guard.emit({"ok": True, **data})
+    guard.emit({"ok": True, **data, "scopes_added": added})
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -614,21 +757,59 @@ def cmd_report(args: argparse.Namespace) -> None:
 
 
 def cmd_inventory(args: argparse.Namespace) -> None:
+    """Build (or idempotently rebuild) the active generation's denominator.
+
+    The first generation derives its `working` scope from the snapshot, which
+    is the state `/cr` began from. Every later generation must derive it from
+    the live worktree instead -- the same rule `cmd_advance` follows -- because
+    the snapshot froze the pre-fix state and cannot contain the hunks the fix
+    itself created. Re-reading the snapshot after `advance` would shrink the
+    denominator back to the pre-fix set and rewrite `inventory_totals` to
+    match, so the mismatch check would not fire and the fix's own new hunks
+    would never be reviewed.
+
+    An inventory that already exists for the active generation is never
+    silently replaced by a different one. An identical id set is idempotent,
+    as before; a different one means the reviewed surface moved under a
+    generation whose verdicts were recorded against the old denominator, and
+    is refused as `ledger_inventory_conflict`. `advance` is the supported way
+    to move to a new denominator, and `init` clears `active_generation` when a
+    new scope widens it.
+    """
     ctx, snapshot, ledger_dir, _ = resolve_ledger(args.session, args.token)
     with LedgerLock(ledger_dir):
         data = read_run(ledger_dir)
-        name = data["active_generation"] or generation_name(
-            data["iteration"], fingerprint_short(ctx)
-        )
+        iteration = int(data["iteration"])
+        active = data["active_generation"] or ""
+        name = active or generation_name(iteration, fingerprint_short(ctx))
         gen_dir = ledger_dir / name
-        gen_dir.mkdir(mode=0o700, exist_ok=True)
 
         entries: list[dict[str, Any]] = []
-        for scope in data["scopes"]:
-            if scope == "working":
-                entries.extend(working_scope_entries(snapshot))
-            else:
-                entries.extend(range_scope_entries(ctx, scope))
+        if iteration > 1:
+            entries.extend(live_scope_entries(ctx, data["scopes"]))
+        else:
+            for scope in data["scopes"]:
+                if scope == "working":
+                    entries.extend(working_scope_entries(snapshot))
+                else:
+                    entries.extend(range_scope_entries(ctx, scope))
+
+        if active and (gen_dir / INVENTORY_NAME).is_file():
+            previous = inventory_ids(gen_dir)
+            current = {entry["id"] for entry in entries}
+            if previous != current:
+                raise guard.GuardError(
+                    "활성 세대의 inventory가 이미 다른 내용으로 존재합니다. "
+                    "수정 후에는 advance로 새 세대를 여십시오.",
+                    reason="ledger_inventory_conflict",
+                    generation=name,
+                    added=sorted(current - previous)[:PENDING_SAMPLE_LIMIT],
+                    removed=sorted(previous - current)[:PENDING_SAMPLE_LIMIT],
+                    added_count=len(current - previous),
+                    removed_count=len(previous - current),
+                )
+
+        gen_dir.mkdir(mode=0o700, exist_ok=True)
         write_inventory(gen_dir, entries)
 
         data["active_generation"] = name

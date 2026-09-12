@@ -67,6 +67,19 @@ def decode(data: bytes) -> str:
     return data.decode("utf-8", "surrogateescape")
 
 
+# `diff.noprefix=true` and `diff.mnemonicPrefix=true` are common global
+# settings that strip or rename the `a/`/`b/` path prefixes. Every diff this
+# package captures, compares or parses must be produced with the prefixes
+# forced on: the review ledger derives its inventory ids from those headers,
+# so a user's config must not be able to change how a path is read back out.
+DIFF_PREFIX_CONFIG = ["-c", "diff.noprefix=false", "-c", "diff.mnemonicPrefix=false"]
+
+
+def diff_argv(*args: str) -> list[str]:
+    """Build a `git diff` argv whose `a/`/`b/` prefixes are guaranteed."""
+    return [*DIFF_PREFIX_CONFIG, "diff", *args]
+
+
 def resolve_git_path(raw: str, cwd: Path) -> Path:
     p = Path(raw)
     if not p.is_absolute():
@@ -604,8 +617,12 @@ def repository_fingerprint(root: Path) -> dict[str, Any]:
     blobs = {
         "head": current_head(root).encode(),
         "status": run_git(["status", "--porcelain=v2", "-z", "--untracked-files=all"], cwd=root),
-        "staged_diff": run_git(["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"], cwd=root),
-        "working_diff": run_git(["diff", "--binary", "--full-index", "--no-ext-diff"], cwd=root),
+        "staged_diff": run_git(
+            diff_argv("--cached", "--binary", "--full-index", "--no-ext-diff"), cwd=root
+        ),
+        "working_diff": run_git(
+            diff_argv("--binary", "--full-index", "--no-ext-diff"), cwd=root
+        ),
     }
     manifest, _ = untracked_manifest(root)
     blobs["untracked"] = json.dumps(
@@ -878,10 +895,10 @@ def capture_snapshot(
             ["status", "--porcelain=v2", "-z", "--untracked-files=all"], cwd=root
         ),
         "working.diff": run_git(
-            ["diff", "--binary", "--full-index", "--no-ext-diff"], cwd=root
+            diff_argv("--binary", "--full-index", "--no-ext-diff"), cwd=root
         ),
         "staged.diff": run_git(
-            ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"], cwd=root
+            diff_argv("--cached", "--binary", "--full-index", "--no-ext-diff"), cwd=root
         ),
         "working.stat": run_git(["diff", "--stat"], cwd=root),
         "staged.stat": run_git(["diff", "--cached", "--stat"], cwd=root),
@@ -1129,7 +1146,7 @@ def review_invariants(
     current_branch_value = branch_name(ctx["root"])
     start_staged = (snapshot / "staged.diff").read_bytes()
     current_staged = run_git(
-        ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"],
+        diff_argv("--cached", "--binary", "--full-index", "--no-ext-diff"),
         cwd=ctx["root"],
     )
     branch_valid = current_branch_value == start_branch
@@ -1155,7 +1172,7 @@ def review_invariants(
     if source_read_only:
         start_working = (snapshot / "working.diff").read_bytes()
         current_working = run_git(
-            ["diff", "--binary", "--full-index", "--no-ext-diff"],
+            diff_argv("--binary", "--full-index", "--no-ext-diff"),
             cwd=ctx["root"],
         )
         start_status = (snapshot / "status-porcelain-v2.z").read_bytes()
@@ -1193,7 +1210,16 @@ def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str |
     misdiagnosed as a missed `advance`). A total that disagrees with the
     count persisted at inventory-build time can only mean the denominator
     was truncated or corrupted after the fact, since `parse_diff_entries`
-    guarantees every changed file yields at least one entry.
+    guarantees every changed file yields at least one entry -- so that
+    mismatch is checked before `ledger_empty_inventory`, which is reserved
+    for a denominator that was genuinely built empty.
+
+    A zero-entry denominator is vacuously "complete": every one of its zero
+    ids has a terminal verdict. That is the normal shape of a `/cr pr`,
+    `/cr today|3days|weekly`, `--base` or `--range` run whose range scope was
+    never declared -- the worktree is clean and the reviewed commits live in
+    a scope the ledger was never told about. Certifying such a run as a
+    completed review is exactly the silent pass this gate exists to prevent.
     """
     if not summary["generation"]:
         return "ledger_no_generation"
@@ -1202,11 +1228,30 @@ def _ledger_gate_failure(data: dict[str, Any], summary: dict[str, Any]) -> str |
     expected_total = (data.get("inventory_totals") or {}).get(summary["generation"])
     if expected_total is not None and expected_total != summary["total"]:
         return "ledger_inventory_mismatch"
+    if not summary["total"]:
+        return "ledger_empty_inventory"
     if summary["unknown_count"]:
         return "ledger_unknown"
     if summary["pending_count"]:
         return "ledger_incomplete"
     return None
+
+
+def ledger_present(snapshot: Path) -> bool:
+    """Report whether this snapshot carries an initialized review ledger.
+
+    The gate is armed by presence, not by a flag. The whole point of the
+    ledger is to stop relying on the model remembering; arming it with
+    `--require-ledger` would have made the gate depend on the model
+    remembering a flag written in the same SKILL.md a compaction eats. A
+    ledger on disk is machine evidence that a `/cr` run started building a
+    denominator, so it is always checked. `/cpr` and `/cca` never create one,
+    so their paths are unchanged.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import ledger
+
+    return (snapshot / ledger.LEDGER_DIR_NAME / ledger.RUN_NAME).is_file()
 
 
 def ledger_gate(
@@ -1284,6 +1329,14 @@ def ledger_gate(
             expected_total=(data.get("inventory_totals") or {}).get(summary["generation"]),
             actual_total=summary["total"],
         )
+    if failure == "ledger_empty_inventory":
+        raise GuardError(
+            "원장 inventory가 비어 있어 리뷰를 완료로 인정할 수 없습니다. "
+            "리뷰 대상 scope가 선언되지 않았을 수 있습니다.",
+            reason="ledger_empty_inventory",
+            generation=summary["generation"],
+            scopes=list(data.get("scopes") or []),
+        )
     if failure == "ledger_unknown":
         raise GuardError(
             "UNKNOWN 판정이 남아 있어 완료할 수 없습니다.",
@@ -1320,7 +1373,7 @@ def cmd_verify_review(args: argparse.Namespace) -> None:
         raise GuardError(
             "/cr 불변 조건을 충족하지 못했습니다: " + ", ".join(failed)
         )
-    if args.require_ledger:
+    if args.require_ledger or ledger_present(snapshot):
         summary = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
         result["ledger"] = summary
         result["ledger_bypassed"] = (
@@ -1417,7 +1470,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
 
     ledger_result = None
     ledger_bypassed = False
-    if args.require_ledger:
+    if args.require_ledger or ledger_present(snapshot):
         ledger_result = ledger_gate(ctx, snapshot, allow_unledgered=args.allow_unledgered)
         ledger_bypassed = (
             bool(args.allow_unledgered) and ledger_result.get("bypassed_reason") is not None
@@ -1975,8 +2028,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="Allow only this branch change when the snapshot began on main/master",
     )
     finish.add_argument("--keep-snapshot", action="store_true")
-    finish.add_argument("--require-ledger", action="store_true")
-    finish.add_argument("--allow-unledgered", action="store_true")
+    finish.add_argument(
+        "--require-ledger",
+        action="store_true",
+        help=(
+            "Additionally fail when the snapshot carries no ledger at all; "
+            "an existing ledger is always gated regardless of this flag"
+        ),
+    )
+    finish.add_argument(
+        "--allow-unledgered",
+        action="store_true",
+        help="Pass despite a refusing ledger, reporting bypassed_reason and pending",
+    )
 
     verify_review = sub.add_parser(
         "verify-review",
@@ -1996,8 +2060,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected-branch",
         help="Allow only this branch change when the snapshot began on main/master",
     )
-    verify_review.add_argument("--require-ledger", action="store_true")
-    verify_review.add_argument("--allow-unledgered", action="store_true")
+    verify_review.add_argument(
+        "--require-ledger",
+        action="store_true",
+        help=(
+            "Additionally fail when the snapshot carries no ledger at all; "
+            "an existing ledger is always gated regardless of this flag"
+        ),
+    )
+    verify_review.add_argument(
+        "--allow-unledgered",
+        action="store_true",
+        help="Pass despite a refusing ledger, reporting bypassed_reason and pending",
+    )
 
     audit = sub.add_parser(
         "audit-snapshot",

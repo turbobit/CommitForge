@@ -999,13 +999,42 @@ class GuardIntegrationTest(unittest.TestCase):
         shutil.rmtree(sibling, ignore_errors=True)
 
     def test_ledger_subdirectory_survives_audit_and_finish(self) -> None:
+        # The whole ledger design depends on `audit_snapshot` ignoring
+        # subdirectories, so a real, fully covered ledger must leave both
+        # `audit-snapshot` and `finish` working.
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
         _, started = self.guard("begin", "--session", "session-ledger")
         snapshot = Path(started["snapshot"])
 
-        generation = snapshot / "ledger" / "gen-01-abcdef12"
-        generation.mkdir(parents=True)
-        (generation / "inventory.jsonl").write_text("{}\n", encoding="utf-8")
-        (snapshot / "ledger" / "run.json").write_text("{}", encoding="utf-8")
+        ledger_script = GUARD.parent / "ledger.py"
+        run(
+            [sys.executable, str(ledger_script), "init",
+             "--session", started["session"], "--scope", "working"],
+            self.tmp,
+        )
+        built = json.loads(
+            run(
+                [sys.executable, str(ledger_script), "inventory",
+                 "--session", started["session"]],
+                self.tmp,
+            ).stdout
+        )
+        self.assertGreater(built["total"], 0)
+        payload = json.dumps(
+            {
+                "verdicts": [
+                    {"id": entry["id"], "verdict": "PASS"} for entry in built["entries"]
+                ]
+            }
+        )
+        recorded = subprocess.run(
+            [sys.executable, str(ledger_script), "record",
+             "--session", started["session"]],
+            cwd=self.tmp, text=True, input=payload,
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+        self.assertTrue((snapshot / "ledger" / "run.json").is_file())
 
         _, audited = self.guard(
             "audit-snapshot",
