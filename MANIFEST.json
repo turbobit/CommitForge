@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 145,
-  "total_bytes": 1272144,
+  "file_count": 146,
+  "total_bytes": 1312878,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -337,8 +337,8 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 23952,
-      "sha256": "213b140adad9ebb2658890eb5a9d565fcde4d6b781f0e93a257e03d1b5341284"
+      "size": 27726,
+      "sha256": "f1d517c964ae12d73477444780a32c417ef1591fe950a5fcb273bef0bea5a78a"
     },
     {
       "path": "QUALITY-REPORT.md",
@@ -366,14 +366,19 @@
       "sha256": "9eff9eba7f9edf400a0bd7308709894dae086cf82ff9fc225c3970bd007d222b"
     },
     {
+      "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
+      "size": 19811,
+      "sha256": "c7835c223952a9eae0888631791971a3ef8c1e802b0de23d3d60348c6764be94"
+    },
+    {
       "path": "editor-extension/.vscodeignore",
       "size": 110,
       "sha256": "abe61bb4e4dfb2c424911dd32005d988806383a6981acf502e96941b285d6663"
     },
     {
       "path": "editor-extension/README.md",
-      "size": 8811,
-      "sha256": "0eb99733b7e8ab3852c84c43cafc016c9d7d18abbe96286f5cf8eea67aaa886c"
+      "size": 11857,
+      "sha256": "e043c64da0717609e56ecf89624a7772035cbc38f6b9ed499399eb2f0a0e94e5"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -387,8 +392,8 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 6470,
-      "sha256": "883c6d77c89f520834aed8df89f6d921b0813f4463a31d7d6a4ceb8d4ff148bb"
+      "size": 11665,
+      "sha256": "b79fee6bd2c082e60890b65ba8a2f5371e756de828a3da4874f466ee54f99093"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -437,8 +442,8 @@
     },
     {
       "path": "editor-extension/src/extension.ts",
-      "size": 6756,
-      "sha256": "8afed755469265b9076703580a118b1f7eb2864ac1c45462504cc051fc82128f"
+      "size": 8091,
+      "sha256": "ffc63bf1219af1686255252bd39efcf70621c5ff69bcd9c85d1e17b70442d522"
     },
     {
       "path": "editor-extension/src/state.ts",
@@ -457,8 +462,8 @@
     },
     {
       "path": "editor-extension/src/vscode/quickPick.ts",
-      "size": 12264,
-      "sha256": "879bb47fea4e0616518b0c07c0815a23d04c5d90d23148017edf37588f2cf997"
+      "size": 14641,
+      "sha256": "de0c0a104297919ef58c9c20da5dbf5e294938c820fa335f04deba2e9a8fecfe"
     },
     {
       "path": "editor-extension/src/vscode/statusBar.ts",
@@ -472,8 +477,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 15215,
-      "sha256": "9c1afd22b8ed2c5a035790f4c68f8c7317e85c11def17a3683ce454991983288"
+      "size": 16485,
+      "sha256": "61f32014fe0d3c7e919dcff2c19d5705f654149d9d1aeabc0ca89b16839b7117"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
@@ -562,8 +567,8 @@
     },
     {
       "path": "editor-extension/test/quickPick.test.ts",
-      "size": 4253,
-      "sha256": "cb44b162895fee2023bf33c629d7dfebdf5b69a12a369fbeefc33cab00fe81cb"
+      "size": 5453,
+      "sha256": "d90049e2308a120500479b6d965bb621149e1b1ca0aa951c2dfd64a7a39267e2"
     },
     {
       "path": "editor-extension/test/state.test.ts",
@@ -597,8 +602,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 19843,
-      "sha256": "728d195c7d3bd5246311fc38c73469b6235123fbc180f99c5fbb63a7d4b01b0b"
+      "size": 22569,
+      "sha256": "078f708246c64823c8b23f4e7e8a6a849fd224f8b228a8a7adc9b50fc4487c16"
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
