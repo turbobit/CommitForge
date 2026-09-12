@@ -2,8 +2,8 @@
   "name": "CommitForge",
   "version": "1.16.0",
   "reproducible": true,
-  "file_count": 139,
-  "total_bytes": 1202287,
+  "file_count": 142,
+  "total_bytes": 1218728,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -327,8 +327,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 23567,
-      "sha256": "9d7597d831367315dadd3e04f41dd1f1281ac1bc4a5a087e61c7e541ad6eaa5c"
+      "size": 24334,
+      "sha256": "4dc724c8a5a650c71e77ddd4063d8676514473329c316432380535f4fe6ce100"
     },
     {
       "path": "INSTALL.md",
@@ -337,8 +337,8 @@
     },
     {
       "path": "MANUAL-TEST-CHECKLIST.md",
-      "size": 12860,
-      "sha256": "532ba0cfe426edd80a16429c10f0bd4ef192de64cf238823df919d563fcc8a79"
+      "size": 20378,
+      "sha256": "e01dc79e8e6420afe1b87371881c21e43e2b174b63b0f8e48a3140ac93fc4fb3"
     },
     {
       "path": "QUALITY-REPORT.md",
@@ -347,8 +347,8 @@
     },
     {
       "path": "README.md",
-      "size": 49196,
-      "sha256": "cc9112a108938ff119843794621ffbfaeffedc1087f4df4d860cab56d69c5d76"
+      "size": 49614,
+      "sha256": "eea2e5f1d40878f24f89cb98ce18b46ffe2ce343720cafcd5531489327f1af17"
     },
     {
       "path": "VERSION",
@@ -371,6 +371,11 @@
       "sha256": "abe61bb4e4dfb2c424911dd32005d988806383a6981acf502e96941b285d6663"
     },
     {
+      "path": "editor-extension/README.md",
+      "size": 5022,
+      "sha256": "3d185213ac9d5cdde427114d8c84018567682fdcbbefc24f141e6b2117372c0c"
+    },
+    {
       "path": "editor-extension/esbuild.mjs",
       "size": 459,
       "sha256": "b5516fe00df26277e44bf64bcc15465b97deafa9479bfd704c306a58fec6d9f5"
@@ -382,13 +387,18 @@
     },
     {
       "path": "editor-extension/package.json",
-      "size": 5885,
-      "sha256": "8abcc3c074628faedeb7400a1326a4e674d2d7046ebbade7d36de3f984147c49"
+      "size": 6351,
+      "sha256": "b0548a7f94a72514207c2af98a7071a0f7a9a075d857302b8262b9bd212a4a3d"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
       "size": 3485,
       "sha256": "609a24111de1c4c49d51332009d2ea19a94773c6ed245bcce13ed6a1ecd4646c"
+    },
+    {
+      "path": "editor-extension/scripts/sync-version.mjs",
+      "size": 945,
+      "sha256": "33766f042fc2edf74b1b0657d8c629faecb51d6931bf1dd0d0c9a4a53103fb6a"
     },
     {
       "path": "editor-extension/src/core/catalog.ts",
@@ -559,6 +569,11 @@
       "path": "editor-extension/test/sync-payload.test.ts",
       "size": 3607,
       "sha256": "6c9b26c80e5c1c9d424bf264a8ae392d618eda20bd1209361abad82f862d604f"
+    },
+    {
+      "path": "editor-extension/test/sync-version.test.ts",
+      "size": 1305,
+      "sha256": "c38f2448c20036ee0c46e9387a7d4ba029df7c0b6466ec8c6011bd85f7de4e5a"
     },
     {
       "path": "editor-extension/test/terminal.test.ts",
