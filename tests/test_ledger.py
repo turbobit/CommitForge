@@ -486,5 +486,51 @@ class RecordTest(LedgerTestCase):
         self.assertEqual(len(lines), 4)
 
 
+class AdvanceTest(LedgerTestCase):
+    def started_with_inventory(self) -> tuple[dict, dict]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, built
+
+    def test_advance_creates_new_generation_from_live_diff(self) -> None:
+        started, first = self.started_with_inventory()
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        _, fingerprint = self.guard("fingerprint")
+        _, advanced = self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+        self.assertTrue(advanced["ok"])
+        self.assertEqual(advanced["iteration"], 2)
+        self.assertNotEqual(advanced["generation"], first["generation"])
+        self.assertTrue(advanced["generation"].startswith("gen-02-"))
+
+    def test_previous_generation_stays_immutable(self) -> None:
+        started, first = self.started_with_inventory()
+        ledger_dir = Path(started["snapshot"]) / "ledger"
+        original = (ledger_dir / first["generation"] / "inventory.jsonl").read_bytes()
+
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        _, fingerprint = self.guard("fingerprint")
+        self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", fingerprint["fingerprint"],
+        )
+        self.assertEqual(
+            (ledger_dir / first["generation"] / "inventory.jsonl").read_bytes(), original
+        )
+
+    def test_advance_rejects_stale_fingerprint(self) -> None:
+        started, _ = self.started_with_inventory()
+        proc, refused = self.ledger(
+            "advance", "--session", started["session"],
+            "--fingerprint", "0" * 64, check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_fingerprint_mismatch")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -373,6 +373,39 @@ def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]
     return parse_diff_entries(diff, source)
 
 
+def live_scope_entries(ctx: dict[str, Path], scopes: list[str]) -> list[dict[str, Any]]:
+    """Build the denominator from the live worktree, not the snapshot.
+
+    The snapshot holds the pre-fix diff, so a post-fix generation must read
+    current state instead.
+    """
+    entries: list[dict[str, Any]] = []
+    for scope in scopes:
+        if scope != "working":
+            entries.extend(range_scope_entries(ctx, scope))
+            continue
+        entries.extend(
+            parse_diff_entries(
+                guard.run_git(
+                    ["diff", "--cached", "--binary", "--full-index", "--no-ext-diff"],
+                    cwd=ctx["root"],
+                ),
+                "staged",
+            )
+        )
+        entries.extend(
+            parse_diff_entries(
+                guard.run_git(
+                    ["diff", "--binary", "--full-index", "--no-ext-diff"],
+                    cwd=ctx["root"],
+                ),
+                "working",
+            )
+        )
+        entries.extend(untracked_record(path) for path in guard.list_untracked(ctx["root"]))
+    return entries
+
+
 def fingerprint_short(ctx: dict[str, Path]) -> str:
     return guard.repository_fingerprint(ctx["root"])["fingerprint"][:8]
 
@@ -496,6 +529,35 @@ def cmd_inventory(args: argparse.Namespace) -> None:
         write_run(ledger_dir, data)
 
     guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
+
+
+def cmd_advance(args: argparse.Namespace) -> None:
+    ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
+    if args.fingerprint != current:
+        raise guard.GuardError(
+            "전달된 fingerprint가 현재 저장소 상태와 다릅니다.",
+            reason="ledger_fingerprint_mismatch",
+            expected=current,
+            received=args.fingerprint,
+        )
+    with LedgerLock(ledger_dir):
+        data = read_run(ledger_dir)
+        data["iteration"] = int(data["iteration"]) + 1
+        name = generation_name(data["iteration"], current[:8])
+        gen_dir = ledger_dir / name
+        gen_dir.mkdir(mode=0o700, exist_ok=True)
+
+        entries = live_scope_entries(ctx, data["scopes"])
+        write_inventory(gen_dir, entries)
+
+        data["active_generation"] = name
+        data["stage"] = "review"
+        write_run(ledger_dir, data)
+
+    guard.emit(
+        {"ok": True, "generation": name, "iteration": data["iteration"], "total": len(entries)}
+    )
 
 
 def _require_list_of_dicts(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
@@ -644,6 +706,11 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--session", required=True)
     record.add_argument("--token")
 
+    advance = sub.add_parser("advance", help="Open a new generation after a fix")
+    advance.add_argument("--session", required=True)
+    advance.add_argument("--token")
+    advance.add_argument("--fingerprint", required=True)
+
     return parser
 
 
@@ -654,6 +721,7 @@ def main() -> None:
         "status": cmd_status,
         "inventory": cmd_inventory,
         "record": cmd_record,
+        "advance": cmd_advance,
     }
     try:
         handlers[args.command](args)
