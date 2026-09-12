@@ -23,14 +23,22 @@ export function sanitizeFreeText(input: string): string {
   return input.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// 브랜치명·경로·ref·semver가 전부 여기 들어간다. 이 집합 밖의 문자가 하나라도
+// 있으면 감싼다.
+const SAFE_UNQUOTED = /^[A-Za-z0-9_.\-/:=@+,]+$/;
+
 function quote(value: string): string {
-  // 공백·큰따옴표뿐 아니라 백슬래시가 있어도 감싼다. 감싸지 않으면 이 값은
-  // 터미널로 그대로 전송되고, /cr의 PreToolUse hook(cr_edit_gate.py)이
-  // 원문 인자 문자열을 shlex.split으로 다시 파싱한다 — shlex는 따옴표 밖의
-  // 백슬래시도 다음 문자를 이스케이프하는 것으로 취급해 예를 들어 "a\b"가
-  // "ab"로 뭉개진다. 감싸서 이스케이프하면 그 왕복이 보존된다.
-  if (!/[\s"\\]/.test(value)) return value;
-  // 감쌀 때는 백슬래시와 큰따옴표를 이스케이프해 따옴표 구조가 깨지지 않게 한다.
+  // 화이트리스트: 안전하다고 알려진 문자로만 이루어진 값만 그대로 둔다.
+  // 이전에는 공백·큰따옴표·백슬래시가 있을 때만 감싸는 블랙리스트였는데,
+  // 한 글자(홑따옴표)를 빠뜨려 조용히 깨졌다 — /cr의 PreToolUse
+  // hook(cr_edit_gate.py)이 터미널로 전송된 원문 인자를 Python
+  // shlex.split()으로 재파싱하고, 감싸지 않은 홑따옴표는
+  // "닫는 따옴표 없음" 오류를 내 --fix 인식 자체가 실패한다. 블랙리스트는
+  // 앞으로도 같은 종류의 구멍을 계속 만들 수 있으므로 화이트리스트로 뒤집는다.
+  if (SAFE_UNQUOTED.test(value)) return value;
+  // 감쌀 때는 백슬래시와 큰따옴표를 이스케이프해 따옴표 구조가 깨지지 않게
+  // 한다. 홑따옴표는 큰따옴표로 감싸면 이스케이프 없이도 안전하다(shlex와
+  // POSIX 쉘 이중따옴표 규칙 모두에서).
   const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   return `"${escaped}"`;
 }
@@ -45,6 +53,13 @@ function validateValue(option: CommandOption, selected: SelectedOption): void {
 
   const value = selected.value?.trim();
   if (!value) throw new Error(`${option.name} 에 값이 필요합니다`);
+
+  // 자유 텍스트(freeText)의 개행은 서식이라 공백으로 바꾸지만, 옵션 값의
+  // 개행은 입력이 잘못됐다는 뜻이다. sendText에서 개행은 Enter이므로
+  // 공백으로 조용히 바꾸면 엉뚱한 값이 전송된다 — 전송 전에 막는다.
+  if (/[\r\n]/.test(value)) {
+    throw new Error(`${option.name} 값에 개행을 넣을 수 없습니다`);
+  }
 
   if (option.kind === "enum" && !option.values?.includes(value)) {
     throw new Error(

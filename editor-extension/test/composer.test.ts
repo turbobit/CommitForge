@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import { compose, isWriteCommand, sanitizeFreeText } from "../src/core/composer";
 import { parseSkillFile } from "../src/core/catalog";
+import { spawnProbe } from "../src/core/python";
 
 const cca = parseSkillFile(
   [
@@ -71,6 +73,33 @@ describe("compose", () => {
     );
   });
 
+  it("공백·백슬래시·큰따옴표 없이 홑따옴표만 있는 값도 감싼다", () => {
+    // 감싸지 않으면 cr_edit_gate.py의 shlex.split(원문 인자)이
+    // "No closing quotation"으로 실패해 --fix 인식 자체가 깨진다.
+    // 큰따옴표로 감싸면 홑따옴표는 이스케이프 없이도 안전하다.
+    expect(compose(cca, { options: [{ name: "--base", value: "o'brien-lib" }] })).toBe(
+      `/cca --base "o'brien-lib"`,
+    );
+  });
+
+  it("안전한 문자(영숫자·- _ . / : = @ + ,)만 있는 값은 감싸지 않는다", () => {
+    for (const value of ["main", "feature/foo", "v1.2.3", "a@b.com", "release_1.0-rc1", "a,b"]) {
+      expect(compose(cca, { options: [{ name: "--base", value } ] })).toBe(`/cca --base ${value}`);
+    }
+  });
+
+  it("옵션 값 중간의 개행을 거부한다", () => {
+    expect(() => compose(cca, { options: [{ name: "--base", value: "foo\nbar" }] })).toThrow(
+      /--base/,
+    );
+  });
+
+  it("옵션 값 앞뒤의 개행·공백은 trim되어 통과한다", () => {
+    expect(compose(cca, { options: [{ name: "--base", value: "\n  main  \n" }] })).toBe(
+      "/cca --base main",
+    );
+  });
+
   it("옵션 순서는 spec 정의 순서를 따른다", () => {
     const result = compose(cca, {
       options: [{ name: "--strict" }, { name: "--team" }],
@@ -122,6 +151,48 @@ describe("compose", () => {
     expect(() => compose(cca, { options: [{ name: "--commits", value: "많이" }] })).toThrow(
       /--commits/,
     );
+  });
+});
+
+/** cr_edit_gate.py가 실제로 쓰는 Python shlex.split()으로 왕복을 검증한다. */
+function shlexSplit(python: string, text: string): string[] {
+  const output = execFileSync(python, [
+    "-c",
+    "import shlex, sys, json; print(json.dumps(shlex.split(sys.argv[1])))",
+    text,
+  ]);
+  return JSON.parse(output.toString()) as string[];
+}
+
+describe("compose ↔ 실제 Python shlex.split 왕복", () => {
+  // 이 환경에 Python이 있을 때만 의미가 있다 — 없으면 건너뛴다(python.test.ts와
+  // 같은 방침).
+  it("홑따옴표·백슬래시·따옴표·공백이 섞인 값도 shlex 왕복에서 보존된다", async (ctx) => {
+    const python = (await spawnProbe("python3"))
+      ? "python3"
+      : (await spawnProbe("python"))
+        ? "python"
+        : null;
+    if (!python) {
+      console.warn("[skip] 이 환경에서는 python3/python을 찾지 못해 shlex 왕복 테스트를 건너뜁니다");
+      ctx.skip();
+      return;
+    }
+
+    const cases: string[] = [
+      "o'brien-lib",
+      'my "branch"\\ x',
+      "a\\b",
+      "main",
+      "feature/foo",
+      "v1.2.3",
+      "a@b.com",
+    ];
+
+    for (const value of cases) {
+      const composed = compose(cca, { options: [{ name: "--base", value }] });
+      expect(shlexSplit(python, composed)).toEqual(["/cca", "--base", value]);
+    }
   });
 });
 
