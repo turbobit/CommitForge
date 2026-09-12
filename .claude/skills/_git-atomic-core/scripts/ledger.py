@@ -298,6 +298,27 @@ def working_scope_entries(snapshot: Path) -> list[dict[str, Any]]:
     return entries
 
 
+def range_scope_entries(ctx: dict[str, Path], spec: str) -> list[dict[str, Any]]:
+    """Enumerate hunks in a committed range.
+
+    The snapshot only captures working state, so `--base`, `--range`, `pr` and
+    the period modes need their denominator computed here instead.
+    """
+    expression = spec[len("range:") :]
+    try:
+        diff = guard.run_git(
+            ["diff", "--binary", "--full-index", "--no-ext-diff", expression],
+            cwd=ctx["root"],
+        )
+    except guard.GuardError as exc:
+        raise guard.GuardError(
+            f"커밋 범위를 해석하지 못했습니다: {expression}",
+            reason="ledger_range_unresolved",
+            range=expression,
+        ) from exc
+    return parse_diff_entries(diff, "range")
+
+
 def fingerprint_short(ctx: dict[str, Path]) -> str:
     return guard.repository_fingerprint(ctx["root"])["fingerprint"][:8]
 
@@ -360,6 +381,8 @@ def cmd_inventory(args: argparse.Namespace) -> None:
         for scope in data["scopes"]:
             if scope == "working":
                 entries.extend(working_scope_entries(snapshot))
+            else:
+                entries.extend(range_scope_entries(ctx, scope))
         write_inventory(gen_dir, entries)
 
         data["active_generation"] = name

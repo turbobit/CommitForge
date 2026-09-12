@@ -247,5 +247,35 @@ class InventoryWorkingScopeTest(LedgerTestCase):
         self.assertEqual(first["generation"], second["generation"])
 
 
+class InventoryRangeScopeTest(LedgerTestCase):
+    def make_range(self) -> str:
+        base = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        (self.tmp / "ranged.txt").write_text("one\n", encoding="utf-8")
+        run(["git", "add", "ranged.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: ranged"], self.tmp)
+        head = run(["git", "rev-parse", "HEAD"], self.tmp).stdout.strip()
+        return f"{base}..{head}"
+
+    def test_range_scope_covers_committed_hunks(self) -> None:
+        spec = self.make_range()
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "working", "--scope", f"range:{spec}",
+        )
+        _, built = self.ledger("inventory", "--session", started["session"])
+        ranged = [entry for entry in built["entries"] if entry["source"] == "range"]
+        self.assertTrue(any(entry["path"] == "ranged.txt" for entry in ranged))
+
+    def test_invalid_range_fails_closed(self) -> None:
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"], "--scope", "range:deadbeef..cafebabe"
+        )
+        proc, refused = self.ledger("inventory", "--session", started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_range_unresolved")
+
+
 if __name__ == "__main__":
     unittest.main()
