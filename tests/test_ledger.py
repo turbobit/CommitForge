@@ -24,6 +24,15 @@ def run(cmd: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedPr
 
 
 class LedgerTestCase(unittest.TestCase):
+    # A run that covers every hunk is not yet a complete review: the gate also
+    # requires the three mandatory perspectives of review-execution.md §2.
+    # Tests that assert a clean pass have to record them.
+    REQUIRED_REVIEWERS = [
+        {"name": "cca-line-reviewer", "status": "ACTIVE"},
+        {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
+        {"name": "cca-security-reviewer", "status": "ACTIVE"},
+    ]
+
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="cca-ledger-test-"))
         run(["git", "init"], self.tmp)
@@ -704,7 +713,10 @@ class GateTest(LedgerTestCase):
         started, ids = self.prepared()
         self.record(
             started["session"],
-            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+            {
+                "verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids],
+                "reviewers": self.REQUIRED_REVIEWERS,
+            },
         )
         _, verified = self.guard(
             "verify-review", "--session", started["session"],
@@ -872,7 +884,10 @@ class AutoArmedGateTest(LedgerTestCase):
         started, ids = self.prepared()
         self.record(
             started["session"],
-            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+            {
+                "verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids],
+                "reviewers": self.REQUIRED_REVIEWERS,
+            },
         )
         _, verified = self.guard(
             "verify-review", "--session", started["session"], "--source-read-only"
@@ -1019,7 +1034,10 @@ class EmptyInventoryGateTest(LedgerTestCase):
         self.assertGreater(built["total"], 0)
         self.record(
             started["session"],
-            {"verdicts": [{"id": e["id"], "verdict": "PASS"} for e in built["entries"]]},
+            {
+                "verdicts": [{"id": e["id"], "verdict": "PASS"} for e in built["entries"]],
+                "reviewers": self.REQUIRED_REVIEWERS,
+            },
         )
         _, verified = self.guard(
             "verify-review", "--session", started["session"], "--source-read-only"
@@ -1533,6 +1551,193 @@ class AdvanceGuardTest(LedgerTestCase):
         )
         _, reported = self.ledger("report", "--session", started["session"])
         self.assertEqual([f["id"] for f in reported["findings"]], ["F1"])
+
+
+class ReviewerCoverageGateTest(LedgerTestCase):
+    """review-execution.md §2: Line, Correctness and Security are mandatory.
+
+    The hunk denominator cannot express that rule. A single reviewer can mark
+    every hunk PASS and satisfy `pending_count == 0`, so a perspective that
+    never ran -- or that returned UNKNOWN -- used to pass the gate in silence.
+    """
+
+    ALL_ACTIVE = [
+        {"name": "cca-line-reviewer", "status": "ACTIVE"},
+        {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
+        {"name": "cca-security-reviewer", "status": "ACTIVE"},
+    ]
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def cover(self, session: str, ids: list[str], reviewers: list[dict]) -> None:
+        self.record(
+            session,
+            {
+                "verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids],
+                "reviewers": reviewers,
+            },
+        )
+
+    def verify(self, session: str, check: bool = True):
+        return self.guard(
+            "verify-review", "--session", session,
+            "--source-read-only", "--require-ledger", check=check,
+        )
+
+    def test_fully_verdicted_ledger_without_reviewers_is_refused(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, [])
+        proc, refused = self.verify(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+        self.assertEqual(
+            sorted(refused["reviewer_roles_missing"]), ["correctness", "line", "security"]
+        )
+
+    def test_partial_reviewer_coverage_names_only_the_missing_role(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, self.ALL_ACTIVE[:2])
+        _, refused = self.verify(started["session"], check=False)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+        self.assertEqual(refused["reviewer_roles_missing"], ["security"])
+
+    def test_unknown_required_reviewer_blocks_the_gate(self) -> None:
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE[:2] + [
+            {"name": "cca-security-reviewer", "status": "UNKNOWN"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        proc, refused = self.verify(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_unknown")
+        self.assertEqual(refused["reviewer_roles_unknown"], ["security"])
+
+    def test_all_required_reviewers_active_passes_the_gate(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, self.ALL_ACTIVE)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+        self.assertEqual(verified["ledger"]["reviewer_roles_missing"], [])
+
+    def test_reasoned_n_a_satisfies_a_required_role(self) -> None:
+        # A docs-only diff may legitimately have nothing for Security to judge.
+        # The gate forces an explicit N_A record; it does not force an ACTIVE.
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE[:2] + [
+            {"name": "cca-security-reviewer", "status": "N_A"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_agent_team_teammate_names_satisfy_required_roles(self) -> None:
+        # review-execution.md §0 packs the three mandatory perspectives into
+        # named core teammates rather than one agent per perspective. Matching
+        # on exact agent filenames would make the gate unsatisfiable in Team
+        # mode, which is the structure the skill picks by default.
+        started, ids = self.prepared()
+        self.cover(
+            started["session"],
+            ids,
+            [
+                {"name": "core-correctness-line-state", "status": "ACTIVE"},
+                {"name": "core-security-privacy-supply-chain", "status": "ACTIVE"},
+            ],
+        )
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_record_rejects_a_status_outside_the_allowed_set(self) -> None:
+        # Same trap as the verdict spelling: "N/A" is not "N_A". Accepting an
+        # unrecognized status would let it read as "not UNKNOWN" and satisfy
+        # the gate, so the gate can only be sound if record validates.
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "PASS"}],
+                "reviewers": [{"name": "cca-line-reviewer", "status": "N/A"}],
+            },
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_reviewer_status")
+
+    def test_rejected_reviewer_status_discards_the_whole_batch(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "PASS"}],
+                "reviewers": [{"name": "cca-line-reviewer", "status": "done"}],
+            },
+            check=False,
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["by_verdict"]["PASS"], 0)
+
+    def test_rerecording_the_same_reviewer_clears_an_earlier_unknown(self) -> None:
+        # A perspective that failed to start and then succeeded on retry is
+        # resolved. Same name means last write wins, or a recovered reviewer
+        # could never clear its own UNKNOWN.
+        started, ids = self.prepared()
+        self.cover(
+            started["session"],
+            ids,
+            self.ALL_ACTIVE[:2] + [{"name": "cca-security-reviewer", "status": "UNKNOWN"}],
+        )
+        self.record(
+            started["session"],
+            {"verdicts": [], "reviewers": [
+                {"name": "cca-security-reviewer", "status": "ACTIVE"}
+            ]},
+        )
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+        self.assertEqual(verified["ledger"]["reviewer_roles"]["security"], "ACTIVE")
+
+    def test_a_second_name_covering_the_same_role_cannot_mask_its_unknown(self) -> None:
+        # Two distinct reviewers both claim `security`. The role is only as
+        # resolved as its weakest record, so an ACTIVE alongside an UNKNOWN
+        # must not read as covered.
+        started, ids = self.prepared()
+        self.cover(
+            started["session"],
+            ids,
+            self.ALL_ACTIVE + [{"name": "core-security-sweep", "status": "UNKNOWN"}],
+        )
+        proc, refused = self.verify(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_unknown")
+        self.assertEqual(refused["reviewer_roles_unknown"], ["security"])
+
+    def test_empty_review_does_not_require_reviewers(self) -> None:
+        # A clean tree is a legitimate empty review. Requiring reviewer records
+        # for a zero-entry denominator would re-close the exit that
+        # f32580f reopened.
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        self.ledger("inventory", "--session", started["session"])
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"], "--source-read-only"
+        )
+        self.assertTrue(verified["ok"])
+
+    def test_allow_unledgered_reports_reviewer_bypass_reason(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, [])
+        _, verified = self.guard(
+            "verify-review", "--session", started["session"],
+            "--source-read-only", "--require-ledger", "--allow-unledgered",
+        )
+        self.assertTrue(verified["ok"])
+        self.assertTrue(verified["ledger_bypassed"])
+        self.assertEqual(verified["ledger"]["bypassed_reason"], "ledger_reviewer_missing")
 
 
 if __name__ == "__main__":

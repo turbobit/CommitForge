@@ -1333,6 +1333,16 @@ def _ledger_gate_failure(
         return "ledger_unknown"
     if summary["pending_count"]:
         return "ledger_incomplete"
+    # Reviewer coverage is a second axis the hunk denominator cannot express:
+    # one reviewer can mark every hunk PASS and reach this point with
+    # Correctness and Security never having run. Checked last because a
+    # pending hunk is the more actionable error, and skipped for an empty
+    # denominator so the documented "검토 대상 없음" exit stays open.
+    if summary["total"]:
+        if summary["reviewer_roles_missing"]:
+            return "ledger_reviewer_missing"
+        if summary["reviewer_roles_unknown"]:
+            return "ledger_reviewer_unknown"
     return None
 
 
@@ -1465,6 +1475,20 @@ def ledger_gate(
             reason="ledger_incomplete",
             pending_count=summary["pending_count"],
             pending=summary["pending"],
+        )
+    if failure == "ledger_reviewer_missing":
+        raise GuardError(
+            "필수 reviewer 관점이 원장에 기록되지 않아 완료할 수 없습니다.",
+            reason="ledger_reviewer_missing",
+            reviewer_roles_missing=summary["reviewer_roles_missing"],
+            reviewer_roles=summary["reviewer_roles"],
+        )
+    if failure == "ledger_reviewer_unknown":
+        raise GuardError(
+            "필수 reviewer 관점이 UNKNOWN으로 남아 있어 완료할 수 없습니다.",
+            reason="ledger_reviewer_unknown",
+            reviewer_roles_unknown=summary["reviewer_roles_unknown"],
+            reviewer_roles=summary["reviewer_roles"],
         )
     if failure is not None:
         # The branches above enumerate every reason `_ledger_gate_failure`

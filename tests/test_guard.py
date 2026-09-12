@@ -1024,7 +1024,14 @@ class GuardIntegrationTest(unittest.TestCase):
             {
                 "verdicts": [
                     {"id": entry["id"], "verdict": "PASS"} for entry in built["entries"]
-                ]
+                ],
+                # Full hunk coverage alone no longer clears the gate; the three
+                # mandatory perspectives must be on record too.
+                "reviewers": [
+                    {"name": "cca-line-reviewer", "status": "ACTIVE"},
+                    {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
+                    {"name": "cca-security-reviewer", "status": "ACTIVE"},
+                ],
             }
         )
         recorded = subprocess.run(

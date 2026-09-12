@@ -33,6 +33,18 @@ STAGES = ("init", "inventory", "review", "fix", "verify", "done")
 TERMINAL_VERDICTS = ("PASS", "FINDING", "N_A")
 VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 
+# Reviewer status shares the verdict spelling trap: "N/A" is not "N_A". An
+# unvalidated status would read as "not UNKNOWN" and satisfy the coverage gate,
+# so the gate can only be sound if `record` rejects anything outside this set.
+REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
+
+# review-execution.md §2 makes Line, Correctness and Security mandatory on
+# every change. Matching is by role keyword rather than by exact agent
+# filename: Agent Team mode packs these perspectives into named core teammates
+# (`core-correctness-line-state`), and a filename match would make the rule
+# unsatisfiable in the structure the skill selects by default.
+REQUIRED_REVIEWER_ROLES = ("line", "correctness", "security")
+
 GENERATION_PREFIX = "gen"
 FINGERPRINT_PREFIX_LEN = 8
 INVENTORY_NAME = "inventory.jsonl"
@@ -872,7 +884,14 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         # ledger/repository divergence. None says "unknown".
         matches = None
 
+    reviewers = (guard.read_json(gen_dir / REVIEWERS_NAME) or {}) if gen_dir else {}
+    roles = reviewer_roles(reviewers)
+
     return {
+        # `complete` stays a statement about the hunk denominator. Reviewer
+        # coverage is a second, independent axis the gate checks separately, so
+        # that resume-after-compaction keeps reading `complete` as "which hunks
+        # are left" rather than silently changing meaning.
         "complete": bool(generation) and not pending and not unknown,
         "fingerprint_matches_current": matches,
         "generation": generation,
@@ -887,8 +906,48 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         ],
         "scopes_declared": list(data.get("scopes") or []),
         "scopes_without_entries": scopes_without_entries(data, per_scope),
-        "reviewers": (guard.read_json(gen_dir / REVIEWERS_NAME) or {}) if gen_dir else {},
+        "reviewers": reviewers,
+        "reviewer_roles": roles,
+        "reviewer_roles_missing": [
+            role for role, status in roles.items() if status is None
+        ],
+        "reviewer_roles_unknown": [
+            role for role, status in roles.items() if status == "UNKNOWN"
+        ],
     }
+
+
+def reviewer_roles(reviewers: dict[str, Any]) -> dict[str, str | None]:
+    """Resolve recorded reviewer names onto the mandatory role keywords.
+
+    A name satisfies a role when it contains that role's keyword, so both
+    `cca-security-reviewer` and an Agent Team teammate called
+    `core-security-privacy-supply-chain` count for `security`, and one
+    teammate covering two perspectives satisfies both.
+
+    Where several names map to the same role the worst status wins: a run that
+    recorded Security twice, once ACTIVE and once UNKNOWN, has an unresolved
+    Security perspective and must not be able to hide it behind the other
+    record.
+    """
+    severity = {"ACTIVE": 0, "N_A": 1, "UNKNOWN": 2}
+    resolved: dict[str, str | None] = {role: None for role in REQUIRED_REVIEWER_ROLES}
+    for name, status in reviewers.items():
+        if not isinstance(name, str):
+            continue
+        # An unrecognized status can only come from a hand-edited
+        # reviewers.json; fold it into UNKNOWN so it fails closed exactly like
+        # an out-of-range verdict does in the loop above.
+        if status not in REVIEWER_STATUSES:
+            status = "UNKNOWN"
+        lowered = name.lower()
+        for role in REQUIRED_REVIEWER_ROLES:
+            if role not in lowered:
+                continue
+            current = resolved[role]
+            if current is None or severity[status] > severity[current]:
+                resolved[role] = status
+    return resolved
 
 
 def cmd_init(args: argparse.Namespace) -> None:
@@ -1206,6 +1265,14 @@ def cmd_record(args: argparse.Namespace) -> None:
         _require_str_field(finding, "id", "findings")
     for reviewer in reviewers:
         _require_str_field(reviewer, "name", "reviewers")
+        status = reviewer.get("status", "UNKNOWN")
+        if status not in REVIEWER_STATUSES:
+            raise guard.GuardError(
+                f"허용되지 않는 reviewer 상태입니다: {status}",
+                reason="ledger_invalid_reviewer_status",
+                name=reviewer.get("name"),
+                allowed=list(REVIEWER_STATUSES),
+            )
 
     _, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
     with LedgerLock(ledger_dir):
