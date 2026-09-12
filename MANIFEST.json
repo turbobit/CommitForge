@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 145,
-  "total_bytes": 1251653,
+  "total_bytes": 1254058,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -347,8 +347,8 @@
     },
     {
       "path": "README.md",
-      "size": 49614,
-      "sha256": "eea2e5f1d40878f24f89cb98ce18b46ffe2ce343720cafcd5531489327f1af17"
+      "size": 50149,
+      "sha256": "c5fec96979d2004b168a903dc4bb49726f912d33d74cafe68f9e70cb1b9a9aa8"
     },
     {
       "path": "VERSION",
@@ -372,8 +372,8 @@
     },
     {
       "path": "editor-extension/README.md",
-      "size": 5559,
-      "sha256": "9df064fa56dc92f7d64722f90fdb833cd2c5bd2f46474c49171e8606cb56068f"
+      "size": 7385,
+      "sha256": "d3cba845fe012d4099247f800c8b2a4edca62444a3e357be39a29bed630a87e3"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -382,13 +382,13 @@
     },
     {
       "path": "editor-extension/package-lock.json",
-      "size": 196538,
-      "sha256": "80f2fcc393167326de700e5d235c35119783dc6a3d8ddd7c66e55aa98b22be52"
+      "size": 196562,
+      "sha256": "aed640b33d4e4458a85a744957a08f7f78de6c8f76fea45eb5dd055133a467da"
     },
     {
       "path": "editor-extension/package.json",
-      "size": 6450,
-      "sha256": "d0ebe4dbe4905c422e1b868c9566ee754e7263db0b0e557a9ab4e453d4f57c98"
+      "size": 6470,
+      "sha256": "883c6d77c89f520834aed8df89f6d921b0813f4463a31d7d6a4ceb8d4ff148bb"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
