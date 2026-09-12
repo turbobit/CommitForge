@@ -28,10 +28,33 @@ export function debounce(
   };
 }
 
+const GIT_WATCH_PATTERNS = ["claude-atomic.lock/**", "claude-atomic-snapshots/**"];
+
+function watchPattern(
+  base: vscode.WorkspaceFolder | vscode.Uri,
+  pattern: string,
+  onEvent: () => void,
+): vscode.FileSystemWatcher {
+  const watcher = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(base, pattern));
+  watcher.onDidChange(onEvent);
+  watcher.onDidCreate(onEvent);
+  watcher.onDidDelete(onEvent);
+  return watcher;
+}
+
 /**
  * 폴링하지 않는다. 창 포커스 복귀와 파일 변화(§7.1)에만 반응해 store를 갱신한다.
  * guard.py는 프로세스를 새로 띄우는 비용이 있으므로, 몰려 들어오는 변화를
  * 200ms 동안 모아 한 번만 실행한다(디바운스 — 반복 타이머가 아니다).
+ *
+ * git 쪽 감시(lock·snapshots)는 워크스페이스 상대경로로 만들 수 없다. git
+ * worktree에서는 `.git`이 디렉터리가 아니라 `gitdir: ...`을 담은 파일이고,
+ * guard.py는 그 리다이렉트가 가리키는 실제 gitDir(예:
+ * `<repo>/.git/worktrees/<name>`)에 lock·snapshot을 만든다. 그 경로는
+ * `guard.py status`가 알려주기 전까지 알 수 없으므로(StateStore.refresh 결과),
+ * 첫 refresh가 성공해 store.onDidChange로 gitDir가 도착할 때 지연 생성한다.
+ * gitDir를 아직 모르는 동안(미설치·git 아님·guard 실패)에는 git 감시자 없이도
+ * 정상 동작해야 한다.
  */
 export function createWatchers(
   store: StateStore,
@@ -39,25 +62,41 @@ export function createWatchers(
 ): vscode.Disposable {
   const refresh = debounce(() => void store.refresh(), 200);
 
-  const patterns = [
-    ".git/claude-atomic.lock/**",
-    ".git/claude-atomic-snapshots/**",
-    ".claude/**",
-  ];
+  // .claude/**는 워크스페이스 상대경로이므로 gitDir을 기다릴 필요 없이 즉시 만든다.
+  const claudeWatcher = watchPattern(folder, ".claude/**", refresh.call);
 
-  const watchers = patterns.map((pattern) => {
-    const watcher = vscode.workspace.createFileSystemWatcher(
-      new vscode.RelativePattern(folder, pattern),
-    );
-    watcher.onDidChange(refresh.call);
-    watcher.onDidCreate(refresh.call);
-    watcher.onDidDelete(refresh.call);
-    return watcher;
+  let currentGitDir: string | undefined;
+  let gitWatchers: vscode.Disposable | undefined;
+
+  const syncGitWatchers = (gitDir: string | undefined): void => {
+    if (gitDir === currentGitDir) return;
+    gitWatchers?.dispose();
+    currentGitDir = gitDir;
+    gitWatchers = gitDir
+      ? vscode.Disposable.from(
+          ...GIT_WATCH_PATTERNS.map((pattern) =>
+            watchPattern(vscode.Uri.file(gitDir), pattern, refresh.call),
+          ),
+        )
+      : undefined;
+  };
+
+  // 워크스페이스 폴더 선택이 바뀌는 등으로 이미 gitDir를 아는 상태에서
+  // createWatchers가 (재)호출될 수 있으므로, 알고 있으면 즉시 반영한다.
+  syncGitWatchers(store.current?.guard?.gitDir || undefined);
+
+  const stateSubscription = store.onDidChange((state) => {
+    syncGitWatchers(state?.guard?.gitDir || undefined);
   });
 
   const focus = vscode.window.onDidChangeWindowState((windowState) => {
     if (windowState.focused) refresh.call();
   });
 
-  return vscode.Disposable.from(...watchers, focus, { dispose: refresh.dispose });
+  return vscode.Disposable.from(claudeWatcher, stateSubscription, focus, {
+    dispose: () => {
+      refresh.dispose();
+      gitWatchers?.dispose();
+    },
+  });
 }
