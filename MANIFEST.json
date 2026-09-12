@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 147,
-  "total_bytes": 1400901,
+  "total_bytes": 1401272,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -482,8 +482,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 19380,
-      "sha256": "63af356c2b08e2fadb1316340e038f879abb46c944fd2fff42e624358d35c8fd"
+      "size": 19751,
+      "sha256": "672825e361f20263efc12600416c18109ab0e42a429e592387033825194579a4"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
