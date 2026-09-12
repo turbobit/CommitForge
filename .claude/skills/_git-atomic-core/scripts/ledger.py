@@ -516,6 +516,14 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         if verdict is None:
             pending.append(identifier)
             continue
+        # A value outside VERDICTS can only reach here through a hand-edited
+        # or corrupted hunks.jsonl (cmd_record validates against VERDICTS at
+        # write time). It must still fail closed: fold it into UNKNOWN rather
+        # than let an unrecognized value slip through as "covered", since
+        # coverage() feeds the gate directly and this design must never fail
+        # open.
+        if verdict not in VERDICTS:
+            verdict = "UNKNOWN"
         by_verdict[verdict] = by_verdict.get(verdict, 0) + 1
         if verdict == "UNKNOWN":
             unknown.append(identifier)

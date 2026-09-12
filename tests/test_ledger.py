@@ -603,6 +603,32 @@ class CoverageTest(LedgerTestCase):
         self.assertEqual(report["findings"][0]["id"], "f-1")
         self.assertEqual(report["coverage"]["by_verdict"]["FINDING"], 1)
 
+    def test_corrupted_verdict_value_blocks_completion(self) -> None:
+        # cmd_record validates against VERDICTS at write time, so the only
+        # way an out-of-vocabulary value reaches hunks.jsonl is a
+        # hand-edited or corrupted file. Simulate that directly.
+        started, ids = self.prepared()
+        _, status = self.ledger("status", "--session", started["session"])
+        generation = status["generation"]
+        hunks = Path(started["snapshot"]) / "ledger" / generation / "hunks.jsonl"
+        with hunks.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"id": ids[0], "verdict": "REVIEWED"}) + "\n")
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertFalse(status["complete"])
+        self.assertIn(ids[0], status["unknown"])
+
+    def test_status_before_inventory_has_full_key_set(self) -> None:
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertIsInstance(status["complete"], bool)
+        self.assertIsInstance(status["fingerprint_matches_current"], bool)
+        self.assertIsInstance(status["generation"], str)
+        self.assertIsInstance(status["pending"], list)
+        self.assertIsInstance(status["pending_count"], int)
+        self.assertIsInstance(status["unknown"], list)
+        self.assertIsInstance(status["unknown_count"], int)
+
 
 if __name__ == "__main__":
     unittest.main()
