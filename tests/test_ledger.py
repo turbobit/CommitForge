@@ -171,6 +171,62 @@ class InventoryWorkingScopeTest(LedgerTestCase):
         grouped = self.ids_by_kind(built)
         self.assertEqual(grouped["meta"], ["staged:tracked.txt#0"])
 
+    def test_quoted_filename_produces_entry_with_decoded_path(self) -> None:
+        if sys.platform.startswith("win"):
+            self.skipTest("Windows는 파일명에 큰따옴표를 허용하지 않는다")
+        quoted_name = 'quote"d.txt'
+        (self.tmp / quoted_name).write_text("base\n", encoding="utf-8")
+        run(["git", "add", "--", quoted_name], self.tmp)
+        run(["git", "commit", "-m", "test: quoted name"], self.tmp)
+        (self.tmp / quoted_name).write_text("base\nadded\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertTrue(
+            any(
+                entry == f"working:{quoted_name}#1"
+                for entry in grouped["hunk"]
+            )
+        )
+
+    def test_rename_to_quoted_name_produces_entry_with_new_path(self) -> None:
+        if sys.platform.startswith("win"):
+            self.skipTest("Windows는 파일명에 큰따옴표를 허용하지 않는다")
+        renamed = 'renamed"q.txt'
+        run(["git", "mv", "tracked.txt", renamed], self.tmp)
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertEqual(grouped["meta"], [f"staged:{renamed}#0"])
+
+    def test_multiple_files_each_start_hunk_numbering_at_one(self) -> None:
+        (self.tmp / "second.txt").write_text("second\n", encoding="utf-8")
+        run(["git", "add", "second.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: second file"], self.tmp)
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        (self.tmp / "second.txt").write_text("second\nmore\n", encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        self.assertIn("working:tracked.txt#1", grouped["hunk"])
+        self.assertIn("working:second.txt#1", grouped["hunk"])
+
+    def test_single_file_multiple_hunks_numbered_in_order(self) -> None:
+        lines = [f"line{i}\n" for i in range(1, 21)]
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        run(["git", "add", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-m", "test: many lines"], self.tmp)
+        lines[0] = "line1-changed\n"
+        lines[-1] = "line20-changed\n"
+        (self.tmp / "tracked.txt").write_text("".join(lines), encoding="utf-8")
+        started = self.init_ledger()
+        _, built = self.ledger("inventory", "--session", started["session"])
+        grouped = self.ids_by_kind(built)
+        tracked_hunks = sorted(
+            entry for entry in grouped["hunk"] if entry.startswith("working:tracked.txt#")
+        )
+        self.assertEqual(tracked_hunks, ["working:tracked.txt#1", "working:tracked.txt#2"])
+
     def test_inventory_is_written_to_active_generation(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
         started = self.init_ledger()

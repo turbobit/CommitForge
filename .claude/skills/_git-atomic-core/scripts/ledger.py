@@ -114,11 +114,101 @@ def validate_scopes(raw: list[str]) -> list[str]:
     return scopes
 
 
-def decode_path(raw: str) -> str:
-    """Undo git's C-style quoting for paths with special characters."""
-    if not raw.startswith('"'):
-        return raw
-    return json.loads(raw)
+_SIMPLE_QUOTE_ESCAPES = {
+    "\\": 0x5C, '"': 0x22, "n": 0x0A, "t": 0x09, "r": 0x0D,
+    "a": 0x07, "b": 0x08, "f": 0x0C, "v": 0x0B,
+}
+
+
+def decode_git_quoted(content: str) -> str:
+    """Decode the inner content of a git C-quoted token (no surrounding quotes).
+
+    Handles the escapes git emits when a path needs quoting: `\\\\`, `\\"`,
+    the usual single-letter C escapes, and `\\NNN` three-digit octal byte
+    escapes (used for bytes >= 0x80, e.g. under `core.quotePath`). Bytes are
+    accumulated and decoded as UTF-8 with `replace` so a non-UTF-8 byte
+    sequence degrades gracefully instead of raising. An escape this function
+    does not recognize is kept literally rather than raising, so a malformed
+    header degrades to a best-effort path instead of crashing the inventory.
+    """
+    out = bytearray()
+    i = 0
+    n = len(content)
+    while i < n:
+        ch = content[i]
+        if ch == "\\" and i + 1 < n:
+            nxt = content[i + 1]
+            if nxt in _SIMPLE_QUOTE_ESCAPES:
+                out.append(_SIMPLE_QUOTE_ESCAPES[nxt])
+                i += 2
+                continue
+            octal = content[i + 1 : i + 4]
+            if len(octal) == 3 and all(d in "01234567" for d in octal):
+                out.append(int(octal, 8) & 0xFF)
+                i += 4
+                continue
+            out.extend(b"\\")
+            i += 1
+            continue
+        out.extend(ch.encode("utf-8", "replace"))
+        i += 1
+    return bytes(out).decode("utf-8", "replace")
+
+
+def _quoted_token_end(text: str, start: int) -> int:
+    """Return the index of the unescaped closing quote for the quoted token
+    whose opening `"` sits at `start`, or -1 if it is never closed."""
+    i = start + 1
+    n = len(text)
+    while i < n:
+        if text[i] == "\\":
+            i += 2
+            continue
+        if text[i] == '"':
+            return i
+        i += 1
+    return -1
+
+
+def extract_b_path(remainder: str) -> str:
+    """Extract and decode the b-side path from a `diff --git` header remainder.
+
+    Git quotes the a-token and b-token independently, so a rename where only
+    one side needs quoting is common. An unquoted token can never itself
+    contain a literal `"` (that character always forces quoting), so once the
+    a-token is known to be unquoted, the first `"` remaining in the string can
+    only be the start of a quoted b-token. When neither token is quoted, a
+    path may legitimately contain spaces, so there is no exact boundary; this
+    falls back to the last ` b/` occurrence, which is the best available
+    heuristic for that ambiguous case. Never raises: a header this cannot
+    make sense of comes back unparsed rather than crashing the inventory.
+    """
+    try:
+        if remainder.startswith('"'):
+            end = _quoted_token_end(remainder, 0)
+            if end == -1:
+                return remainder
+            b_token = remainder[end + 1 :].lstrip(" ")
+        else:
+            quote_at = remainder.find('"')
+            if quote_at != -1:
+                b_token = remainder[quote_at:]
+            else:
+                idx = remainder.rfind(" b/")
+                if idx == -1:
+                    return remainder
+                b_token = remainder[idx + 1 :]
+
+        if b_token.startswith('"'):
+            end = _quoted_token_end(b_token, 0)
+            content = b_token[1:end] if end != -1 else b_token[1:]
+            path = decode_git_quoted(content)
+        else:
+            path = b_token
+
+        return path[2:] if path.startswith("b/") else path
+    except Exception:
+        return remainder
 
 
 def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
@@ -158,11 +248,7 @@ def parse_diff_entries(diff: bytes, source: str) -> list[dict[str, Any]]:
         if line.startswith("diff --git "):
             flush()
             remainder = line[len("diff --git ") :]
-            state["path"] = (
-                decode_path(remainder.split(" b/", 1)[-1])
-                if " b/" in remainder
-                else remainder
-            )
+            state["path"] = extract_b_path(remainder)
             continue
         if state["path"] is None:
             continue
