@@ -506,6 +506,16 @@ class AdvanceTest(LedgerTestCase):
         self.assertEqual(advanced["iteration"], 2)
         self.assertNotEqual(advanced["generation"], first["generation"])
         self.assertTrue(advanced["generation"].startswith("gen-02-"))
+        self.assertGreaterEqual(advanced["total"], 1)
+        inventory_path = (
+            Path(started["snapshot"]) / "ledger" / advanced["generation"] / "inventory.jsonl"
+        )
+        lines = [
+            json.loads(line)
+            for line in inventory_path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+        self.assertTrue(any(entry["path"] == "tracked.txt" for entry in lines))
 
     def test_previous_generation_stays_immutable(self) -> None:
         started, first = self.started_with_inventory()
@@ -530,6 +540,68 @@ class AdvanceTest(LedgerTestCase):
         )
         self.assertNotEqual(proc.returncode, 0)
         self.assertEqual(refused["reason"], "ledger_fingerprint_mismatch")
+
+
+class CoverageTest(LedgerTestCase):
+    def prepared(self) -> tuple[dict, list[str]]:
+        # Two independent entries (a tracked hunk plus an untracked file) so
+        # that recording a verdict for only one of them leaves the other
+        # genuinely pending; a single-entry fixture would make "record the
+        # only id" and "cover everything" indistinguishable.
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        (self.tmp / "extra.txt").write_text("fresh\n", encoding="utf-8")
+        started = self.begin()
+        self.ledger("init", "--session", started["session"], "--scope", "working")
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def test_status_reports_incomplete_coverage(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertFalse(status["complete"])
+        self.assertGreater(status["pending_count"], 0)
+
+    def test_status_reports_complete_coverage(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids]},
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertTrue(status["complete"])
+        self.assertEqual(status["pending"], [])
+
+    def test_unknown_verdict_blocks_completion(self) -> None:
+        started, ids = self.prepared()
+        verdicts = [{"id": identifier, "verdict": "PASS"} for identifier in ids[1:]]
+        verdicts.append({"id": ids[0], "verdict": "UNKNOWN"})
+        self.record(started["session"], {"verdicts": verdicts})
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertFalse(status["complete"])
+        self.assertEqual(status["unknown"], [ids[0]])
+
+    def test_latest_verdict_wins_for_same_id(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "UNKNOWN"}]})
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["unknown"], [])
+
+    def test_report_emits_findings_and_counts(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "FINDING", "finding_ids": ["f-1"]}],
+                "findings": [{"id": "f-1", "severity": "MAJOR", "file": "tracked.txt"}],
+            },
+        )
+        _, report = self.ledger("report", "--session", started["session"])
+        self.assertTrue(report["ok"])
+        self.assertEqual(len(report["findings"]), 1)
+        self.assertEqual(report["findings"][0]["id"], "f-1")
+        self.assertEqual(report["coverage"]["by_verdict"]["FINDING"], 1)
 
 
 if __name__ == "__main__":

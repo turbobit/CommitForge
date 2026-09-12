@@ -469,6 +469,79 @@ def inventory_ids(gen_dir: Path) -> set[str]:
     return {record["id"] for record in read_jsonl(gen_dir / INVENTORY_NAME)}
 
 
+PENDING_SAMPLE_LIMIT = 20
+
+
+def latest_verdicts(gen_dir: Path) -> dict[str, str]:
+    """Collapse the append-only log so the last write for an id wins."""
+    resolved: dict[str, str] = {}
+    for record in read_jsonl(gen_dir / HUNKS_NAME):
+        identifier = record.get("id")
+        if isinstance(identifier, str):
+            resolved[identifier] = record.get("verdict", "UNKNOWN")
+    return resolved
+
+
+def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> dict[str, Any]:
+    generation = data.get("active_generation") or ""
+    if not generation:
+        return {
+            "complete": False,
+            "fingerprint_matches_current": False,
+            "generation": "",
+            "total": 0,
+            "pending": [],
+            "pending_count": 0,
+            "unknown": [],
+            "unknown_count": 0,
+            "by_verdict": {},
+            "scopes": [],
+            "reviewers": {},
+        }
+
+    gen_dir = ledger_dir / generation
+    entries = read_jsonl(gen_dir / INVENTORY_NAME)
+    resolved = latest_verdicts(gen_dir)
+
+    by_verdict = {name: 0 for name in VERDICTS}
+    pending: list[str] = []
+    unknown: list[str] = []
+    per_scope: dict[str, dict[str, int]] = {}
+
+    for entry in entries:
+        identifier = entry["id"]
+        bucket = per_scope.setdefault(entry["source"], {"total": 0, "covered": 0})
+        bucket["total"] += 1
+        verdict = resolved.get(identifier)
+        if verdict is None:
+            pending.append(identifier)
+            continue
+        by_verdict[verdict] = by_verdict.get(verdict, 0) + 1
+        if verdict == "UNKNOWN":
+            unknown.append(identifier)
+            continue
+        bucket["covered"] += 1
+
+    current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
+    expected = generation.rsplit("-", 1)[-1]
+
+    return {
+        "complete": not pending and not unknown,
+        "fingerprint_matches_current": current.startswith(expected),
+        "generation": generation,
+        "total": len(entries),
+        "pending": pending[:PENDING_SAMPLE_LIMIT],
+        "pending_count": len(pending),
+        "unknown": unknown[:PENDING_SAMPLE_LIMIT],
+        "unknown_count": len(unknown),
+        "by_verdict": by_verdict,
+        "scopes": [
+            {"source": source, **counts} for source, counts in sorted(per_scope.items())
+        ],
+        "reviewers": guard.read_json(gen_dir / REVIEWERS_NAME) or {},
+    }
+
+
 def cmd_init(args: argparse.Namespace) -> None:
     scopes = validate_scopes(args.scope)
     _, _, ledger_dir, resolved_token = resolve_ledger(args.session, args.token)
@@ -487,13 +560,10 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 
 def cmd_status(args: argparse.Namespace) -> None:
-    _, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
     if not (ledger_dir / RUN_NAME).is_file():
         guard.emit({"ok": True, "exists": False})
     data = read_run(ledger_dir)
-    generation = data.get("active_generation") or ""
-    if generation:
-        read_jsonl(ledger_dir / generation / HUNKS_NAME)
     guard.emit(
         {
             "ok": True,
@@ -501,7 +571,25 @@ def cmd_status(args: argparse.Namespace) -> None:
             "stage": data["stage"],
             "iteration": data["iteration"],
             "active_generation": data["active_generation"],
-            "scopes": data["scopes"],
+            "scopes_declared": data["scopes"],
+            **coverage(ctx, ledger_dir, data),
+        }
+    )
+
+
+def cmd_report(args: argparse.Namespace) -> None:
+    ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    data = read_run(ledger_dir)
+    summary = coverage(ctx, ledger_dir, data)
+    generation = data.get("active_generation") or ""
+    findings = read_jsonl(ledger_dir / generation / FINDINGS_NAME) if generation else []
+    guard.emit(
+        {
+            "ok": True,
+            "generation": generation,
+            "iteration": data["iteration"],
+            "coverage": summary,
+            "findings": findings,
         }
     )
 
@@ -711,6 +799,10 @@ def build_parser() -> argparse.ArgumentParser:
     advance.add_argument("--token")
     advance.add_argument("--fingerprint", required=True)
 
+    report = sub.add_parser("report", help="Emit findings and coverage for the final report")
+    report.add_argument("--session", required=True)
+    report.add_argument("--token")
+
     return parser
 
 
@@ -722,6 +814,7 @@ def main() -> None:
         "inventory": cmd_inventory,
         "record": cmd_record,
         "advance": cmd_advance,
+        "report": cmd_report,
     }
     try:
         handlers[args.command](args)
