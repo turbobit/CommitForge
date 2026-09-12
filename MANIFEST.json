@@ -3,7 +3,7 @@
   "version": "1.16.0",
   "reproducible": true,
   "file_count": 142,
-  "total_bytes": 1221328,
+  "total_bytes": 1224657,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -417,8 +417,8 @@
     },
     {
       "path": "editor-extension/src/core/detect.ts",
-      "size": 8211,
-      "sha256": "d8325c23209dcfab415fe1d48d7aa552402a529b00c07c7ddd3ccd57fb348369"
+      "size": 9621,
+      "sha256": "b2ffb4dd1a6a005f17751e4f516888a48a9bd5d8ce31c066c47219592b84b0e3"
     },
     {
       "path": "editor-extension/src/core/guard.ts",
@@ -457,8 +457,8 @@
     },
     {
       "path": "editor-extension/src/vscode/statusBar.ts",
-      "size": 3729,
-      "sha256": "6e4add4765780d69500889adbef18431a09116826b0b21654acc0cee3e81fd0b"
+      "size": 3899,
+      "sha256": "5538dbfe1a110d9e4a28d47b262596ba286b8ce6babe3372607d1cb46819a25c"
     },
     {
       "path": "editor-extension/src/vscode/terminal.ts",
@@ -467,8 +467,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 8785,
-      "sha256": "92d5484e1e8a41328bcae582edb2d584c16493c2e3d7c772f4baea798c026cd1"
+      "size": 9327,
+      "sha256": "aa70ee8a207728b52cab962ab437c3e38690fce3e1b0c6fea7369e37e6f9f107"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
@@ -582,8 +582,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 10761,
-      "sha256": "c4d735bbb38e7418655bbb72088f441461cc8e7f5ef833be1dd5d07824344f06"
+      "size": 11968,
+      "sha256": "c140fcd9354c70826d7a58bd93757cb16835bfe940f0b454800dc2824b5651d2"
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
