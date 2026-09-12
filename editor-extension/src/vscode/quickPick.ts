@@ -90,6 +90,21 @@ export function lockWarning(guard: GuardStatus | null, command: string): string 
 }
 
 /**
+ * 카탈로그에서 이름으로 CommandSpec을 찾는다. SCM 패널 단축 버튼(spec 요청 1)의
+ * 핵심 규칙을 담는다: 단축 버튼은 하드코딩된 명령 문자열을 보내지 않고, 항상
+ * 실행 시점의 `WorkspaceState.catalog`(SKILL.md의 argument-hint에서 생성됨)에서
+ * 찾아야 한다. 카탈로그에 없으면(미설치이거나 upstream에서 이름이 바뀌었으면)
+ * `undefined`를 반환해 호출자가 "엉뚱한 문자열을 보내지 않고" 사용자에게
+ * 알리게 한다.
+ */
+export function resolveShortcutSpec(
+  catalog: readonly CommandSpec[],
+  name: string,
+): CommandSpec | undefined {
+  return catalog.find((spec) => spec.name === name);
+}
+
+/**
  * lock 경고 모달의 답에 따라 무엇을 보낼지, 최근 목록에 남길지 정한다.
  *
  * "clean 실행"은 사용자가 카탈로그에서 고른 명령이 아니라 lock 충돌을
@@ -238,6 +253,63 @@ async function sendToTerminal(
   setTimeout(() => void store.refresh(), 1000);
 }
 
+/**
+ * lock 경고 → 확인 → 전송의 공유 로직(spec §6.3·§6.4). `runCommandFlow`(전체
+ * QuickPick)와 `runShortcut`(SCM 패널 단축 버튼) 둘 다 명령 문자열을 조립한
+ * 뒤에는 이 함수 하나로 수렴한다 — 단축 버튼이라고 lock 사전 경고나 전송 전
+ * 확인(`commitforge.confirmBeforeSend`)을 건너뛰지 않는다.
+ */
+async function sendResolvedCommand(
+  store: StateStore,
+  context: vscode.ExtensionContext,
+  commandName: string,
+  command: string,
+): Promise<void> {
+  const warning = lockWarning(store.current?.guard ?? null, commandName);
+  if (warning) {
+    const answer = await vscode.window.showWarningMessage(
+      warning,
+      { modal: true, detail: "그래도 보내면 Claude가 거부할 수 있습니다." },
+      "그래도 보내기",
+      "clean 실행",
+    );
+    const resolved = resolveWarningAnswer(answer, command);
+    if (!resolved) return;
+    await sendToTerminal(store, context, resolved.command, resolved.remember);
+    return;
+  }
+
+  await sendToTerminal(store, context, command, true);
+}
+
+/**
+ * SCM 패널 단축 버튼(`commitforge.send.*`)의 공유 핸들러. 버튼마다 명령은
+ * 다르지만 로직은 한 벌뿐이다 — `handleInstall`이 install/upgrade/reinstall
+ * 셋에 공유되는 것과 같은 패턴이다.
+ *
+ * 옵션 없이 바로 전송한다(QuickPick에서 Enter를 누른 것과 같은 동작). 모드나
+ * 옵션이 필요하면 사용자는 여전히 `commitforge.run`(전체 QuickPick)의 톱니(⚙)
+ * 경로를 쓸 수 있다.
+ */
+export async function runShortcut(
+  store: StateStore,
+  context: vscode.ExtensionContext,
+  name: string,
+): Promise<void> {
+  const state = store.current;
+  if (!state) return;
+
+  const spec = resolveShortcutSpec(state.catalog, name);
+  if (!spec) {
+    void vscode.window.showWarningMessage(
+      `/${name} 명령을 카탈로그에서 찾지 못했습니다. CommitForge가 설치돼 있는지, 명령 이름이 바뀌지 않았는지 확인하십시오.`,
+    );
+    return;
+  }
+
+  await sendResolvedCommand(store, context, spec.name, `/${spec.name}`);
+}
+
 export async function runCommandFlow(
   store: StateStore,
   context: vscode.ExtensionContext,
@@ -307,21 +379,7 @@ export async function runCommandFlow(
 
   if (!command) return;
 
-  const warning = lockWarning(state.guard, commandName);
-  if (warning) {
-    const answer = await vscode.window.showWarningMessage(
-      warning,
-      { modal: true, detail: "그래도 보내면 Claude가 거부할 수 있습니다." },
-      "그래도 보내기",
-      "clean 실행",
-    );
-    const resolved = resolveWarningAnswer(answer, command);
-    if (!resolved) return;
-    await sendToTerminal(store, context, resolved.command, resolved.remember);
-    return;
-  }
-
-  await sendToTerminal(store, context, command, true);
+  await sendResolvedCommand(store, context, commandName, command);
 }
 
 /**

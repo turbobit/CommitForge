@@ -67,6 +67,34 @@
         "command": "commitforge.revealSnapshots",
         "title": "CommitForge: 스냅샷 폴더 열기",
         "icon": "$(folder-opened)"
+      },
+      {
+        "command": "commitforge.send.cr",
+        "title": "CommitForge: 리뷰 실행 (/cr)",
+        "icon": "$(search)"
+      },
+      {
+        "command": "commitforge.send.cc",
+        "title": "CommitForge: 순차 커밋 실행 (/cc)",
+        "icon": "$(git-commit)"
+      },
+      {
+        "command": "commitforge.send.ccf",
+        "title": "CommitForge: 파일 단위로 빠르게 커밋 (/ccf)"
+      },
+      {
+        "command": "commitforge.send.cf",
+        "title": "CommitForge: 전체 변경을 한 번에 커밋 (/cf)"
+      },
+      {
+        "command": "commitforge.send.cca",
+        "title": "CommitForge: 리뷰·수정·검증·commit 전체 실행 (/cca)"
+      }
+    ],
+    "submenus": [
+      {
+        "id": "commitforge.scmMore",
+        "label": "CommitForge"
       }
     ],
     "viewsContainers": {
@@ -111,6 +139,65 @@
         {
           "command": "commitforge.revealSnapshots",
           "when": "false"
+        },
+        {
+          "command": "commitforge.send.cr",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.send.cc",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.send.ccf",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.send.cf",
+          "when": "false"
+        },
+        {
+          "command": "commitforge.send.cca",
+          "when": "false"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "commitforge.send.cr",
+          "when": "scmProvider == git",
+          "group": "navigation@1"
+        },
+        {
+          "command": "commitforge.send.cc",
+          "when": "scmProvider == git",
+          "group": "navigation@2"
+        },
+        {
+          "submenu": "commitforge.scmMore",
+          "when": "scmProvider == git",
+          "group": "1_commitforge"
+        }
+      ],
+      "commitforge.scmMore": [
+        {
+          "command": "commitforge.send.ccf",
+          "when": "scmProvider == git",
+          "group": "1_commitforge@1"
+        },
+        {
+          "command": "commitforge.send.cf",
+          "when": "scmProvider == git",
+          "group": "1_commitforge@2"
+        },
+        {
+          "command": "commitforge.send.cca",
+          "when": "scmProvider == git",
+          "group": "1_commitforge@3"
+        },
+        {
+          "command": "commitforge.run",
+          "when": "scmProvider == git",
+          "group": "1_commitforge@4"
         }
       ],
       "view/item/context": [

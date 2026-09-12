@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { groupOptionsByMode, pushRecent, resolveWarningAnswer } from "../src/vscode/quickPick";
-import type { CommandOption } from "../src/core/catalog";
+import {
+  groupOptionsByMode,
+  pushRecent,
+  resolveShortcutSpec,
+  resolveWarningAnswer,
+} from "../src/vscode/quickPick";
+import type { CommandOption, CommandSpec } from "../src/core/catalog";
 
 function flag(name: string): CommandOption {
   return { name, kind: "flag" };
@@ -102,5 +107,29 @@ describe("resolveWarningAnswer", () => {
 
   it("모달을 닫거나 다른 답이면 아무것도 보내지 않는다", () => {
     expect(resolveWarningAnswer(undefined, "/cca today")).toBeUndefined();
+  });
+});
+
+// SCM 패널 단축 버튼(spec 요청 1)의 핵심 규칙: 단축 버튼은 하드코딩된 명령
+// 문자열을 보내지 않고 항상 실행 시점의 카탈로그에서 spec을 찾는다. 카탈로그에
+// 없으면(미설치이거나 upstream에서 이름이 바뀌었으면) undefined를 반환해
+// 호출자가 엉뚱한 문자열을 보내지 않고 사용자에게 알리게 한다.
+describe("resolveShortcutSpec", () => {
+  function spec(name: string): CommandSpec {
+    return { name, description: "", modes: [], acceptsFreeText: false, options: [] };
+  }
+
+  it("카탈로그에 있는 이름이면 그 spec을 찾는다", () => {
+    const catalog = [spec("cr"), spec("cc"), spec("cca")];
+    expect(resolveShortcutSpec(catalog, "cc")).toBe(catalog[1]);
+  });
+
+  it("카탈로그에 없는 이름이면 undefined를 낸다(미설치이거나 이름이 바뀐 경우)", () => {
+    const catalog = [spec("cr"), spec("cc")];
+    expect(resolveShortcutSpec(catalog, "ccf")).toBeUndefined();
+  });
+
+  it("빈 카탈로그(미설치)에서도 undefined를 낸다", () => {
+    expect(resolveShortcutSpec([], "cr")).toBeUndefined();
   });
 });
