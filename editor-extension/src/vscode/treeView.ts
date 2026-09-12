@@ -176,8 +176,9 @@ export function buildTree(state: WorkspaceState | null): Node[] {
       icon: lock ? "lock" : "unlock",
       description: stale ? `${lockLabel} (오래된 값)` : lockLabel,
       color: staleColor,
-      // [해제(clean)] 메뉴·명령은 아직 붙이지 않는다 — guard.py clean 직접
-      // 호출은 spec §4.2가 금지하고, 실제 동작(§6.3 터미널 전송)은 Task 12다.
+      // lock 유무와 무관하게 항상 붙인다 — [해제(clean)] 버튼(commitforge.
+      // cleanLock)은 guard.py clean을 직접 부르지 않고 항상 /cr clean을
+      // 터미널로 보낸다(spec §4.2, §6.3).
       contextValue: LOCK_CONTEXT,
     }),
   );

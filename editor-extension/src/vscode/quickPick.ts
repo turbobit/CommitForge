@@ -89,6 +89,26 @@ export function lockWarning(guard: GuardStatus | null, command: string): string 
   return `다른 세션이 lock을 보유 중입니다: session ${session} · ${age} 경과 · ${host}`;
 }
 
+/**
+ * lock 경고 모달의 답에 따라 무엇을 보낼지, 최근 목록에 남길지 정한다.
+ *
+ * "clean 실행"은 사용자가 카탈로그에서 고른 명령이 아니라 lock 충돌을
+ * 피하려는 보조 동작이다 — 트리 `[해제(clean)]` 버튼(runCleanLock)이 같은
+ * `/cr clean`을 `remember:false`로 보내는 것과 정확히 같은 상황이므로 같은
+ * 정책을 따른다. 예전에는 이 경로만 `remember:true`로 흘러 "카탈로그에서
+ * 고른 게 아닌 보조 명령은 남기지 않는다"는 정책과 모순됐다. "그래도
+ * 보내기"는 사용자가 원래 고른 명령을 그대로 보내는 것이므로 기존
+ * `remember:true`를 유지한다.
+ */
+export function resolveWarningAnswer(
+  answer: string | undefined,
+  originalCommand: string,
+): { command: string; remember: boolean } | undefined {
+  if (answer === "clean 실행") return { command: "/cr clean", remember: false };
+  if (answer === "그래도 보내기") return { command: originalCommand, remember: true };
+  return undefined;
+}
+
 function optionDetail(option: CommandOption): string {
   switch (option.kind) {
     case "flag":
@@ -295,8 +315,10 @@ export async function runCommandFlow(
       "그래도 보내기",
       "clean 실행",
     );
-    if (answer === "clean 실행") command = "/cr clean";
-    else if (answer !== "그래도 보내기") return;
+    const resolved = resolveWarningAnswer(answer, command);
+    if (!resolved) return;
+    await sendToTerminal(store, context, resolved.command, resolved.remember);
+    return;
   }
 
   await sendToTerminal(store, context, command, true);

@@ -272,8 +272,21 @@ describe("buildTree - 설치 상태별 contextValue와 scope", () => {
 });
 
 describe("buildTree - 잠금·스냅샷 contextValue", () => {
-  it("잠금 노드는 commitforge.node.lock을 받는다 (버튼은 아직 없음, Task 12 대비)", () => {
+  it("잠금 노드는 lock 유무와 무관하게 commitforge.node.lock을 받는다([해제(clean)] 버튼은 항상 보인다)", () => {
     const nodes = buildTree(state());
+    expect(findChild(nodes, "잠금")?.contextValue).toBe("commitforge.node.lock");
+  });
+
+  it("lock을 다른 세션이 보유 중이어도 잠금 노드는 여전히 commitforge.node.lock을 받는다", () => {
+    const nodes = buildTree(
+      state({
+        guard: {
+          ...idleGuard,
+          lockOwner: { session: "abc123", created_at: null },
+          lockAgeSeconds: 30,
+        },
+      }),
+    );
     expect(findChild(nodes, "잠금")?.contextValue).toBe("commitforge.node.lock");
   });
 
