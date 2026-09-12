@@ -6,7 +6,8 @@
   "publisher": "commitforge",
   "license": "MIT",
   "engines": {
-    "vscode": "^1.94.0"
+    "vscode": "^1.94.0",
+    "node": ">=20"
   },
   "categories": [
     "SCM Providers",

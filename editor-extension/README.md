@@ -25,6 +25,56 @@ CommitForge를 VS Code와 Cursor에서 설치·관리하고 명령을 실행합�
 확장은 CommitForge 패키지(`.claude/`, `install.py`, `uninstall.py`,
 `MANIFEST.json`)를 내장하고 있어 별도로 저장소를 체크아웃할 필요가 없습니다.
 
+## 설치
+
+Marketplace에 공개하지 않으므로 `.vsix`를 직접 만들어 설치합니다. Node.js 20
+이상이 필요합니다.
+
+### 1. `.vsix` 만들기
+
+CommitForge 저장소를 클론한 뒤:
+
+```bash
+cd editor-extension
+npm install
+npm run package
+```
+
+`editor-extension/commitforge.vsix`가 생성됩니다. 이 파일 하나에 확장과
+CommitForge 패키지가 모두 들어 있습니다.
+
+### 2. 에디터에 설치
+
+명령 팔레트(<kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>)에서
+**`Extensions: Install from VSIX...`** 를 실행하고 방금 만든
+`commitforge.vsix`를 고릅니다. Cursor와 VS Code 모두 같은 절차입니다.
+
+CLI를 쓴다면:
+
+```bash
+cursor --install-extension editor-extension/commitforge.vsix
+# VS Code는
+code --install-extension editor-extension/commitforge.vsix
+```
+
+설치 후 창을 다시 불러오면(`Developer: Reload Window`) 상태바 왼쪽에
+`CommitForge`가 나타납니다.
+
+### 3. 프로젝트에 CommitForge 설치
+
+확장이 설치됐다고 CommitForge가 프로젝트에 설치된 것은 아닙니다. 사이드바의
+CommitForge 아이콘을 열면 설치 상태가 보이고, `설치` 행의 **`[설치]`** 버튼이나
+팔레트의 `CommitForge: 설치`로 범위(project/global)를 골라 설치합니다. 변경
+예정 내용을 `--dry-run`으로 먼저 보여주고 확인을 받습니다.
+
+### 업그레이드와 제거
+
+- **업그레이드**: 저장소를 `git pull`한 뒤 1·2단계를 다시 실행해 확장을 새
+  `.vsix`로 덮어씁니다. 그다음 트리의 `[업그레이드]` 버튼으로 프로젝트 설치본을
+  갱신합니다.
+- **제거**: 트리의 `[제거]` 버튼(또는 `CommitForge: 제거`)으로 프로젝트에서
+  CommitForge를 먼저 지우고, 에디터의 확장 목록에서 확장을 제거합니다.
+
 ## 비목표 (1단계)
 
 다음은 이 확장의 1단계 범위 밖입니다.

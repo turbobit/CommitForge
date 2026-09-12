@@ -78,14 +78,21 @@ Windows PowerShell에서는 `.\install.ps1 -Scope Project`를 사용합니다. �
 
 ### 에디터 확장
 
-VS Code나 Cursor를 쓴다면 확장으로 설치·상태 확인·명령 실행을 GUI에서 할 수 있습니다.
+VS Code나 Cursor를 쓴다면 확장으로 설치·상태 확인·명령 실행을 GUI에서 할 수 있습니다. Node.js 20 이상이 필요합니다.
 
 ```bash
 cd editor-extension
 npm install && npm run package
 ```
 
-생성된 `commitforge.vsix`를 에디터에서 설치합니다. 자세한 내용은 [editor-extension/README.md](editor-extension/README.md)를 참고하십시오.
+생성된 `editor-extension/commitforge.vsix`를 에디터에서 설치합니다. 명령 팔레트에서 `Extensions: Install from VSIX...`를 실행해 그 파일을 고르거나, CLI를 씁니다.
+
+```bash
+cursor --install-extension editor-extension/commitforge.vsix
+# VS Code는 code --install-extension ...
+```
+
+설치 후 창을 다시 불러오면 상태바에 `CommitForge`가 나타납니다. 확장이 CommitForge 패키지를 내장하므로, 프로젝트 설치는 사이드바의 `[설치]` 버튼이나 `CommitForge: 설치` 명령으로 합니다. 자세한 내용은 [editor-extension/README.md](editor-extension/README.md)를 참고하십시오.
 
 ## 문서 바로가기
 
