@@ -35,8 +35,33 @@
     "context": "",
     "expected_active": [
       "cca-data-migration-reviewer",
-      "cca-dependency-supply-chain-reviewer"
+      "cca-dependency-supply-chain-reviewer",
+      "cca-release-deployment-reviewer"
     ]
+  },
+  {
+    "name": "release artifacts",
+    "paths": ["VERSION", "MANIFEST.json", "checksums.sha256"],
+    "context": "",
+    "expected_active": ["cca-release-deployment-reviewer"]
+  },
+  {
+    "name": "lock and crash recovery",
+    "paths": ["src/session/lock_owner.py", "docs/recovery.md"],
+    "context": "",
+    "expected_active": ["cca-reliability-recovery-reviewer"]
+  },
+  {
+    "name": "lockfile is supply chain not locking",
+    "paths": ["poetry.lock"],
+    "context": "",
+    "expected_active": ["cca-dependency-supply-chain-reviewer"]
+  },
+  {
+    "name": "spec source file is not a requirement",
+    "paths": ["src/spec.ts"],
+    "context": "",
+    "expected_active": []
   },
   {
     "name": "ordinary documentation",

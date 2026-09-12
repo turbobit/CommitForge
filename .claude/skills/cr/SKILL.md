@@ -323,7 +323,7 @@ trigger에 따라 specialist를 추가한다. 그 밖에는 기존 custom subage
 
 Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실행하지 않는다.
 
-`conditional-reviewers.md`의 trigger를 판정해 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product reviewer를 필요한 경우에만 추가한다. 비활성 조건도 `N/A`와 근거를 남긴다.
+`conditional-reviewers.md`의 trigger를 판정해 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Release/Deployment, Requirements/Product reviewer를 필요한 경우에만 추가한다. 비활성 조건도 `N_A`와 근거를 남긴다.
 
 변경 경로를 다음 도구에 전달해 조건부 reviewer의 최소 활성 집합을 얻는다.
 
@@ -331,15 +331,12 @@ Git/Atomicity reviewer는 Atomic Commit 계획 전용이므로 `/cr`에서 실�
 python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" <changed-path...>
 ```
 
-이 결과는 하한선이다. 실제 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단과 finding schema를 적용한다.
+이 결과는 하한선이다. 실제 코드 의미에서 추가 trigger가 확인되면 reviewer를 더 활성화한다. 반환된 `inactive` 목록은 그대로 `N_A` 기록의 출발점이며, 비활성 reviewer를 기억으로 나열하지 않는다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단과 finding schema를 적용한다. baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppressions.md`에 따라 finding 상태만 `BASELINED`로 표시한다. finding 자체를 삭제하지 않는다.
 
-baseline이 있으면 `baseline.py`로 먼저 검증하고 `baseline-and-suppressions.md`에 따라 finding 상태만 `BASELINED`로 표시한다. finding 자체를 삭제하지 않는다.
-
-- `cca-data-migration-reviewer`
-- `cca-dependency-supply-chain-reviewer`
-- `cca-reliability-recovery-reviewer`
-- `cca-privacy-governance-reviewer`
-- `cca-requirements-product-reviewer`
+조건부 reviewer: `cca-data-migration-reviewer`,
+`cca-dependency-supply-chain-reviewer`, `cca-reliability-recovery-reviewer`,
+`cca-privacy-governance-reviewer`, `cca-release-deployment-reviewer`,
+`cca-requirements-product-reviewer`.
 
 각 agent에 `review-only` 모드, 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 제공한다. Agent는 shell과 파일 수정을 하지 않고 근거·정확한 위치·심각도·실패 시나리오를 반환하며 Atomic Commit 계획이나 메시지 후보를 만들지 않는다.
 
@@ -364,6 +361,8 @@ JSON
 - 기록 후에는 해당 판정을 컨텍스트에 유지하지 않아도 된다. 원장이 정본이다.
 - 원장 기록은 lead만 수행한다. reviewer subagent와 Agent Team teammate는 기록하지 않는다.
 - `inventory`에 없는 id는 거부된다. 판정 대상은 분모에서만 고른다.
+
+- hunk 판정과 별개로 **reviewer 관점**을 `reviewers`에 기록한다. 필수 관점 Line·Correctness·Security가 빠지면 `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`가 차단된다. `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용하고 `N/A` 철자는 batch 전체가 거부된다. 상세는 `review-execution.md` §3.5다.
 
 ## 4. Gate, 수정, 전면 재리뷰
 

@@ -236,7 +236,7 @@ subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`�
 
 `conditional-reviewers.md`의 trigger를 판정해 다음 reviewer를 필요한 경우에만 추가한다.
 
-조건부 reviewer: `cca-data-migration-reviewer`,
+조건부 reviewer: `cca-data-migration-reviewer`, `cca-release-deployment-reviewer`,
 `cca-dependency-supply-chain-reviewer`, `cca-reliability-recovery-reviewer`,
 `cca-privacy-governance-reviewer`, `cca-requirements-product-reviewer`.
 

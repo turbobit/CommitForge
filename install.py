@@ -45,6 +45,7 @@ AGENTS = (
     "cca-dependency-supply-chain-reviewer.md",
     "cca-reliability-recovery-reviewer.md",
     "cca-privacy-governance-reviewer.md",
+    "cca-release-deployment-reviewer.md",
     "cca-requirements-product-reviewer.md",
 )
 CORE_REFERENCE = ".claude/skills/_git-atomic-core"

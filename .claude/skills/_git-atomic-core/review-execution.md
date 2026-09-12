@@ -90,13 +90,19 @@ Agent Team 선택 시:
   - I/O·async·queue·network·cache·retry·timeout·resource·분산 상태:
     **Performance/Reliability/Observability/Operability**, traces/metrics/logs의
     correlation·alert·민감정보 비노출
+  - listener/timer/subscription·장기 실행 프로세스·대형 렌더·동기 blocking:
+    **자원 고갈과 응답성**. 메모리 누수와 무한 증가, CPU 점유와 stuck,
+    main thread·event loop 정지를 "느린 코드"와 구분해 판정한다. 상세 항목은
+    `cca-performance-reviewer`가 보유한다.
   - UI 변경: **UX/Accessibility**, WCAG 2.2, 사용자 흐름
   - schema·저장 형식 변경: **Data/Migration**, backfill·부분 배포·rollback
   - 비교 가능한 ticket·ADR·명세: **Requirements/Product**, acceptance criterion
   - CI/CD·infra·feature flag·배포 순서 변경:
-    **Release/Deployment/Rollback**
+    **Release/Deployment/Rollback** → `cca-release-deployment-reviewer`
   - Flutter·React·DB·암호화·결제·분산 시스템 등 전문 기술:
-    **Domain/Framework**
+    **Domain/Framework** → 전용 agent가 없다. `cca-language-api-reviewer`가
+    언어·프레임워크 의미를 맡고, 그것으로 덮이지 않는 도메인 지식은 lead가 직접
+    수행한다. 어느 쪽이든 관점 상태를 기록하며, 수행하지 못하면 `UNKNOWN`이다.
 - 각 specialist는 `ACTIVE`, 근거 있는 `N/A`, `UNKNOWN` 중 하나를 기록한다.
   활성 specialist를 환경 상한 때문에 추가할 수 없으면 가장 가까운 core owner와
   lead가 해당 관점을 명시적으로 교차검증한다. 그것도 완료하지 못하면
@@ -132,6 +138,13 @@ Agent Team 선택 시:
 - agent 시작 실패·timeout·turn 소진 시 main agent가 같은 관점을 직접 수행한다.
 - fallback도 완료하지 못하면 해당 관점은 `UNKNOWN`이며 성공 또는 commit을 차단한다.
 - 선택 관점을 조용히 누락하지 않는다. `PASS`, `FINDING`, `N_A`, `UNKNOWN` 중 하나를 기록한다.
+- 필수 3개 관점은 문서 규칙에 그치지 않고 원장 게이트가 강제한다. 분모가 비어 있지
+  않은 실행에서 세 관점 중 하나라도 기록이 없으면 `ledger_reviewer_missing`,
+  `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`와 `verify-review`가
+  차단된다. 관점은 역할 키워드로 해석하므로 Agent Team의 묶음 teammate 이름도
+  그대로 인정된다. 기록 방법은 `cr/SKILL.md` §3.1을 따른다.
+- reviewer `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. hunk 판정과 마찬가지로
+  `N/A` 철자는 `ledger_invalid_reviewer_status`로 batch 전체가 거부된다.
 - `UNKNOWN`은 `N_A`가 아니다. 적용되지 않는다는 근거가 있을 때만 `N_A`다.
 - hunk 판정의 철자는 `N_A`다. 원장은 `N/A`를 `ledger_invalid_verdict`로 거부하며,
   거부는 batch 전체를 버리므로 같은 batch의 `PASS`도 함께 사라진다. reviewer 산문에
@@ -173,6 +186,43 @@ Main agent는 reviewer 출력을 다음 필드로 정규화한다.
   반환하고, lead가 수신 즉시 적재한다.
 - `cca-*` reviewer agent에 Bash를 부여하지 않는다. 읽기 전용 경계이자 원장의
   단일 writer를 보장하는 조건이다.
+
+## 3.5 Reviewer 관점 기록
+
+hunk 분모는 "누가 봤는지"를 표현하지 못한다. reviewer 하나가 모든 hunk를 `PASS`로
+채우면 분모는 가득 차지만 Correctness와 Security는 한 번도 돌지 않았을 수 있다.
+그래서 관점은 별도 축으로 기록하고 게이트가 따로 확인한다.
+
+- `reviewers`의 `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. `N/A` 철자는
+  `ledger_invalid_reviewer_status`로 **batch 전체**가 거부된다. verdict와 같은 함정이다.
+- 필수 관점인 **Line, Correctness, Security**는 매 실행에서 반드시 기록한다.
+  하나라도 없으면 `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로
+  `finish`와 `verify-review`가 차단된다.
+- 관점 판정은 agent 파일명이 아니라 **이름에 포함된 역할 키워드**로 해석한다.
+  Agent Team의 `core-correctness-line-state` 같은 teammate 하나가 두 역할을 함께
+  만족시킬 수 있다.
+- **같은 이름**을 다시 기록하면 나중 값이 이긴다. 시작에 실패해 `UNKNOWN`이던
+  reviewer가 재시도에 성공하면 `ACTIVE`로 다시 기록해 해소한다.
+- **다른 이름**이 같은 역할을 덮으면 가장 나쁜 상태가 채택된다.
+  `cca-security-reviewer`가 `ACTIVE`여도 `core-security-sweep`이 `UNKNOWN`이면
+  그 역할은 `UNKNOWN`이다. 한 관점을 나눠 맡았으면 가장 약한 기록만큼만 해소된 것이다.
+- 비활성 조건부 reviewer는 `N_A`로 기록한다. `reviewer_triggers.py`의 `inactive`
+  목록이 그 출발점이며, 비활성 목록을 기억으로 나열하지 않는다.
+- 적용 대상이 없어 `N_A`인 경우와, 확인하지 못해 `UNKNOWN`인 경우를 섞지 않는다.
+  `UNKNOWN`은 성공을 차단하는 상태이고 `N_A`는 근거 있는 종결이다.
+- 분모가 비어 있는 실행(변경 없음)에는 관점 게이트를 적용하지 않는다. 빈 리뷰의
+  "검토 대상 없음" 종료는 그대로 유지된다.
+
+```bash
+python3 "<absolute-CF_CORE>/scripts/ledger.py" record \
+  --session "$COMMITFORGE_SESSION_ID" <<'JSON'
+{"verdicts": [],
+ "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"},
+               {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
+               {"name": "cca-security-reviewer", "status": "ACTIVE"},
+               {"name": "cca-data-migration-reviewer", "status": "N_A"}]}
+JSON
+```
 
 ## 4. 중복 제거
 
