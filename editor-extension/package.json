@@ -106,6 +106,10 @@
         {
           "command": "commitforge.reinstall",
           "when": "false"
+        },
+        {
+          "command": "commitforge.revealSnapshots",
+          "when": "false"
         }
       ],
       "view/item/context": [

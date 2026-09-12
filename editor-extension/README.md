@@ -46,12 +46,13 @@ CommitForge를 VS Code와 Cursor에서 설치·관리하고 명령을 실행합�
 | `CommitForge: 상태 새로고침` | 상태를 다시 읽음 |
 | `CommitForge: 뷰 열기` | 사이드바의 CommitForge 트리 뷰에 포커스 |
 | `CommitForge: lock 해제(clean)` | `guard.py clean`을 직접 부르지 않고 `/cr clean`을 터미널로 보냅니다 |
-| `CommitForge: 스냅샷 폴더 열기` | 트리의 스냅샷 행에서 호출해야 동작합니다 — 팔레트에서 인자 없이 실행하면 아무 일도 일어나지 않습니다 |
 
 `CommitForge: 업그레이드`, `CommitForge: 재설치`는 내부적으로 설치와 같은
 동작(`install.py`가 백업 후 덮어씀)을 하는 별칭 명령이며, 트리 인라인 버튼의
-tooltip을 상태에 맞게 보여주기 위해서만 존재합니다. 명령 팔레트에는 나타나지
-않습니다.
+tooltip을 상태에 맞게 보여주기 위해서만 존재합니다. `CommitForge: 스냅샷 폴더
+열기`도 트리의 스냅샷 행(경로)이 있어야 동작하는 명령입니다. 셋 다 인자 없이
+팔레트에서 실행하면 아무 일도 하지 않으므로, `package.json`의
+`commandPalette`에서 `when: false`로 숨겨 팔레트에는 나타나지 않습니다.
 
 ## 트리 뷰 (사이드바)
 
