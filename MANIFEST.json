@@ -1,6 +1,6 @@
 {
   "name": "CommitForge",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "reproducible": true,
   "file_count": 151,
   "total_bytes": 1656956,
@@ -363,7 +363,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "00afc49f1599e59129a59b64c2b019de3fe35300c05bb9d96cb25002576ff43b"
+      "sha256": "04d659518a1793d5396007fcabdc9211a8c1db8406bf4e0fa8069171fdb06518"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
