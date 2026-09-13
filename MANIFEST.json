@@ -3,7 +3,7 @@
   "version": "1.18.0",
   "reproducible": true,
   "file_count": 151,
-  "total_bytes": 1656956,
+  "total_bytes": 1663415,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -147,8 +147,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/large-diff-review.md",
-      "size": 3661,
-      "sha256": "3a2abf1238e39c1bbd90f8576eae5331d6093ac2395fdf0a34802b01c88690fd"
+      "size": 4054,
+      "sha256": "ad4ab3ba62040d2d176bb87f54c229178814e43d2a908dcfa3443fea93550248"
     },
     {
       "path": ".claude/skills/_git-atomic-core/lock-cleanup.md",
@@ -187,8 +187,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 21753,
-      "sha256": "538493033be430d0e1a9987469681918f9d805c5c925545eaffc4ad9b4b79167"
+      "size": 24015,
+      "sha256": "724f14bb0d10cfd475736618784f3f3c2f8af03b1e46d456e5ee64235bc39383"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -202,8 +202,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 10939,
-      "sha256": "20960ba8c585a395380cecba292acdda6fb63a6e647aa9330ccd9de2a8a0cf29"
+      "size": 12217,
+      "sha256": "613d5c2da066b8c7195dae314a2970826a93bce55009c717782fb94c3ae28c8f"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
@@ -282,8 +282,8 @@
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 25464,
-      "sha256": "01712ba44f8f2ded4836780d2d7b864abcf2df259de40fa695cab7d769d3a73a"
+      "size": 25716,
+      "sha256": "f6d8f8c0c79581222ddebdcf845930b6c572c3468cb31454ef4facefc9c6a82b"
     },
     {
       "path": ".claude/skills/ccf/SKILL.md",
@@ -317,8 +317,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 32706,
-      "sha256": "41ac359ee7038545e12733582e5dd8eb3a7de30359582f0dd5e47f921aebeac2"
+      "size": 32958,
+      "sha256": "8571cfa7455f6a8ed7ceab17b2149c2127403587846b4a86173f0ac8e5a98855"
     },
     {
       "path": ".gitattributes",
@@ -687,8 +687,8 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 43999,
-      "sha256": "18cd605145bedcee16bb38b8a36e01412e40d3835f88baa7ebf25b17dad85179"
+      "size": 46021,
+      "sha256": "fb8614683538ef4c7b6db60120f340b0c4fbec53fca90659b027132f512f9b0c"
     },
     {
       "path": "tests/test_install_marker.py",
