@@ -136,6 +136,39 @@ Agent Team 선택 시:
 8. 남은 reviewer는 축소된 batch로 이어서 실행하며 필수 관점을 생략하지 않는다.
 9. 수정 후 이전 결과를 폐기하고 fingerprint·trigger·활성 reviewer를 다시 계산한다.
 
+## 1.5 Reviewer 입력 전달
+
+Reviewer에게 diff·log·맥락을 넘기는 방법은 둘뿐이다.
+
+1. agent prompt에 직접 담는다. 이것이 기본이다.
+2. 그대로 담기에 너무 크면 파일로 떨구고 **경로**를 넘긴다.
+
+2번의 중간 파일은 **Guard snapshot 아래 `agent-input/` 하위 디렉터리에만** 만든다.
+snapshot 절대경로는 `begin` 응답의 `snapshot`이며 각 skill이 시작 시 보관한다.
+
+```bash
+mkdir -p "<snapshot>/agent-input"
+git diff --binary > "<snapshot>/agent-input/working.diff"
+```
+
+- `/tmp`, `/var/tmp`, `$TMPDIR`, 홈 디렉터리, 저장소 작업 트리에는 만들지 않는다.
+  snapshot 이름은 `<timestamp>-<session>-<random>`이라 저장소·세션마다 반드시 다르지만,
+  시스템 temp 아래의 경로를 mode 이름이나 저장소 이름으로 지으면 **여러 저장소가 같은
+  값을 고른다.** mode에서 파생한 `/tmp/cr3days/ui.diff` 같은 이름이 전형적인 예다.
+- 경로가 겹쳐도 **오류는 나지 않는다.** 다른 저장소가 덮어쓴 파일이 그대로 읽히고
+  reviewer만 엉뚱한 코드를 본다. 원장 분모는 실제 `git diff`로 만들어지므로 정상적으로
+  채워지고, 관점 게이트도 통과하며, Guard의 source-read-only fingerprint는 Git 상태만
+  비교하므로 이 경로를 감시하지 않는다. 어느 층에서도 걸리지 않는 조용한 오염이다.
+- 파일은 snapshot **root가 아니라 하위 디렉터리**에 둔다. `finish`의 snapshot 감사는
+  root의 파일 목록을 checksum inventory와 대조하므로 root에 추가한 파일은 `unexpected`로
+  성공을 차단한다. 하위 디렉터리는 감사 대상이 아니다. `ledger/`와 같은 위치다.
+- 별도 정리는 하지 않는다. `finish`가 snapshot을 재귀 삭제하며 함께 사라지고,
+  `abort`나 `--keep-snapshot`이면 리뷰 근거와 함께 보존된다.
+- 작업 트리에 만들면 `--source-read-only` 검증이 untracked 변경으로 잡아 정상 리뷰를
+  실패시킨다. `.gitignore`로 가리는 방법으로 우회하지 않는다.
+- 파일로 넘기더라도 reviewer는 여전히 read-only다. agent에 쓰기 권한이나 Bash를 주는
+  근거가 되지 않는다.
+
 ## 2. 필수성과 실패 정책
 
 - 필수: Line, Correctness, Security

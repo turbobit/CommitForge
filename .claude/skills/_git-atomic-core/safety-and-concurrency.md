@@ -45,6 +45,8 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 
 스냅샷 metadata에는 보존 파일별 크기와 SHA-256이 기록된다. `finish`는 삭제 직전에 이 inventory를 다시 감사하며 누락·크기 변화·해시 불일치가 있으면 성공 처리와 삭제를 차단한다. 필요하면 `audit-snapshot`으로 중간 상태를 별도 확인한다.
 
+이 감사는 스냅샷 **최상위 파일**만 대상으로 한다. 하위 디렉터리는 inventory에도 감사에도 들어가지 않으므로, 원장(`ledger/`)과 reviewer 입력(`agent-input/`, `review-execution.md` §1.5)은 스냅샷 안에 두어도 `finish`를 차단하지 않는다. 반대로 최상위에 파일을 추가하면 `unexpected`로 차단된다.
+
 `/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다. 기본 `/cr`은 두 명령에 `--source-read-only`도 사용해 working binary diff, porcelain status, untracked 내용까지 일치시킨다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 source read-only 검사를 생략한다. `release`·`emergency`·`learn`은 `--fix`와 관계없이 source read-only다.
 
 `verify-review`와 `finish`는 `--session`만 주면 현재 worktree에서 동일 session인
@@ -149,6 +151,20 @@ snapshot, 경고를 결과에 포함한다. `clean` 이후 일반 명령을 자�
 않으며 사용자가 다음 명령을 별도로 실행한다.
 
 ## 4. 여러 Claude Code 세션
+
+### 서로 다른 저장소의 동시 실행
+
+여러 프로젝트에서 동시에 같은 명령을 실행하는 것은 정상이며 차단되지 않는다. lock,
+snapshot, 원장은 모두 `git rev-parse --git-dir`로 얻은 실제 Git directory 아래에 있고
+snapshot 이름에 session과 난수가 들어가므로 저장소끼리 겹칠 수 없다.
+
+겹칠 수 있는 것은 **실행 중에 임의로 만든 경로뿐이다.** 명령 이름·mode 이름·저장소
+이름으로 지은 시스템 temp 경로(`/tmp/cr3days/...`)는 모든 저장소에서 같은 값이 되고,
+충돌해도 오류 대신 다른 저장소의 내용을 읽게 만든다. Guard의 fingerprint 검증은 Git
+상태만 비교하므로 이 오염을 잡지 못한다. 중간 파일은 항상 자기 세션의 snapshot 아래에
+만든다. 규칙은 `review-execution.md` §1.5다.
+
+### 동일 작업 트리의 동시 실행
 
 동일 작업 트리에서 여러 세션이 동시에 파일을 편집하면 어떤 프롬프트도 완전한 안전을 보장할 수 없다.
 

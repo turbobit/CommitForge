@@ -128,6 +128,55 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertTrue(finished["snapshot_removed"])
         self.assertFalse(clean_snapshot.exists())
 
+    def test_agent_input_subdirectory_survives_audit_but_root_file_does_not(self) -> None:
+        """review-execution.md §1.5 depends on subdirectories being invisible to the audit.
+
+        Reviewer hand-off files must live somewhere per-repository and per-session so
+        that concurrent runs in different repositories cannot read each other's diffs.
+        The snapshot is that place only if extra content does not fail `finish`.
+        """
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+
+        _, started = self.guard("begin", "--session", "agent-input-session")
+        snapshot = Path(started["snapshot"])
+
+        agent_input = snapshot / "agent-input"
+        agent_input.mkdir()
+        (agent_input / "shard-1.diff").write_text("diff --git a/x b/x\n", encoding="utf-8")
+
+        _, audited = self.guard(
+            "audit-snapshot",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        )
+        self.assertTrue(audited["ok"])
+        self.assertEqual(audited["unexpected"], [])
+
+        stray = snapshot / "stray.diff"
+        stray.write_text("at the snapshot root\n", encoding="utf-8")
+        proc, rejected = self.guard(
+            "audit-snapshot",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertFalse(rejected["ok"])
+        self.assertIn("unexpected=['stray.diff']", rejected["error"])
+        stray.unlink()
+
+        run(["git", "restore", "--worktree", "--staged", "."], self.tmp)
+        _, finished = self.guard(
+            "finish",
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        )
+        self.assertTrue(finished["snapshot_removed"])
+        self.assertFalse(snapshot.exists())
+
     def test_snapshot_preserves_diff_without_acquiring_lock(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
         (self.tmp / "untracked.txt").write_text("new\n", encoding="utf-8")

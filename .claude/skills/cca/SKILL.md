@@ -246,7 +246,7 @@ subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`�
 
 baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인증·데이터 손실 finding은 suppress하지 않는다.
 
-각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다.
+각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다. diff가 커서 prompt에 직접 담지 못하면 `review-execution.md` §1.5를 따른다. 중간 파일은 `<snapshot>/agent-input/` 아래에만 만들고, `/tmp` 등 시스템 temp의 고정 경로는 저장소 간에 겹치므로 쓰지 않는다.
 
 - Agent가 설치되지 않았거나 실행할 수 없으면 main agent가 동일 관점을 직접 수행한다.
 - UI가 없으면 UX/A11y, 운영 동작이 없으면 Observability처럼 적용 불가능한 관점은 생략하지 말고 `N/A`와 근거를 반환한다.

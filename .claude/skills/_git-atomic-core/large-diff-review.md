@@ -31,16 +31,20 @@
 1. 전체 hunk inventory와 cross-file contract graph를 먼저 만든다.
 2. package/domain/runtime boundary로 shard한다. 파일 수만 균등 분할하지 않는다.
 3. schema·API·event·shared type·migration은 생산자와 소비자 shard를 교차 연결한다.
-4. core 3명에게 domain shard와 Correctness, Security, Architecture 관점을
+4. shard diff를 prompt에 직접 담지 못하면 `review-execution.md` §1.5를 따른다.
+   shard 파일은 `<snapshot>/agent-input/shard-<n>.diff`처럼 snapshot 하위에만 만든다.
+   shard 이름은 저장소 안에서만 유일하므로, 시스템 temp에 두면 동시에 실행 중인
+   다른 저장소의 shard와 같은 경로가 되어 reviewer가 남의 diff를 읽는다.
+5. core 3명에게 domain shard와 Correctness, Security, Architecture 관점을
    겹쳐 배정하고 Testing, Reliability, UX, Migration, Requirements, Release,
    Domain trigger에 따라 specialist를 추가한다. 모든 shard에서 Line·Correctness
    coverage를 유지한다.
-5. Security·Architecture owner는 개별 shard에 갇히지 않고 전체 contract graph를
+6. Security·Architecture owner는 개별 shard에 갇히지 않고 전체 contract graph를
    검토하며 관련 owner에게 `SendMessage`로 교차검증을 요청한다.
-6. lead aggregator가 finding stable ID, 반론, 중복을 통합한다. shard 하나가
+7. lead aggregator가 finding stable ID, 반론, 중복을 통합한다. shard 하나가
    끝날 때마다 그 shard의 판정을 `ledger.py record`로 즉시 적재한다. lead는
    판정을 컨텍스트에 누적하지 않는다.
-7. 전체 diff의 삭제 동작, wrapper/proxy, public contract를 다시 확인한다.
+8. 전체 diff의 삭제 동작, wrapper/proxy, public contract를 다시 확인한다.
    미검토 hunk가 0인지는 기억이 아니라 `ledger.py status`의 `complete`와
    `pending`으로 확인한다.
 

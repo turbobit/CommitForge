@@ -338,7 +338,7 @@ python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" <changed-
 `cca-privacy-governance-reviewer`, `cca-release-deployment-reviewer`,
 `cca-requirements-product-reviewer`.
 
-각 agent에 `review-only` 모드, 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 제공한다. Agent는 shell과 파일 수정을 하지 않고 근거·정확한 위치·심각도·실패 시나리오를 반환하며 Atomic Commit 계획이나 메시지 후보를 만들지 않는다.
+각 agent에 `review-only` 모드, 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 제공한다. Agent는 shell과 파일 수정을 하지 않고 근거·정확한 위치·심각도·실패 시나리오를 반환하며 Atomic Commit 계획이나 메시지 후보를 만들지 않는다. diff가 커서 prompt에 직접 담지 못하면 `review-execution.md` §1.5를 따른다. 중간 파일은 `<snapshot>/agent-input/` 아래에만 만들고, `/tmp` 등 시스템 temp의 고정 경로는 저장소 간에 겹치므로 쓰지 않는다.
 
 - 설치되지 않은 agent 관점은 main agent가 직접 수행한다.
 - 적용 불가능한 관점도 `N/A`와 근거를 남긴다.
