@@ -23,6 +23,34 @@ def classify(*paths: str, context: str = "") -> dict:
     return json.loads(proc.stdout)
 
 
+class DataMigrationTriggerTest(unittest.TestCase):
+    """실측으로 확인한 미탐지 경로가 활성화되어야 한다."""
+
+    def test_plural_schema_directory_activates_data_migration(self) -> None:
+        # 기존 패턴은 `schema`만 있어 복수형 디렉터리를 놓쳤다.
+        result = classify("src/schemas/user.py")
+        self.assertIn("cca-data-migration-reviewer", result["active"])
+
+    def test_singular_schema_directory_still_activates(self) -> None:
+        result = classify("src/schema/user.py")
+        self.assertIn("cca-data-migration-reviewer", result["active"])
+
+    def test_schema_definition_files_activate_data_migration(self) -> None:
+        for path in ("api/user.proto", "events/click.avsc"):
+            with self.subTest(path=path):
+                result = classify(path)
+                self.assertIn("cca-data-migration-reviewer", result["active"])
+
+    def test_storage_format_paths_activate_data_migration(self) -> None:
+        result = classify("config/storage-format.yaml")
+        self.assertIn("cca-data-migration-reviewer", result["active"])
+
+    def test_unrelated_source_does_not_activate_data_migration(self) -> None:
+        # 패턴은 하한선이다. 넓히더라도 평범한 소스를 끌어들이면 안 된다.
+        result = classify("src/ui/button.tsx", "docs/readme.md")
+        self.assertNotIn("cca-data-migration-reviewer", result["active"])
+
+
 class ReliabilityTriggerTest(unittest.TestCase):
     def test_lock_and_recovery_paths_activate_reliability_reviewer(self) -> None:
         result = classify(

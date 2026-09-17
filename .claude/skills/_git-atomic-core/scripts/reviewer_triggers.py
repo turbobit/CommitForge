@@ -21,10 +21,15 @@ CONTEXT_SOURCE = "context"
 
 RULES: dict[str, tuple[str, ...]] = {
     "cca-data-migration-reviewer": (
-        r"(^|/)(migrations?|schema|prisma)(/|$)",
-        r"\.(sql|ddl)$",
+        # `schemas?` because a plural directory (`src/schemas/`) is as common as
+        # the singular and was silently missed.
+        r"(^|/)(migrations?|schemas?|prisma)(/|$)",
+        # Schema definition files carry the storage contract even when no
+        # directory name says so.
+        r"\.(sql|ddl|proto|avsc)$",
         r"(^|/)(models?|entities)/",
         r"(backfill|data[-_]?migration)",
+        r"(storage[-_]?format)",
     ),
     "cca-dependency-supply-chain-reviewer": (
         r"(^|/)(package(-lock)?\.json|yarn\.lock|pnpm-lock\.yaml)$",
