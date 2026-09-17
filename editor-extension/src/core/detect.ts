@@ -259,6 +259,8 @@ export async function detectInstall(
     totalExact: total,
     corePathOk,
     hooksRegistered,
+    markerVersion: marker?.version ?? null,
+    bundleVersion: manifest.version,
   });
 
   if (state === "ok" && marker && marker.version !== manifest.version) {
@@ -291,10 +293,26 @@ function classify(input: {
   totalExact: number;
   corePathOk: boolean;
   hooksRegistered: boolean;
+  markerVersion: string | null;
+  bundleVersion: string;
 }): InstallState {
+  // 파일이 실제로 다르고 마커가 다른 버전을 가리키면, 그 차이는 손상이 아니라
+  // 버전 차이의 결과다. 아래 개수 휴리스틱보다 먼저 판정해야 한다. 버전이
+  // 올라갈 때 모든 파일이 바뀌는 경우는 없으므로, 개수로 추정하면 정상적인
+  // 버전 차이가 거의 항상 손상으로 보고된다. 번들에만 있는 파일이 설치본에
+  // 없는 것도 그 버전에서 삭제된 파일일 수 있으므로 missingCount보다 앞선다.
+  //
+  // 파일이 전부 일치하는데 마커만 다른 경우는 제외한다. 그때는 설치 내용이 곧
+  // 번들이므로 낡은 것은 마커뿐이고, 아래에서 ok로 판정한 뒤 경고만 남긴다.
+  const differs = input.missingCount > 0 || input.mismatchedCount > 0;
+  if (differs && input.markerVersion && input.markerVersion !== input.bundleVersion) {
+    return "version-mismatch";
+  }
+
   if (input.missingCount > 0) return "corrupt";
 
-  // 전부 다르면 다른 버전, 일부만 다르면 손상으로 본다.
+  // 마커가 없어 버전을 확인할 수 없을 때만 개수로 추정한다. 전부 다르면 다른
+  // 버전, 일부만 다르면 손상으로 본다.
   if (input.mismatchedCount > 0) {
     return input.mismatchedCount === input.totalExact ? "version-mismatch" : "corrupt";
   }

@@ -41,7 +41,12 @@ function buildManifest(coreTemplatePath: string): Manifest {
 /** 정상 설치 상태를 임시 디렉터리에 만든다. */
 async function makeInstall(
   root: string,
-  opts: { marker?: boolean; corePath?: string; hooks?: boolean } = {},
+  opts: {
+    marker?: boolean;
+    corePath?: string;
+    hooks?: boolean;
+    markerVersion?: string;
+  } = {},
 ): Promise<string> {
   const claudeDir = join(root, ".claude");
   const corePath = opts.corePath ?? join(claudeDir, "skills", "_git-atomic-core");
@@ -62,7 +67,7 @@ async function makeInstall(
       join(claudeDir, ".commitforge-install.json"),
       JSON.stringify({
         schema: "commitforge-install/v1",
-        version: "1.15.0",
+        version: opts.markerVersion ?? "1.15.0",
         scope: "project",
         installed_at: "2026-09-11T08:12:03Z",
         python: "/usr/bin/python3",
@@ -146,6 +151,42 @@ describe("detectInstall", () => {
     expect(report.installedVersion).toBe("1.15.0");
     expect(report.corePathOk).toBe(true);
     expect(report.hooksRegistered).toBe(true);
+  });
+
+  it("마커가 번들과 다른 버전이면 일부만 달라도 version-mismatch다", async () => {
+    // 버전이 올라갈 때 모든 파일이 바뀌는 경우는 없다. 개수로 추정하면
+    // 정상적인 버전 차이가 거의 항상 손상으로 보고된다.
+    const claudeDir = await makeInstall(root, { markerVersion: "1.18.0" });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(join(claudeDir, "agents", "cca-git-reviewer.md"), "changed\n");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("version-mismatch");
+    expect(report.installedVersion).toBe("1.18.0");
+  });
+
+  it("마커가 번들과 다른 버전이면 파일 누락도 version-mismatch다", async () => {
+    // 번들 매니페스트에 있는 파일이 설치본에 없는 것은, 그 버전에서 삭제된
+    // 파일일 수 있다. 손상으로 단정하지 않는다.
+    const claudeDir = await makeInstall(root, { markerVersion: "1.18.0" });
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await rm(join(claudeDir, "agents", "cca-git-reviewer.md"));
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("version-mismatch");
+  });
+
+  it("마커가 번들과 같은 버전인데 일부만 다르면 corrupt다", async () => {
+    // 같은 버전인데 파일이 다르면 그것이 진짜 손상이다.
+    const claudeDir = await makeInstall(root);
+    const corePath = join(claudeDir, "skills", "_git-atomic-core");
+    await writeFile(join(claudeDir, "agents", "cca-git-reviewer.md"), "changed\n");
+
+    const report = await detectInstall(claudeDir, buildManifest(corePath), "project");
+
+    expect(report.state).toBe("corrupt");
   });
 
   it("해시가 전부 다르면 version-mismatch다", async () => {
