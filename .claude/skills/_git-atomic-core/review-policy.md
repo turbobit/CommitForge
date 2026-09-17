@@ -43,8 +43,19 @@ requirements:
   격리 검증이 이 값 미만으로 판정한 finding을 `REJECTED`로 바꾼다. 값을 낮추면
   잡음이 늘고, 높이면 실제 결함을 기각할 수 있다. 검증 대상 자체는
   `blocking_severity` 이상으로 한정된다.
-- `confidence_threshold`로 secret, 인증·인가, 데이터 손실 finding을 일괄 기각할 수
-  없다. 이 영역은 검증이 명시적 근거로 기각한 경우에만 `REJECTED`다.
+- `confidence_threshold`로 일괄 기각할 수 없는 영역이 있다. 이 목록은 **되돌릴 수
+  없는 피해**를 기준으로 하며, 검증이 명시적 근거로 기각한 경우에만 `REJECTED`다.
+  - secret·자격증명 노출
+  - 인증·인가 우회
+  - 데이터 손실·손상
+  - 복구 불가능한 migration·데이터 변환. `review-gates.md` §2 CRITICAL의
+    "잘못된 migration으로 복구 곤란한 상태"와 같은 기준이다
+  - 재시작 없이 회복되지 않는 자원 고갈
+- 이 목록은 **어느 reviewer가 찾았는지가 아니라 피해 유형으로** 판정한다.
+  Performance reviewer가 찾은 데이터 손실도 보호되고, Security reviewer가 찾은
+  저영향 finding은 보호되지 않는다.
+- 하위 호환성 파괴는 이 목록에 넣지 않는다. rollback으로 회복 가능하므로 기준에
+  들지 않으며, 목록을 더 넓히면 `confidence_threshold`가 잡음 억제 기능을 잃는다.
 - exclude는 generated/vendor noise를 줄이기 위한 것이며 secret, public contract, migration, 호출자 영향은 제외하지 않는다.
 - policy가 잘못되거나 상충하면 안전한 기본값을 사용하고 경고한다.
 - requirements source가 실제로 존재할 때만 Requirements/Product reviewer 근거로 사용한다.
