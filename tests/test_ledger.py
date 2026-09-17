@@ -2101,6 +2101,52 @@ class SkillScopedReviewerRolesTest(LedgerTestCase):
         _, verified = self.verify(started["session"])
         self.assertTrue(verified["ok"])
 
+    def test_every_skill_declares_its_own_role_set(self) -> None:
+        # review-ledger.md §1의 표는 이 매핑의 사본이다. 어긋나면 코드가 이긴다.
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("cf_ledger", LEDGER)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        self.assertEqual(
+            {name: sorted(roles) for name, roles in module.REQUIRED_REVIEWER_ROLES.items()},
+            {
+                "cr": ["architecture", "correctness", "line", "performance", "security"],
+                "cca": [
+                    "architecture", "correctness", "git", "line", "performance", "security",
+                ],
+                "cpr": [
+                    "architecture", "correctness", "line", "performance", "release", "security",
+                ],
+                "cp": [
+                    "architecture", "correctness", "line", "performance", "release", "security",
+                ],
+            },
+        )
+
+    def test_ccr_has_no_entry_and_falls_back(self) -> None:
+        # /ccr은 Guard begin을 호출하지 않아 snapshot이 없고, 원장은 snapshot
+        # 안에 산다. 매핑에 넣으면 만들 수 없는 원장을 약속하는 셈이다.
+        started, ids = self.prepared("ccr")
+        self.cover(started["session"], ids, self.CR_ACTIVE[:3])
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_cpr_requires_release_perspective(self) -> None:
+        started, ids = self.prepared("cpr")
+        self.cover(started["session"], ids, self.CR_ACTIVE)
+        _, refused = self.verify(started["session"], check=False)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+        self.assertEqual(refused["reviewer_roles_missing"], ["release"])
+
+    def test_cca_requires_git_perspective(self) -> None:
+        started, ids = self.prepared("cca")
+        self.cover(started["session"], ids, self.CR_ACTIVE)
+        _, refused = self.verify(started["session"], check=False)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+        self.assertEqual(refused["reviewer_roles_missing"], ["git"])
+
     def test_empty_denominator_still_passes_with_extra_roles(self) -> None:
         # guard.py의 `if summary["total"]:`가 빈 분모에서 관점 게이트를
         # 건너뛴다. role이 늘어도 "검토 대상 없음" 종료는 열려 있어야 한다.

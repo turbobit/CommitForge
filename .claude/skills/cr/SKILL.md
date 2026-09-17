@@ -115,12 +115,13 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 6. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
 7. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
 8. `.claude/skills/_git-atomic-core/review-execution.md`
-9. `.claude/skills/_git-atomic-core/review-policy.md`
-10. `.claude/skills/_git-atomic-core/reporting-formats.md`
-11. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
-12. `.claude/skills/_git-atomic-core/large-diff-review.md`
-13. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
-14. `.claude/skills/_git-atomic-core/extended-modes.md` — `release`·`emergency`·`learn`에서만 읽는다.
+9. `.claude/skills/_git-atomic-core/review-ledger.md`
+10. `.claude/skills/_git-atomic-core/review-policy.md`
+11. `.claude/skills/_git-atomic-core/reporting-formats.md`
+12. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
+13. `.claude/skills/_git-atomic-core/large-diff-review.md`
+14. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+15. `.claude/skills/_git-atomic-core/extended-modes.md` — `release`·`emergency`·`learn`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -215,31 +216,10 @@ merge-base`·`pr_context.py`로 계산되기 전에는 알 수 없기 때문이�
 
 ### 1.5.1 상태 확인과 재개
 
-Guard `begin` 직후 원장 상태를 먼저 확인한다.
-
-```bash
-python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" status \
-  --session "$COMMITFORGE_SESSION_ID"
-```
-
-- `exists`가 `false`면 신규 실행이다. 아래 1.5.2로 진행한다.
-- `exists`가 `true`이고 `fingerprint_matches_current`가 `true`면 **처음부터 다시 리뷰하지 않는다.** `pending`에 남은 id만 이어서 검토한다. 컴팩트로 대화 기억을 잃었더라도 원장이 진행 상황의 정본이다.
-- `fingerprint_matches_current`가 `false`면 원장과 저장소가 어긋난 상태다. 임의로 진행하지 말고 사용자에게 보고한다. `null`은 `inventory` 전의 정상 상태이므로 어긋난 것이 아니며, 1.5.2·1.5.3을 이어서 한다.
+Guard `begin` 직후 `ledger.py status`로 재개 여부를 판정한다. 판정 기준은
+`review-ledger.md` §3이다.
 
 ### 1.5.2 scope 선언
-
-scope는 **실제 리뷰 대상과 일치해야 한다.** 선언하지 않은 scope는 분모에
-들어가지 않으므로, 그 범위를 아무리 충실히 리뷰해도 종료 게이트에는 보이지
-않는다.
-
-게이트의 `ledger_empty_inventory`는 **snapshot에 변경이 있는데 분모가 0**일 때만
-발생한다. 원인은 (1) 리뷰 대상 scope 미선언(`pr`·`today`·`3days`·`weekly`·
-`--base`·`--range`에서 커밋 범위를 빠뜨렸거나 `working`을 빠뜨림) 또는
-(2) 분모 유실이다.
-
-분모가 0이어도 **snapshot이 비어 있으면 차단하지 않는다.** 아무것도 바뀌지 않은
-저장소의 `/cr`은 정상적인 빈 리뷰이며 §2의 "검토 대상 없음" 종료가 그대로
-동작한다. 선언한 커밋 범위에 commit이 없는 경우도 빈 리뷰이지 오류가 아니다.
 
 Guard `begin` 직후에는 아직 범위를 모르므로 `working`만 선언한다.
 
@@ -249,32 +229,26 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
 ```
 
 §2에서 `<A>..<B>`를 계산한 뒤, 커밋 범위를 리뷰하는 모드면 `init`을 한 번 더
-실행해 그 scope를 추가한다. `init`은 파괴적이지 않다. 기존 scope에 **합집합**으로
-더하며 `iteration`과 이미 기록한 판정을 보존한다. 이미 선언된 scope를 다시
-선언하면 아무 일도 일어나지 않는다.
+실행해 그 scope를 추가한다.
 
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
   --session "$COMMITFORGE_SESSION_ID" --scope "range:<A>..<B>"
 ```
 
+`/cr`에서 `ledger_empty_inventory`가 나는 전형적인 원인은 `pr`·`today`·`3days`·
+`weekly`·`--base`·`--range`에서 커밋 범위 scope를 빠뜨렸거나 `working`을 빠뜨린
+것이다. 나머지 규칙은 `review-ledger.md` §4다.
+
 ### 1.5.3 분모 생성
 
-모든 scope를 선언한 뒤 `inventory`를 실행한다.
+모든 scope를 선언한 뒤 `inventory`를 한 번 실행한다. 규칙은 `review-ledger.md`
+§5다.
 
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" inventory \
   --session "$COMMITFORGE_SESSION_ID"
 ```
-
-`inventory`가 반환한 id 집합이 커버리지의 분모다. 이 목록을 직접 만들거나 수정하지 않는다.
-
-- `inventory`는 같은 결과를 다시 만들 때만 멱등하다. 이미 분모가 있는 세대에서
-  다른 id 집합이 나오면 `ledger_inventory_conflict`로 거부한다. 수정 후 분모를
-  바꾸는 유일한 방법은 §4의 `advance`다.
-- `inventory` 이후에 scope를 추가하면 활성 세대가 해제되므로 `inventory`를 다시
-  실행해 분모를 넓힌다. 넓어진 분모는 이전 분모의 상위집합이므로 이미 기록한
-  판정은 그대로 유효하다.
 - `coverage.scopes_without_entries`에 남은 scope는 분모에 아무것도 넣지 못한 범위다. 빈 범위면 정상이지만 base·기간·PR 계산 오류 신호일 수 있으므로 최종 보고에 표시한다. 변경이 없는 저장소에서도 `inventory`를 건너뛰지 않는다. 생략하면 `finish`가 `ledger_no_generation`으로 차단한다.
 
 ## 2. 변경 전체 스캔

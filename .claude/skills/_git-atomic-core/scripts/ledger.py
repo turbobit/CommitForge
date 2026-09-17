@@ -41,8 +41,9 @@ REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
 # review-execution.md §2 makes Line, Correctness and Security mandatory on
 # every change, and Architecture (which owns contract and compatibility) and
 # Performance are mandatory for `/cr`. The set is keyed by the skill that
-# created the ledger because `/cca`, `/cpr`, `/cp` and `/ccr` will each carry a
-# different one when they adopt the ledger; only `cr` creates one today.
+# created the ledger because each carries a different one: `/cca` adds Git
+# (atomicity), and `/cpr`/`/cp` add Release because a PR is where deployment
+# order and rollback become real.
 #
 # Matching is by role keyword rather than by exact agent filename: Agent Team
 # mode packs these perspectives into named core teammates
@@ -51,8 +52,16 @@ REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
 # review-execution.md §3.5 forbids abbreviating a role keyword in a teammate
 # name -- `core-arch-...` would silently fail to satisfy `architecture` and
 # would block a review that actually covered it.
+# `/ccr` is absent on purpose. It never calls Guard `begin`, so it has no
+# snapshot, and the ledger lives inside one. Giving it a snapshot would also
+# give it the exclusive worktree lock, which would stop a lightweight planning
+# command from running alongside a review -- a worse trade than the coverage it
+# would buy, since `/cc` and `/cca` re-derive the plan anyway.
 REQUIRED_REVIEWER_ROLES: dict[str, tuple[str, ...]] = {
     "cr": ("line", "correctness", "security", "architecture", "performance"),
+    "cca": ("line", "correctness", "security", "architecture", "performance", "git"),
+    "cpr": ("line", "correctness", "security", "architecture", "performance", "release"),
+    "cp": ("line", "correctness", "security", "architecture", "performance", "release"),
 }
 
 # A ledger with no `skill` field predates the mapping, and an unmapped name is a

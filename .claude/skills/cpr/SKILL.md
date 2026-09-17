@@ -39,6 +39,7 @@ allowed-tools:
   - Bash(gh pr view *)
   - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/pr_context.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py")'
@@ -86,10 +87,11 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 3. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
 4. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
 5. `.claude/skills/_git-atomic-core/review-execution.md`
-6. `.claude/skills/_git-atomic-core/review-gates.md` — §1~§4의 finding 요건과 심각도 정의를 적용한다. §5·§6은 `/cr`·`/cca` 전용이므로 따르지 않는다.
-7. `.claude/skills/_git-atomic-core/review-policy.md`
-8. `.claude/skills/_git-atomic-core/validation-strategy.md`
-9. `.claude/skills/_git-atomic-core/large-diff-review.md`
+6. `.claude/skills/_git-atomic-core/review-ledger.md`
+7. `.claude/skills/_git-atomic-core/review-gates.md` — §1~§4의 finding 요건과 심각도 정의를 적용한다. §5·§6은 `/cr`·`/cca` 전용이므로 따르지 않는다.
+8. `.claude/skills/_git-atomic-core/review-policy.md`
+9. `.claude/skills/_git-atomic-core/validation-strategy.md`
+10. `.claude/skills/_git-atomic-core/large-diff-review.md`
 
 언어·프레임워크에 해당하는 `language-api-pitfalls.md` 섹션만 추가로 읽는다. 저장소의 PR template, `CLAUDE.md`, `AGENTS.md`, 기여 가이드, `.commitforge/review.yml`, `.commitforge/profile.md`, `.commitforge/profile.json` 학습 프로필도 적용한다.
 
@@ -115,17 +117,28 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
    Guard 실패 후 `git` 명령으로 우회해 리뷰를 진행하지 않는다.
 2. `--base`가 없으면 GitHub 기본 branch를 읽는다.
 3. `pr_context.py`로 local base/head/range/clean 상태를 계산한다. 현재가 base인 `main`/`master`이면 `--allow-base-head`로 remote tracking base 대비 ahead commit을 분석한다.
-4. `--team`·`--no-team` 충돌을 검사한다. 옵션이 없고 환경이 활성화되어 있으면
+4. 리뷰 원장을 연다. 규약은 `review-ledger.md`다. Guard `begin` 직후
+   `ledger.py status`로 재개 여부를 판정하고, 범위가 확정된 지금
+   `init --scope "range:<A>..<B>" --skill cpr`과 `inventory`를 실행한다.
+   원장을 만들지 않으면 마지막 검증의 `--require-ledger`가 차단한다.
+5. `--team`·`--no-team` 충돌을 검사한다. 옵션이 없고 환경이 활성화되어 있으면
    Team을 기본으로 하되 명백히 사소한 단일 영역 변경만 축소한다. Team이면
    core 3명이 domain/runtime shard, shared task와 peer messaging으로 committed
    range의 모든 hunk, contract와 최종 net effect를 교차검증한다. Testing·
    Reliability·UX·Migration·Requirements·Release·Domain trigger에 따라
-   specialist를 추가한다. Team fallback에서는 기존 subagent를 사용한다.
-5. 저장소 정의 검증을 실행한다. `--no-verify`여도 safety 검사는 유지한다.
-6. PR template에 맞춘 제목·본문 초안을 작성한다.
-7. readiness와 blocker를 결정한다.
-8. `verify-review --source-read-only`와 `finish --review-only --source-read-only`로 불변 상태를 검증한다.
-9. PR 초안과 결과를 한글로 보고한다.
+   specialist를 추가한다. Team fallback에서는 기존 subagent를 사용한다. reviewer batch 결과를
+   받을 때마다 lead가 즉시 `ledger.py record`로 hunk 판정과 reviewer 관점을
+   적재한다. 필수 관점은 line·correctness·security·architecture·performance·
+   release 여섯이며, 적용되지 않는 관점은 근거를 적어 `N_A`로 기록한다.
+6. 저장소 정의 검증을 실행한다. `--no-verify`여도 safety 검사는 유지한다.
+7. PR template에 맞춘 제목·본문 초안을 작성한다.
+8. readiness와 blocker를 결정한다.
+9. `finish` 이전에 `ledger.py report`를 받아 보관한다. `finish`는 snapshot을
+   지우므로 그 뒤에는 실행할 수 없다. 이어서
+   `verify-review --source-read-only --require-ledger`와
+   `finish --review-only --source-read-only --require-ledger`로 불변 상태와
+   원장 커버리지를 검증한다.
+10. PR 초안과 결과를 한글로 보고한다.
 
 ## 보고
 

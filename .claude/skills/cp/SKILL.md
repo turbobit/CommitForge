@@ -38,6 +38,7 @@ allowed-tools:
   - Bash(gh pr view *)
   - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/pr_context.py" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
 ---
@@ -85,10 +86,11 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 3. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
 4. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
 5. `.claude/skills/_git-atomic-core/review-execution.md`
-6. `.claude/skills/_git-atomic-core/review-gates.md` — §1~§4의 finding 요건과 심각도 정의를 적용한다. §5·§6은 `/cr`·`/cca` 전용이므로 따르지 않는다.
-7. `.claude/skills/_git-atomic-core/review-policy.md`
-8. `.claude/skills/_git-atomic-core/validation-strategy.md`
-9. `.claude/skills/_git-atomic-core/large-diff-review.md`
+6. `.claude/skills/_git-atomic-core/review-ledger.md`
+7. `.claude/skills/_git-atomic-core/review-gates.md` — §1~§4의 finding 요건과 심각도 정의를 적용한다. §5·§6은 `/cr`·`/cca` 전용이므로 따르지 않는다.
+8. `.claude/skills/_git-atomic-core/review-policy.md`
+9. `.claude/skills/_git-atomic-core/validation-strategy.md`
+10. `.claude/skills/_git-atomic-core/large-diff-review.md`
 
 언어·프레임워크에 해당하는 `language-api-pitfalls.md` 섹션만 추가로 읽는다. 저장소 PR template, 프로젝트 규칙, `.commitforge/profile.md`, `.commitforge/profile.json` 학습 프로필을 순서대로 적용한다.
 
@@ -114,16 +116,25 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
    모두 통과한 stale lock만 제거하며 남은 lock은 강제로 삭제하지 않는다.
    Guard 실패 후 `git` 명령으로 우회해 push나 PR 생성을 진행하지 않는다.
 2. base를 확정하고 `pr_context.py`로 clean branch와 committed range를 계산한다. 현재가 base인 `main`/`master`이면 `--allow-base-head`를 사용한다.
-3. 모든 hunk와 net effect를 심층 리뷰하고 프로젝트 검증을 수행한다.
-4. blocker가 없을 때 PR template 기반 제목·본문을 확정한다.
-5. 현재가 `main`/`master`이면 의미에 맞는 충돌 없는 branch 이름을 검증하고 현재 commit에서 새 branch를 만든다.
-6. 열린 동일-head PR을 조회한다. 있으면 새 PR을 만들지 않고 기존 URL을 보고한다.
-7. `ls-remote` SHA와 최신 local tracking ref가 일치하는지 확인한 뒤 fast-forward 가능성을 검증한다. tracking ref가 없거나 stale이면 자동 fetch하지 않고 차단한다.
-8. 현재 HEAD를 검증된 동일 이름 remote branch로 force 없이 push한다.
-9. remote SHA가 현재 HEAD인지 확인한다.
-10. snapshot 내부 PR 본문 파일로 `gh pr create`를 실행한다. `--draft`를 정확히 반영한다.
-11. 생성된 PR number·URL·base·head·draft·title을 다시 조회한다.
-12. source/index/commit SHA 불변을 확인한다. 자동 분기하지 않았다면 Guard의 source-read-only 절차를 사용하고, 자동 분기했다면 `--expected-branch "<validated-branch>"`로 허용된 branch 이름 변경만 검증한다.
+3. 리뷰 원장을 연다. 규약은 `review-ledger.md`다. 범위가 확정된 지금
+   `ledger.py status`로 재개 여부를 판정하고
+   `init --scope "range:<A>..<B>" --skill cp`와 `inventory`를 실행한다.
+4. 모든 hunk와 net effect를 심층 리뷰하고 프로젝트 검증을 수행한다. reviewer
+   batch 결과를 받을 때마다 lead가 즉시 `ledger.py record`로 hunk 판정과
+   reviewer 관점을 적재한다. 필수 관점은 line·correctness·security·
+   architecture·performance·release 여섯이며, 적용되지 않는 관점은 근거를 적어
+   `N_A`로 기록한다. push 전에 원장이 완결되어야 한다.
+5. blocker가 없을 때 PR template 기반 제목·본문을 확정한다.
+6. 현재가 `main`/`master`이면 의미에 맞는 충돌 없는 branch 이름을 검증하고 현재 commit에서 새 branch를 만든다.
+7. 열린 동일-head PR을 조회한다. 있으면 새 PR을 만들지 않고 기존 URL을 보고한다.
+8. `ls-remote` SHA와 최신 local tracking ref가 일치하는지 확인한 뒤 fast-forward 가능성을 검증한다. tracking ref가 없거나 stale이면 자동 fetch하지 않고 차단한다.
+9. 현재 HEAD를 검증된 동일 이름 remote branch로 force 없이 push한다.
+10. remote SHA가 현재 HEAD인지 확인한다.
+11. snapshot 내부 PR 본문 파일로 `gh pr create`를 실행한다. `--draft`를 정확히 반영한다.
+12. 생성된 PR number·URL·base·head·draft·title을 다시 조회한다.
+13. `finish` 이전에 `ledger.py report`를 받아 보관한다. 이어서 source/index/commit
+    SHA 불변과 원장 커버리지를 `--require-ledger`로 함께 확인한다. 자동
+    분기하지 않았다면 Guard의 source-read-only 절차를 사용하고, 자동 분기했다면 `--expected-branch "<validated-branch>"`로 허용된 branch 이름 변경만 검증한다.
 
 ## 부분 실패
 
