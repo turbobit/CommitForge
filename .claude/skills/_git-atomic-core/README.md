@@ -10,7 +10,7 @@
 - `commit-message-guide.md`: 한글 메시지
 - `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
 - `lock-cleanup.md`: 모든 명령의 현재 worktree `clean` 조기 종료 계약
-- `review-gates.md`: `/cr`·`/cca` 품질 gate
+- `review-gates.md`: 심각도 정의와 reviewer 관점 체크리스트(모든 리뷰 명령어), `/cr` 완료 Gate와 `/cca` Commit Gate
 - `extended-modes.md`: `/cr`·`/cca`의 today|3days|weekly|release|emergency|learn 분기와 프로젝트 프로필
 - `period-review-modes.md`: `/cr`·`/cca`의 강화된 today·3days·weekly 범위·원장·net-effect 리뷰
 - `deep-review-protocol.md`: line-by-line, removed behavior, cross-file, wrapper/proxy, UX·observability 검토

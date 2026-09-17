@@ -85,9 +85,10 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 3. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
 4. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
 5. `.claude/skills/_git-atomic-core/review-execution.md`
-6. `.claude/skills/_git-atomic-core/review-policy.md`
-7. `.claude/skills/_git-atomic-core/validation-strategy.md`
-8. `.claude/skills/_git-atomic-core/large-diff-review.md`
+6. `.claude/skills/_git-atomic-core/review-gates.md` — §1~§4의 finding 요건과 심각도 정의를 적용한다. §5·§6은 `/cr`·`/cca` 전용이므로 따르지 않는다.
+7. `.claude/skills/_git-atomic-core/review-policy.md`
+8. `.claude/skills/_git-atomic-core/validation-strategy.md`
+9. `.claude/skills/_git-atomic-core/large-diff-review.md`
 
 언어·프레임워크에 해당하는 `language-api-pitfalls.md` 섹션만 추가로 읽는다. 저장소 PR template, 프로젝트 규칙, `.commitforge/profile.md`, `.commitforge/profile.json` 학습 프로필을 순서대로 적용한다.
 
