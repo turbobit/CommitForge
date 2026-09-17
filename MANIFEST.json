@@ -3,7 +3,7 @@
   "version": "1.19.0",
   "reproducible": true,
   "file_count": 154,
-  "total_bytes": 1753089,
+  "total_bytes": 1756678,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -342,8 +342,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 28244,
-      "sha256": "640ea7ddb6ca9aead4d77582fcf0659a21e53f5d7fd9fbf8253b0e5c3a9a821b"
+      "size": 31833,
+      "sha256": "cad10b6922d563737990ca49f4b6e3a0799d3a67a2e1baab97ee923122f05712"
     },
     {
       "path": "INSTALL.md",

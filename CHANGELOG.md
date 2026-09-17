@@ -1,5 +1,54 @@
 # Changelog
 
+## 1.19.0 — 2026-09-17
+
+- `/cpr`·`/cp`에 리뷰 원장을 도입했다. 원장 규약을 cr/SKILL.md에서
+  `_git-atomic-core/review-ledger.md`로 추출해 참조로 바꾸고, 두 명령은
+  committed range를 scope로 원장을 연다. PR은 배포 순서와 rollback이 실제가
+  되는 지점이라 필수 관점에 release를 더한다. `/ccr`은 제외 — Guard begin을
+  호출하지 않아 snapshot이 없으며, snapshot을 주면 배타적 락이 가벼운 계획
+  명령을 리뷰와 동시에 돌 수 없게 만든다
+- `/cca`에 리뷰 원장과 봉인(seal)을 추가했다. `/cca`는 리뷰 뒤 의도적으로
+  staging·commit을 해서 헤드 전이가 세대 fingerprint를 어긋나게 만들고
+  `ledger_stale`을 일으켰다. seal은 staging 직전에 게이트와 동일한 검사를
+  수행해 통과한 실행만 봉인하고, advance는 봉인을 해제한다
+- seal과 게이트의 판정을 `guard.py`의 `_ledger_gate_failure`에서 공용화했다.
+  두 곳에 같은 판정을 두면 어긋날 수 있고, seal이 게이트보다 느슨해지는 순간
+  우회가 된다
+- `/cr`에 계약 위험·성능 관점 강제를 배선하고, 필수 reviewer 관점을
+  명령어별로 선언 가능하게 변경했다. `/cpr`·`/cp`에 심각도 정의를 공급하고
+  기각 금지 목록을 피해 유형 기준으로 재정의했다. data/migration trigger가
+  놓치던 경로 3종을 추가했다
+- 익스텐션의 설치 시 다운그레이드 경고를 추가했다. 정리(reinstall)·업그레이드
+  명령은 번들 payload를 덮어쓰는데, 설치본이 번들보다 최신이면 버전이 뒤로
+  밀린다. 막지는 않되 dry-run 출력과 확인 모달에 다운그레이드임을 밝힌다
+- 익스텐션 버전을 저장소 VERSION에 맞춘다. 1.16.0에 머물러 있어 번들과
+  설치본 비교의 기준 자체가 낡아 있었다
+- 버전 차이를 손상으로 오판하던 설치 판정을 수정하고, 잘린 누락·불일치
+  목록에 총계와 남은 개수를 표시한다. payload 개수 단언은 절대값 대신
+  분류 불변식으로 바꾼다
+- 리뷰 게이트 강화의 설계 문서와 구현 계획을 `docs/superpowers/`에 추가했다
+
+## 1.18.0 — 2026-09-13
+
+- 모든 reviewer agent(17개)에 확신도(confidence)·보고 제외·판정 precedent
+  섹션을 추가했다. review-execution.md에 §3.1 확신도 등급 기준과 §3.6 격리
+  검증을 도입하고, ledger.py·report_validator.py에 confidence·verification
+  필드 검증과 verification summary를 추가한다. examples/review.yml에
+  confidence_threshold 설정이 들어간다
+- reviewer 관점 게이트로 Line·Correctness·Security 관점을 필수화했다.
+  coverage에 reviewer_roles·missing·unknown을 추가하고, finish·verify-review
+  에서 `ledger_reviewer_missing`·`ledger_reviewer_unknown`으로 차단한다
+  (`ledger_invalid_reviewer_status` 포함)
+- `cca-release-deployment-reviewer`를 신규 추가하고 reviewer_triggers.py를
+  대폭 확장했다(inactive, exclusions, context). large-diff 규모별 관점 배분
+  지침과 performance 관점의 메모리 누수·CPU 점유·main thread 정지 설명도
+  보강했다
+- 원장의 침묵 통과 경로를 막았다. 미판정 hunk가 finish에 도달하는 3개 경로,
+  분모 누락·원장 손상·세대 전이 순서, 빈 리뷰와 prefix 고정·존재 검사를
+  처리하고 verify.py 필수 목록에 ledger.py를 추가한다
+- `/cr` 원장 사용 순서와 판정 어휘 문서를 실제 구현에 맞췄다
+
 ## 1.17.0 — 2026-09-12
 
 - `/cr`에 리뷰 원장을 도입했다. `ledger.py`가 Guard 스냅샷과 커밋 범위에서 hunk
