@@ -1,6 +1,6 @@
 {
   "name": "CommitForge",
-  "version": "1.18.0",
+  "version": "1.19.0",
   "reproducible": true,
   "file_count": 154,
   "total_bytes": 1753089,
@@ -368,7 +368,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "04d659518a1793d5396007fcabdc9211a8c1db8406bf4e0fa8069171fdb06518"
+      "sha256": "c55c898de5079ee498d5f051b29815688154292df4d72ab91f1edb5497ac4e6e"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -418,12 +418,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "47f22a52953c7c85d8b815bb3035275117a5780dd219a4dc5a09dd457dd368d5"
+      "sha256": "f4d8b6dde8b60a7dfb92cf27229babf2696f01b7b5ef7043d81a11228a26aea3"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11665,
-      "sha256": "b7f6e9258e09450436801273fe64dc801eb3a83f59b0453e2193345de44eaa3e"
+      "sha256": "acb30837a90af84b1924eb9e09857e300fe3e9d44c1c956d3841b35a6c71351e"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
