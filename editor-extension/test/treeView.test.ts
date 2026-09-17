@@ -169,6 +169,30 @@ describe("buildTree - 설치 상태 5가지", () => {
     expect(missingLabels).toHaveLength(5);
     expect(labels(node)).toContain("불일치: mismatched.md");
   });
+
+  it("잘린 목록은 남은 개수를 알린다", () => {
+    // 앞 5개만 보여주면서 총계를 숨기면 "5개만 깨졌다"는 인상을 준다.
+    const report: InstallReport = {
+      ...baseReport,
+      state: "corrupt",
+      missingFiles: Array.from({ length: 8 }, (_, i) => `missing-${i}.md`),
+      mismatchedFiles: Array.from({ length: 37 }, (_, i) => `mismatched-${i}.md`),
+    };
+    const node = install(report);
+    expect(labels(node)).toContain("누락 8건 중 5건 표시, 3건 더 있음");
+    expect(labels(node)).toContain("불일치 37건 중 5건 표시, 32건 더 있음");
+  });
+
+  it("목록이 잘리지 않으면 남은 개수를 알리지 않는다", () => {
+    const report: InstallReport = {
+      ...baseReport,
+      state: "corrupt",
+      missingFiles: [],
+      mismatchedFiles: ["mismatched.md"],
+    };
+    const node = install(report);
+    expect(labels(node).some((label) => label.includes("더 있음"))).toBe(false);
+  });
 });
 
 function findInstallNodeFor(report: InstallReport): Node {

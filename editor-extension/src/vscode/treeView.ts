@@ -163,6 +163,22 @@ function scopeTooltip(scope: Scope, redundant: boolean): string {
  * `misconfigured`·`corrupt`처럼 손상됐을 때는 "없어도 됨"이라고 하면 안
  * 된다 — 실제로는 아무 쪽도 동작하지 않을 수 있다(리뷰 재현 1).
  */
+const FILE_DETAIL_LIMIT = 5;
+
+/**
+ * 목록을 앞 5개로 자르되, 잘렸으면 총계와 남은 수를 함께 알린다. 총계를 숨기면
+ * 37건이 깨진 설치가 "5건만 깨졌다"로 읽혀 심각도를 잘못 판단하게 된다.
+ */
+function pushFileDetails(details: string[], label: string, paths: string[]): void {
+  for (const path of paths.slice(0, FILE_DETAIL_LIMIT)) details.push(`${label}: ${path}`);
+  const hidden = paths.length - FILE_DETAIL_LIMIT;
+  if (hidden > 0) {
+    details.push(
+      `${label} ${paths.length}건 중 ${FILE_DETAIL_LIMIT}건 표시, ${hidden}건 더 있음`,
+    );
+  }
+}
+
 function installNode(report: InstallReport, otherUsable: boolean): Node {
   // statusBar.ts와 같은 규칙(displayedVersion, spec §5.1)을 쓴다 — 해시가
   // 판정 근거이므로 ok는 번들 버전을, version-mismatch는 마커 버전(없으면
@@ -178,8 +194,8 @@ function installNode(report: InstallReport, otherUsable: boolean): Node {
   if (!report.hooksRegistered && report.state !== "missing") {
     details.push("SessionEnd hook이 등록되지 않았습니다");
   }
-  for (const path of report.missingFiles.slice(0, 5)) details.push(`누락: ${path}`);
-  for (const path of report.mismatchedFiles.slice(0, 5)) details.push(`불일치: ${path}`);
+  pushFileDetails(details, "누락", report.missingFiles);
+  pushFileDetails(details, "불일치", report.mismatchedFiles);
 
   const description = redundant
     ? `${STATE_LABEL[report.state]} · 없어도 됨`
