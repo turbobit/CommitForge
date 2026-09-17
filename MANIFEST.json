@@ -2,13 +2,13 @@
   "name": "CommitForge",
   "version": "1.18.0",
   "reproducible": true,
-  "file_count": 151,
-  "total_bytes": 1663415,
+  "file_count": 153,
+  "total_bytes": 1723748,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
-      "size": 1735,
-      "sha256": "fbfcdcea33b8150bb4871b1f91a0c3d05b0abcc45a71e6ee290d114a34acf3d6"
+      "size": 2173,
+      "sha256": "af226ca58e1473a91e35eade51c55bac422db97841d9557fefaa87338a34e35a"
     },
     {
       "path": ".claude/agents/cca-correctness-reviewer.md",
@@ -92,8 +92,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 3091,
-      "sha256": "7f179703656f4ff73ef54ef13ec7d0a429d8352bf06247dd1755bcb4c2c73a67"
+      "size": 3183,
+      "sha256": "88765be3eafae44a80012076412245b1808c5db65f08b3b3be059ca6b4856c45"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -157,8 +157,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/period-review-modes.md",
-      "size": 5712,
-      "sha256": "4769c4eaefb9608f3a4000b6c34027b7ab811f2144d4619f6cbf0702b1530ecf"
+      "size": 5763,
+      "sha256": "0d55207e3a934c138806908a9c1fee79a03971da569f68077a778149acb66953"
     },
     {
       "path": ".claude/skills/_git-atomic-core/project-profiles.md",
@@ -187,18 +187,18 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 24015,
-      "sha256": "724f14bb0d10cfd475736618784f3f3c2f8af03b1e46d456e5ee64235bc39383"
+      "size": 25045,
+      "sha256": "2492c66b3d7153f8c85a075535b91f7b8a1668eaa87393a413034fc537c12489"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
-      "size": 6361,
-      "sha256": "3f4f46bc4803077f6d7d8cc187ca7a64ab8df6f2e7b0ee295dde3f6f6c98391f"
+      "size": 6829,
+      "sha256": "6db443034e2c31534d83fdbee4bf2c08494f5ead79b2b07f81998148afa1e656"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-policy.md",
-      "size": 2070,
-      "sha256": "9f2afcbdc9c29dfa9a30982afdc7616c6b44bb84c23c3687118c265fccd4dbda"
+      "size": 3075,
+      "sha256": "1b7a4e5e173094a39fbe87954f49a3dbab3474962725f6e78c544105e5f0aaf8"
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
@@ -232,8 +232,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 63003,
-      "sha256": "b7ef03f8d306be837bf3cd9c6db07a4ff20a01ba38df0b92b998aa99758c7d18"
+      "size": 64893,
+      "sha256": "a5adabab16738853cc8e96f32c082b84bb556f9a4c24e3f0765f5a0a021a11e3"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -257,8 +257,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py",
-      "size": 5855,
-      "sha256": "a8d15c2630fa3dcf34799bf5c1b74c2be3c81a90b7c2ba49b8d0fc4c7f51e161"
+      "size": 6138,
+      "sha256": "e3ed3e24f4da594e36c779e5c8076a1d149d97705fe81f8eb5ebf1bce5c4347a"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py",
@@ -307,18 +307,18 @@
     },
     {
       "path": ".claude/skills/cp/SKILL.md",
-      "size": 7509,
-      "sha256": "7f9bf2372b0fbc22c770d1a9da9ac36541304593ed41a5bae29017d92774fd1f"
+      "size": 7692,
+      "sha256": "7977f9b20fef341548616fa6108dd4d02a0558ac0da6df0091c24ac36f11b676"
     },
     {
       "path": ".claude/skills/cpr/SKILL.md",
-      "size": 7192,
-      "sha256": "754f03be932f38569d4a69077eaab4018e7fa91d26a79d6b8a557cf31bddcee3"
+      "size": 7375,
+      "sha256": "c10a060f380f4439bae2b2623b8ada260e6535bcee4d903e36e88a87d322ed73"
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 32958,
-      "sha256": "8571cfa7455f6a8ed7ceab17b2149c2127403587846b4a86173f0ac8e5a98855"
+      "size": 33313,
+      "sha256": "33de725b6bd840fcf9ec83472a3457cb71114e91a26c83376a9c60498abe8303"
     },
     {
       "path": ".gitattributes",
@@ -376,6 +376,11 @@
       "sha256": "b0ce30a470b6f49b76220cbd1e0cf5044d06af38d5a78fb681bef2d7fd35477f"
     },
     {
+      "path": "docs/superpowers/plans/2026-09-17-review-gate-hardening.md",
+      "size": 33078,
+      "sha256": "f1bc5aacbfccac3289135fa406e055ffcccccf9df58945f87e084e319a1ca8e4"
+    },
+    {
       "path": "docs/superpowers/specs/2026-09-11-vscode-extension-design.md",
       "size": 20332,
       "sha256": "9eff9eba7f9edf400a0bd7308709894dae086cf82ff9fc225c3970bd007d222b"
@@ -384,6 +389,11 @@
       "path": "docs/superpowers/specs/2026-09-12-cr-review-ledger-design.md",
       "size": 24298,
       "sha256": "2ac1aa54cefb52dfdb9cb27a87eaffd3cf1126c446d0b9e666c505908767888d"
+    },
+    {
+      "path": "docs/superpowers/specs/2026-09-17-review-gate-hardening-design.md",
+      "size": 14531,
+      "sha256": "55b85e07e753cbe30e6df418bfb0f44d31d434df2e2e3f4ee4c2ab31a2bd2aed"
     },
     {
       "path": "editor-extension/.vscodeignore",
@@ -697,8 +707,8 @@
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 93744,
-      "sha256": "05650037dae4feeb17caa2002f2ab9660755c62c8b353fb7a69aabcba1d4a245"
+      "size": 99067,
+      "sha256": "8d35cb68ece04746cee68c665bd9cc63f3183305cf3b912cf5269d449c7fdb7d"
     },
     {
       "path": "tests/test_package.py",
@@ -732,8 +742,8 @@
     },
     {
       "path": "tests/test_reviewer_triggers.py",
-      "size": 4774,
-      "sha256": "76fb369f6aea1d83ac07943a28b2a1b8ec6e34bc2be3b44a28ba6f30273a1a14"
+      "size": 6197,
+      "sha256": "45c5b1c4fdfb9733b61540cfcbb2693d49e461f8ad32b2d9aaac81fbfca23f3b"
     },
     {
       "path": "tests/test_session_lifecycle.py",

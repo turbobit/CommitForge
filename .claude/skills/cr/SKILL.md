@@ -208,9 +208,9 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
 merge-base`·`pr_context.py`로 계산되기 전에는 알 수 없기 때문이다.
 
 1. `status` — 재개 여부 판정 (아래, Guard `begin` 직후)
-2. `init --scope working` — 신규 실행이면 즉시 (아래, Guard `begin` 직후)
+2. `init --scope working --skill cr` — 신규 실행이면 즉시 (아래, Guard `begin` 직후). `--skill cr`이 필수 관점을 5개로 정하며, 생략하면 3개만 강제된다
 3. §2에서 리뷰 범위를 계산한다
-4. `init --scope "range:<A>..<B>"` — 커밋 범위를 리뷰하는 모드에서만, §2 직후
+4. `init --scope "range:<A>..<B>"` — 커밋 범위를 리뷰하는 모드에서만, §2 직후. `--skill`은 첫 호출 값이 보존되므로 다시 넘기지 않는다
 5. `inventory` — 모든 scope를 선언한 뒤 한 번 (§2 직후, 리뷰 시작 전)
 
 ### 1.5.1 상태 확인과 재개
@@ -248,11 +248,6 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
   --session "$COMMITFORGE_SESSION_ID" --scope working --skill cr
 ```
 
-`--skill cr`은 이 원장의 필수 reviewer 관점 집합을 정한다. `/cr`은 Line,
-Correctness, Security에 더해 **Architecture와 Performance**를 요구하며, 다섯
-관점 중 하나라도 기록이 없으면 `finish`가 `ledger_reviewer_missing`으로
-차단한다. 생략하면 기존 3개 관점만 강제되므로 빠뜨리지 않는다.
-
 §2에서 `<A>..<B>`를 계산한 뒤, 커밋 범위를 리뷰하는 모드면 `init`을 한 번 더
 실행해 그 scope를 추가한다. `init`은 파괴적이지 않다. 기존 scope에 **합집합**으로
 더하며 `iteration`과 이미 기록한 판정을 보존한다. 이미 선언된 scope를 다시
@@ -262,9 +257,6 @@ Correctness, Security에 더해 **Architecture와 Performance**를 요구하며,
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
   --session "$COMMITFORGE_SESSION_ID" --scope "range:<A>..<B>"
 ```
-
-두 번째 `init`에는 `--skill`을 다시 넘기지 않아도 된다. 첫 호출이 저장한 값이
-보존되며, 넘기더라도 같은 값이면 결과가 같다.
 
 ### 1.5.3 분모 생성
 
