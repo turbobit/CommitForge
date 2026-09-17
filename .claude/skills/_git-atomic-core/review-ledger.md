@@ -163,7 +163,35 @@ python3 "<CF_CORE>/scripts/ledger.py" advance \
 세대를 전이하면 이전 세대의 §3.6 격리 검증 결과도 함께 무효다. 새 세대의 finding은
 다시 검증한다.
 
-## 8. 보고와 종료
+## 8. 봉인 — 저장소를 바꾸는 명령의 종료 경로
+
+`/cca`처럼 리뷰 뒤에 staging과 commit을 수행하는 명령은 저장소를 의도적으로
+바꾼다. 그 변화는 세대 fingerprint를 어긋나게 만들어 이후 모든 게이트가
+`ledger_stale`을 보고하는데, 이는 완결된 원장에 대한 잘못된 차단이다.
+
+**staging 직전에** 원장을 닫는다. 수정은 끝났고 HEAD와 staging area는 아직 시작
+상태이므로, 불변식과 커버리지를 함께 확인할 수 있는 유일한 지점이다.
+
+```bash
+bash "<CF_CORE>/scripts/guard.sh" verify-review --session "<session>" --require-ledger
+python3 "<CF_CORE>/scripts/ledger.py" seal --session "$COMMITFORGE_SESSION_ID"
+```
+
+`--source-read-only`는 쓰지 않는다. 수정으로 working tree가 바뀌는 것이 정상
+동작이기 때문이다.
+
+`seal`은 게이트와 **같은 검사를 스스로 수행**하므로 우회 수단이 아니다. 미판정
+hunk나 누락된 필수 관점이 있으면 거부되며, 통과할 수 있었던 실행만 봉인된다.
+봉인 뒤에는 staging과 commit이 저장소를 바꿔도 게이트가 차단하지 않는다. 봉인
+없이 commit하면 `finish`가 `ledger_stale`로 차단한다.
+
+§7의 `advance`는 봉인을 해제한다. 새 세대는 새 리뷰 대상이므로 재리뷰 후 다시
+봉인한다.
+
+읽기 전용 명령(`/cr`, `/cpr`, `/cp`)은 봉인하지 않는다. 저장소를 바꾸지 않으므로
+원장이 stale이 될 일이 없다.
+
+## 9. 보고와 종료
 
 `report`는 **`finish` 이전에** 받아 보관한다. `finish`는 lock을 해제하고 snapshot을
 삭제하므로 그 뒤에는 `owner_not_found`로 실패한다.
@@ -188,7 +216,7 @@ python3 "<CF_CORE>/scripts/ledger.py" report --session "$COMMITFORGE_SESSION_ID"
 | `ledger_reviewer_missing` | 필수 관점 기록이 없다 |
 | `ledger_reviewer_unknown` | 필수 관점이 `UNKNOWN`이다 |
 
-## 9. `--allow-unledgered`
+## 10. `--allow-unledgered`
 
 원장이 불완전해도 통과시키는 탈출구다. 사용자가 명시적으로 요청한 경우에만 쓴다.
 

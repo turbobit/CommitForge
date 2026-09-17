@@ -1301,7 +1301,7 @@ def denominator_should_be_nonempty(
     )
 
 
-def _ledger_gate_failure(
+def ledger_gate_failure(
     data: dict[str, Any],
     summary: dict[str, Any],
     *,
@@ -1319,7 +1319,16 @@ def _ledger_gate_failure(
     before `ledger_empty_inventory`, which is reserved for a denominator that
     should have had entries and does not (see
     `denominator_should_be_nonempty`).
+
+    A sealed ledger skips every check. `/cca` closes its review and then
+    deliberately stages and commits; those writes move HEAD and empty the
+    working tree, so an unsealed ledger would report `ledger_stale` -- a true
+    statement about a ledger that is not actually unfinished. The seal is only
+    written after `ledger.py seal` has run these same checks and passed, so
+    skipping here does not skip them, it remembers that they already ran.
     """
+    if data.get("sealed"):
+        return None
     if not summary["generation"]:
         return "ledger_no_generation"
     if not summary["fingerprint_matches_current"]:
@@ -1424,7 +1433,7 @@ def ledger_gate(
     except ledger.guard.GuardError as exc:
         raise GuardError(str(exc), **exc.details) from exc
 
-    failure = _ledger_gate_failure(
+    failure = ledger_gate_failure(
         data,
         summary,
         empty_denominator_is_wrong=denominator_should_be_nonempty(
@@ -1491,7 +1500,7 @@ def ledger_gate(
             reviewer_roles=summary["reviewer_roles"],
         )
     if failure is not None:
-        # The branches above enumerate every reason `_ledger_gate_failure`
+        # The branches above enumerate every reason `ledger_gate_failure`
         # returns today, so this is unreachable now -- and that is exactly why
         # it has to exist. Without it, adding a seventh reason (or renaming
         # one on a single side) makes the chain fall through to the clean

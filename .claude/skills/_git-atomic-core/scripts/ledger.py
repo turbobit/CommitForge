@@ -1209,6 +1209,50 @@ def cmd_inventory(args: argparse.Namespace) -> None:
     guard.emit({"ok": True, "generation": name, "total": len(entries), "entries": entries})
 
 
+def cmd_seal(args: argparse.Namespace) -> None:
+    """Record that the review gate passed, before the command mutates the repo.
+
+    `/cca` closes its review and then deliberately stages and commits. Those
+    writes move HEAD and empty the working tree, so the generation fingerprint
+    stops matching and every later gate reports `ledger_stale` -- a true
+    statement about a ledger that is not actually unfinished. Sealing lets the
+    gate tell the command's own commits apart from unreviewed drift.
+
+    The seal runs the gate's own checks, so it cannot be used to skip them: an
+    incomplete denominator or a missing required perspective refuses here
+    exactly as it would at `finish`. Only a run that would have passed can
+    seal.
+    """
+    ctx, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    with LedgerLock(ledger_dir):
+        data = read_run(ledger_dir)
+        summary = coverage(ctx, ledger_dir, data)
+        failure = guard.ledger_gate_failure(
+            data,
+            summary,
+            empty_denominator_is_wrong=guard.denominator_should_be_nonempty(
+                data, summary, ledger_dir.parent
+            ),
+        )
+        if failure:
+            raise guard.GuardError(
+                "원장이 완결되지 않아 봉인할 수 없습니다.",
+                reason=failure,
+                pending_count=summary["pending_count"],
+                pending=summary["pending"],
+                reviewer_roles_missing=summary["reviewer_roles_missing"],
+                reviewer_roles_unknown=summary["reviewer_roles_unknown"],
+            )
+        sealed = {
+            "generation": summary["generation"],
+            "fingerprint": guard.repository_fingerprint(ctx["root"])["fingerprint"],
+            "total": summary["total"],
+        }
+        data["sealed"] = sealed
+        write_run(ledger_dir, data)
+    guard.emit({"ok": True, "sealed": sealed, "coverage": summary})
+
+
 def cmd_advance(args: argparse.Namespace) -> None:
     """Open a new generation for a repository state the active one predates.
 
@@ -1251,6 +1295,10 @@ def cmd_advance(args: argparse.Namespace) -> None:
 
         data["active_generation"] = name
         data["stage"] = "review"
+        # A new generation is new review work, so any earlier seal no longer
+        # describes it. Leaving the seal would let a post-fix run skip the gate
+        # on the strength of a pass that covered the pre-fix denominator.
+        data.pop("sealed", None)
         totals = dict(data.get("inventory_totals") or {})
         totals[name] = len(entries)
         data["inventory_totals"] = totals
@@ -1511,6 +1559,10 @@ def build_parser() -> argparse.ArgumentParser:
     record.add_argument("--session", required=True)
     record.add_argument("--token")
 
+    seal = sub.add_parser("seal", help="Record that the review gate passed before staging")
+    seal.add_argument("--session", required=True)
+    seal.add_argument("--token")
+
     advance = sub.add_parser("advance", help="Open a new generation after a fix")
     advance.add_argument("--session", required=True)
     advance.add_argument("--token")
@@ -1527,6 +1579,7 @@ def main() -> None:
     args = build_parser().parse_args()
     handlers = {
         "init": cmd_init,
+        "seal": cmd_seal,
         "status": cmd_status,
         "inventory": cmd_inventory,
         "record": cmd_record,

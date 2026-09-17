@@ -41,6 +41,7 @@ allowed-tools:
   - Bash(git diff-tree *)
   - Bash(cmp *)
   - 'Bash(bash ".claude/skills/_git-atomic-core/scripts/guard.sh" *)'
+  - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/reviewer_triggers.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/report_validator.py" *)'
   - 'Bash(python3 ".claude/skills/_git-atomic-core/scripts/baseline.py" *)'
@@ -94,12 +95,13 @@ Guard를 생략하거나 스캔·리뷰·검증·staging·commit을 대신 수�
 10. `.claude/skills/_git-atomic-core/deep-review-protocol.md`
 11. `.claude/skills/_git-atomic-core/conditional-reviewers.md`
 12. `.claude/skills/_git-atomic-core/review-execution.md`
-13. `.claude/skills/_git-atomic-core/review-policy.md`
-14. `.claude/skills/_git-atomic-core/reporting-formats.md`
-15. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
-16. `.claude/skills/_git-atomic-core/large-diff-review.md`
-17. `.claude/skills/_git-atomic-core/graceful-stop.md`
-18. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
+13. `.claude/skills/_git-atomic-core/review-ledger.md`
+14. `.claude/skills/_git-atomic-core/review-policy.md`
+15. `.claude/skills/_git-atomic-core/reporting-formats.md`
+16. `.claude/skills/_git-atomic-core/baseline-and-suppressions.md`
+17. `.claude/skills/_git-atomic-core/large-diff-review.md`
+18. `.claude/skills/_git-atomic-core/graceful-stop.md`
+19. `.claude/skills/_git-atomic-core/period-review-modes.md` — `today`·`3days`·`weekly`에서만 읽는다.
 
 변경 언어·프레임워크를 판별한 뒤 `.claude/skills/_git-atomic-core/language-api-pitfalls.md`에서 관련 섹션만 읽는다.
 
@@ -159,22 +161,16 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
 
 `session`, `token`, `snapshot`, `fingerprint`, 시작 `head`를 보관한다.
 
-- `ok: false`면 즉시 중단한다.
-- Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
+- `ok: false`거나 Guard가 아예 실행되지 못하면 즉시 중단한다. exit code 126·127,
   `No such file or directory`, `command not found`, Python 미탐지, permission
-  거부가 여기에 해당한다. Guard를 생략하고 진행하지 않는다. Preflight로 `CF_CORE`를
-  다시 확정해 한 번만 재시도하고, 그래도 실패하면 종료한다.
+  거부가 후자에 해당한다. Guard를 생략하고 진행하거나, `git status`·`git diff`·
+  `git log`로 대신 스캔하거나, `git -C <경로>`로 우회하지 않는다. Preflight로
+  `CF_CORE`를 다시 확정해 한 번만 재시도하고, 그래도 실패하면 종료한다.
+- `guard_lock_conflict`·`git_external_lock`이면 Guard가 준 `stale_candidate`,
+  `lock_owner_same_host`, `recovery.remove_hint` 진단을 그대로 보고한다. 회수
+  절차는 `safety-and-concurrency.md`를 따르며, stale 후보여도 스스로 회수하지
+  않고 `/cca clean` 또는 `begin --reclaim-stale`을 안내해 승인을 받는다.
 - merge/rebase/cherry-pick/revert/bisect, Git lock, 동일 worktree의 다른 `/cc`·`/cca` 실행이 있으면 자동 해결하지 않는다.
-- `reason=git_external_lock`은 Git 자체 lock이 원인이다. `git_locks`의
-  `age_seconds`, `size`, `writer_pids`, `stale_candidate`와
-  `recovery.remove_hint`를 그대로 보고하고 `/cca clean`을 안내한다. `clean`은
-  안전 조건을 모두 통과한 stale lock만 제거하며 남은 lock은 강제로 삭제하지 않는다.
-- Guard `begin` 실패 후 `git status`·`git diff`·`git log`로 변경을 스캔하거나
-  `git -C <경로>`로 우회해 작업을 이어가지 않는다.
-- `reason=guard_lock_conflict`이면 `stale_candidate`, `lock_owner_same_host`,
-  `lock_owner_same_session`, `lock_age_seconds`를 그대로 보고한다. stale 후보여도
-  스스로 회수하지 않고 `/cca clean` 또는 `begin --reclaim-stale`을 안내한 뒤
-  사용자 승인을 받아 실행한다.
 - 이후 실패·중단 시 `abort`로 자신의 lock만 해제하고 원본 Diff snapshot은 보존한다.
 - `today`·`3days`·`weekly`는 Guard를 획득한 뒤 `period_range.py`로 경계를 확정하고 기간 commit 원장을 수집한다.
 
@@ -217,6 +213,11 @@ policy threshold를 넘는 변경은 `large-diff-review.md`의 domain shard와 c
 
 변경이 없으면 기본 모드는 guard `finish`로 정리하고 종료한다. `release`는 `--prepare`가 있으면 version/CHANGELOG 준비가 새 변경을 만들 수 있으므로 종료하지 않으며, 그 외에는 source-read-only로 정리하고 사전 분석 보고를 완료한다. `today`·`3days`·`weekly`는 기간 commit이 있으면 Step 3~5의 심층 리뷰·검증까지 계속한 뒤 Atomic 계획·commit 없이 `finish`하고 기간 보고를 반환한다. 기간 commit도 없을 때만 즉시 “검토 대상 없음”으로 종료한다. 구체적인 장애 수정 요청이 있는 `emergency`는 이 시점에 `finish`하지 않고 Guard를 유지한 채 `extended-modes.md`의 clean-tree 진단 규칙으로 진행한다.
 
+## 2.5 리뷰 원장 개시
+
+규약은 `review-ledger.md`다. `ledger.py status`로 재개를 판정하고, 신규 실행이면
+`init --scope working --skill cca`와 `inventory`를 실행한다. `--skill cca`가 필수 관점을 여섯으로 정한다.
+
 ## 3. read-only Agent Team 전문 리뷰
 
 동일 fingerprint에 `review-execution.md`의 구조 선택을 적용한다. Team이면 core
@@ -234,19 +235,17 @@ subagent를 **동일한 현재 diff 기준으로 병렬 실행**한다. `today`�
 `cca-ux-accessibility-reviewer`, `cca-observability-reviewer`,
 `cca-quality-reviewer`.
 
-`conditional-reviewers.md`의 trigger를 판정해 다음 reviewer를 필요한 경우에만 추가한다.
-
-조건부 reviewer: `cca-data-migration-reviewer`, `cca-release-deployment-reviewer`,
-`cca-dependency-supply-chain-reviewer`, `cca-reliability-recovery-reviewer`,
-`cca-privacy-governance-reviewer`, `cca-requirements-product-reviewer`.
-
-비활성 조건도 `N/A`와 근거를 coverage에 남긴다.
+`conditional-reviewers.md`의 trigger를 판정해 다음 reviewer만 필요할 때 추가하고,
+비활성 조건도 근거와 함께 `N_A`로 남긴다: `cca-data-migration-reviewer`,
+`cca-release-deployment-reviewer`, `cca-dependency-supply-chain-reviewer`,
+`cca-reliability-recovery-reviewer`, `cca-privacy-governance-reviewer`,
+`cca-requirements-product-reviewer`.
 
 변경 경로를 `reviewer_triggers.py`에 전달한 결과를 최소 활성 집합으로 사용하고, 코드 의미에서 확인된 추가 trigger를 합친다. `review-execution.md`의 최대 동시 실행 수, fallback, `UNKNOWN` 차단, finding 공통 schema와 중복 제거 규칙을 적용한다.
 
 baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인증·데이터 손실 finding은 suppress하지 않는다.
 
-각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다. diff가 커서 prompt에 직접 담지 못하면 `review-execution.md` §1.5를 따른다. 중간 파일은 `<snapshot>/agent-input/` 아래에만 만들고, `/tmp` 등 시스템 temp의 고정 경로는 저장소 간에 겹치므로 쓰지 않는다.
+각 agent에 사용자 맥락, branch/HEAD, status, staged·unstaged·untracked diff, 관련 log, scope를 입력으로 제공하고 “shell을 실행하거나 파일을 수정하지 말고 근거와 정확한 위치를 반환”하라는 조건을 전달한다. Line reviewer에는 심층 리뷰 프로토콜을, Language/API reviewer에는 적용 가능한 카탈로그 섹션을 함께 제공한다. 입력을 파일로 넘겨야 할 때의 경로 규칙은 `review-execution.md` §1.5다.
 
 - Agent가 설치되지 않았거나 실행할 수 없으면 main agent가 동일 관점을 직접 수행한다.
 - UI가 없으면 UX/A11y, 운영 동작이 없으면 Observability처럼 적용 불가능한 관점은 생략하지 말고 `N/A`와 근거를 반환한다.
@@ -255,28 +254,21 @@ baseline은 검증 후 상태 표시에만 사용한다. CRITICAL·secret·인�
 - 중복 finding은 하나로 통합한다.
 - 범위 밖 기존 문제와 현재 변경이 만든 문제를 구분한다.
 - secret 후보 값은 출력하지 않고 마스킹한다.
-- 모든 hunk가 Line reviewer 원장에 있고 적용 가능한 각 관점이 `PASS`, `FINDING`, `N/A` 중 하나인지 확인한다. 미검토 hunk가 있으면 commit을 차단한다.
+- reviewer batch 결과를 받을 때마다 lead가 **즉시** `ledger.py record`로 hunk 판정과
+  reviewer 관점을 적재한다. 철자는 `N_A`이며 `N/A`는 batch 전체가 거부된다.
+  필수 관점은 line·correctness·security·architecture·performance·git 여섯이다.
+  미판정 hunk가 남으면 §5.5의 봉인이 실패해 commit으로 넘어갈 수 없다.
 
 ## 4. 품질 Gate와 수정 반복
 
-`.claude/skills/_git-atomic-core/review-gates.md`를 적용한다.
-
-### 기본 Gate
-
-- 확인된 CRITICAL: 반드시 차단 또는 안전하게 수정
-- 확인된 MAJOR: 기본적으로 차단 또는 안전하게 수정
-- MINOR: 현재 scope와 위험에 따라 수정/기록
-- NOTE: scope를 확대하지 않고 기록
+`.claude/skills/_git-atomic-core/review-gates.md`를 적용한다. 심각도별 차단 기준은 그 문서 §2가 정본이므로 여기에 다시 적지 않는다.
 
 ### 심층 Coverage Gate
 
-- 모든 hunk 판정 완료
-- 모든 삭제 동작의 의도·대체 경로 확인
-- 변경 contract의 정의·구현·호출자·테스트 추적
-- wrapper/proxy의 인자·반환·오류·취소·context 보존 확인
-- 적용 가능한 Architecture, Language/API, UX/A11y, Observability, Quality 관점 완료
-- 변경 trigger에 해당하는 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 관점 완료
-- API 함정은 실제 언어·버전·코드 근거로 검증
+`deep-review-protocol.md` §9의 완료 조건을 모두 만족해야 한다. hunk 판정과 필수
+관점은 §5.5의 봉인이 기계적으로 확인하므로, 여기서는 삭제 동작의 대체 경로,
+contract의 호출자 추적, wrapper/proxy 의미 보존, 조건부 trigger 관점의 완료를
+직접 확인한다. API 함정은 실제 언어·버전·코드 근거로 검증한다.
 
 ### 자동 수정 허용 범위
 
@@ -347,6 +339,11 @@ fingerprint 갱신 → 새 read-only 재리뷰` 순서를 지킨다.
 - 변경으로 인한 실패는 commit 전에 해결한다.
 - 명백히 무관한 기존 실패만 근거와 함께 경고 처리할 수 있다.
 - `--no-verify`여도 staged diff, whitespace, secret, safety 검사는 수행한다.
+
+## 5.5 리뷰 원장 봉인
+
+staging 전에 원장을 닫는다. 절차와 근거는 `review-ledger.md` §8이다. 미판정
+hunk나 누락된 필수 관점이 있으면 여기서 거부되어 commit 단계로 넘어갈 수 없다.
 
 ## 6. 최종 Atomic Commit 계획
 
@@ -460,6 +457,8 @@ hash, 제목, 목적, 통계, 검증을 기록한다. hook/도구가 새로운 �
 - 각 commit의 title/body/stats
 
 검증 실패가 현재 변경과 관련되면 성공 처리하지 않는다. 이미 생성한 commit을 자동 amend/reset하지 않는다. snapshot을 보존하고 현재 상태를 정확히 보고한다.
+
+`finish` 이전에 `ledger.py report`로 최종 보고 재료를 확보한다. 이후에는 snapshot이 사라져 실행할 수 없다.
 
 ## 9. Snapshot 및 Lock 종료
 

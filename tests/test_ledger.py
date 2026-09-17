@@ -2147,6 +2147,54 @@ class SkillScopedReviewerRolesTest(LedgerTestCase):
         self.assertEqual(refused["reason"], "ledger_reviewer_missing")
         self.assertEqual(refused["reviewer_roles_missing"], ["git"])
 
+    def seal(self, session: str, check: bool = True):
+        return self.ledger("seal", "--session", session, check=check)
+
+    def test_seal_refuses_an_incomplete_ledger(self) -> None:
+        started, _ = self.prepared("cca")
+        # 관점은 전부 기록하되 hunk 판정을 남겨 둔다. 미판정이 관점 누락보다
+        # 먼저 보고되어야 실행자가 고칠 것을 정확히 안다.
+        reviewers = self.CR_ACTIVE + [{"name": "cca-git-reviewer", "status": "ACTIVE"}]
+        self.record(started["session"], {"verdicts": [], "reviewers": reviewers})
+        proc, refused = self.seal(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_incomplete")
+        self.assertEqual(refused["pending_count"], 1)
+
+    def test_seal_refuses_when_a_required_role_is_missing(self) -> None:
+        started, ids = self.prepared("cca")
+        self.cover(started["session"], ids, self.CR_ACTIVE)  # git 누락
+        proc, refused = self.seal(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+
+    def test_sealed_ledger_survives_the_repository_moving_on(self) -> None:
+        # /cca는 원장을 닫은 뒤 staging과 commit으로 저장소를 의도적으로
+        # 바꾼다. 봉인 전에는 stale이 정당한 차단이지만, 봉인 후의 변화는
+        # 그 명령이 스스로 만든 것이므로 게이트가 막아서는 안 된다.
+        started, ids = self.prepared("cca")
+        reviewers = self.CR_ACTIVE + [{"name": "cca-git-reviewer", "status": "ACTIVE"}]
+        self.cover(started["session"], ids, reviewers)
+        _, sealed = self.seal(started["session"])
+        self.assertTrue(sealed["ok"])
+        self.assertTrue(sealed["sealed"]["fingerprint"])
+
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        _, verified = self.guard("verify-review", "--session", started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_unsealed_ledger_still_blocks_when_stale(self) -> None:
+        started, ids = self.prepared("cca")
+        reviewers = self.CR_ACTIVE + [{"name": "cca-git-reviewer", "status": "ACTIVE"}]
+        self.cover(started["session"], ids, reviewers)
+
+        (self.tmp / "tracked.txt").write_text("base\nadded\nmore\n", encoding="utf-8")
+        proc, refused = self.guard(
+            "verify-review", "--session", started["session"], check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_stale")
+
     def test_empty_denominator_still_passes_with_extra_roles(self) -> None:
         # guard.py의 `if summary["total"]:`가 빈 분모에서 관점 게이트를
         # 건너뛴다. role이 늘어도 "검토 대상 없음" 종료는 열려 있어야 한다.
