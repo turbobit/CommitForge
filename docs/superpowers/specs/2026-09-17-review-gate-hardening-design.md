@@ -169,9 +169,35 @@ alias 테이블(`arch` → `architecture`)은 채택하지 않는다. lead의 �
 | 성능 관점 강제가 문서 변경에서 마찰을 만든다 | `N_A` 경로가 정상이며 빈 분모는 게이트를 건너뛴다 |
 | trigger 패턴 확대가 오탐을 늘린다 | 패턴을 보수적으로 유지하고 각 패턴에 회귀 테스트를 붙인다 |
 
-## 7. 후속 과제
+## 7. 후속 과제 — 결과
 
-이번 범위에서 제외했다. 각각 자기 스펙과 계획을 갖는다.
+이번 스펙 작성 시점에는 제외했으나 같은 사이클에서 이어 수행했다. 실제 구현에서
+드러난 사실이 계획과 달랐으므로 아래에 결과를 남긴다.
+
+### 수행 결과 요약
+
+- **C 완료.** 설계 분기는 "staging 전에 닫는다"로 정해졌다. `verify-review`가
+  `head_unchanged`와 `staged_diff_unchanged`를 항상 검사하고 `--source-read-only`만
+  워킹 트리 검사를 더하므로, staging 직전이 불변식과 커버리지를 함께 볼 수 있는
+  유일한 지점이다. 예상하지 못한 문제는 **커밋 후 원장이 필연적으로 stale**이 되어
+  최종 `finish`가 차단된다는 점이었고, `ledger.py seal`로 해결했다.
+- **D 완료.** 예상대로 기계적이었다. 부수적으로 `/cpr`·`/cp`의 allowed-tools에
+  `ledger.py`가 없다는 사실이 드러나 함께 추가했다.
+- **E 철회.** `/ccr`은 Guard `begin`을 **전혀 호출하지 않는다**. 원장은 snapshot
+  안에 살므로 snapshot 없이는 원장도 없다. snapshot을 주면 배타적 worktree 락도
+  함께 잡아, 가벼운 계획 명령이 리뷰와 동시에 돌 수 없게 된다. `/cc`·`/cca`가 그
+  계획을 어차피 재분석하므로 얻는 커버리지보다 잃는 것이 크다. 스펙 작성 시점에
+  E의 쟁점을 "security 포함 여부"로 본 것은 틀렸다.
+
+### 부수 작업
+
+원장 규약이 `cr/SKILL.md`에만 있어 다른 명령어가 붙으려면 복제해야 했다.
+`review-ledger.md`로 추출하고 각 skill은 참조만 둔다. `cr`·`cca` 모두 500줄
+상한에 붙어 있어 이 추출 없이는 확장이 불가능했다.
+
+### 원래 계획
+
+각각 자기 스펙과 계획을 갖는 것으로 적었던 내용이다.
 
 - **C. `/cca` 원장 도입.** 가장 복잡하다. 원장의 세대 모델(`advance`는 fingerprint 변화에 반응)은 `/cr`의 `리뷰 → 수정 → 재리뷰` 루프용이다. `/cca`는 staging과 commit이 붙어 실행 중 HEAD와 staged fingerprint가 의도적으로 바뀌고 `verify-review --source-read-only`가 적용되지 않는다. "원장을 staging 전에 닫는가, 커밋별 scope로 추적하는가"를 먼저 정해야 한다.
 - **D. `/cpr`·`/cp` 원장 도입.** 둘 다 read-only이고 committed range만 보므로 `range:<A>..<B>` scope(`cr/SKILL.md:258`)를 재사용할 수 있다. C보다 기계적이다.

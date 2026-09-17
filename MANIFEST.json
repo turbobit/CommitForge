@@ -3,7 +3,7 @@
   "version": "1.18.0",
   "reproducible": true,
   "file_count": 154,
-  "total_bytes": 1751413,
+  "total_bytes": 1753089,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -397,8 +397,8 @@
     },
     {
       "path": "docs/superpowers/specs/2026-09-17-review-gate-hardening-design.md",
-      "size": 14531,
-      "sha256": "55b85e07e753cbe30e6df418bfb0f44d31d434df2e2e3f4ee4c2ab31a2bd2aed"
+      "size": 16207,
+      "sha256": "b3e19d0c0f54e0b988ac3dcedb7aa0172c3558ef96b60756a5835c64f1d71584"
     },
     {
       "path": "editor-extension/.vscodeignore",
