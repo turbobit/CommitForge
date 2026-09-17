@@ -3,7 +3,7 @@
   "version": "1.18.0",
   "reproducible": true,
   "file_count": 153,
-  "total_bytes": 1723748,
+  "total_bytes": 1731677,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -413,12 +413,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "aed640b33d4e4458a85a744957a08f7f78de6c8f76fea45eb5dd055133a467da"
+      "sha256": "47f22a52953c7c85d8b815bb3035275117a5780dd219a4dc5a09dd457dd368d5"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11665,
-      "sha256": "b79fee6bd2c082e60890b65ba8a2f5371e756de828a3da4874f466ee54f99093"
+      "sha256": "b7f6e9258e09450436801273fe64dc801eb3a83f59b0453e2193345de44eaa3e"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -447,8 +447,8 @@
     },
     {
       "path": "editor-extension/src/core/detect.ts",
-      "size": 10447,
-      "sha256": "ad275cb7e53d6c5e31846e399d37167f7b1019dd7460fb26a3bcd0c12daf231c"
+      "size": 11613,
+      "sha256": "a5dc6f2511463eaa8ff16a203e58a184c89e64baf8ab611e0a54559a59ff90fc"
     },
     {
       "path": "editor-extension/src/core/guard.ts",
@@ -482,8 +482,8 @@
     },
     {
       "path": "editor-extension/src/vscode/installer.ts",
-      "size": 2709,
-      "sha256": "0d60ed71c804e3b0ab6076b0999d867fb425f5739c153611f01500c68d3057b6"
+      "size": 4545,
+      "sha256": "33bf86dcf6c05ab8a0c5878ebf40ddfb8a9c8d15a998f689c62eb678723ab672"
     },
     {
       "path": "editor-extension/src/vscode/quickPick.ts",
@@ -502,8 +502,8 @@
     },
     {
       "path": "editor-extension/src/vscode/treeView.ts",
-      "size": 19751,
-      "sha256": "672825e361f20263efc12600416c18109ab0e42a429e592387033825194579a4"
+      "size": 20319,
+      "sha256": "e46d1fcf32d2dd652c319af3177354bc3193c3d4d7b2da07e6f3fcdd11209368"
     },
     {
       "path": "editor-extension/src/vscode/watchers.ts",
@@ -532,8 +532,8 @@
     },
     {
       "path": "editor-extension/test/detect.test.ts",
-      "size": 16174,
-      "sha256": "40ae5a7167a07666fecfb770d91596da07a2b03d6dd65c79857f337adaa7aac6"
+      "size": 18078,
+      "sha256": "cdb631a29b454042b28ff08dfe96b07ee916476254cafc05668cad9d2d7ba5ea"
     },
     {
       "path": "editor-extension/test/fixtures/guard-status-held.json",
@@ -572,8 +572,8 @@
     },
     {
       "path": "editor-extension/test/installerArgs.test.ts",
-      "size": 1036,
-      "sha256": "c3c3e442ecbc3f82c88af04dd00eb7260b43f44d0e782414f3bba5c8854a46d2"
+      "size": 2070,
+      "sha256": "b3dc36bd5b6e0f4f5a377570425a81531508a659a1be74b0b8907716e923941e"
     },
     {
       "path": "editor-extension/test/lockWarning.test.ts",
@@ -582,8 +582,8 @@
     },
     {
       "path": "editor-extension/test/payload.test.ts",
-      "size": 4036,
-      "sha256": "94a845ae456b4726f11c9b9fddf98e14cf75dc15d753a6e69843255f5def64b6"
+      "size": 4478,
+      "sha256": "e48678d5be5d65888729b021a11f286b9faaa8d15848cfcd646965a3da7c397d"
     },
     {
       "path": "editor-extension/test/python.test.ts",
@@ -627,8 +627,8 @@
     },
     {
       "path": "editor-extension/test/treeView.test.ts",
-      "size": 28580,
-      "sha256": "657104c48c01ab6f7e4b73482aa3599f7013df552d8c0864e60fc6882f50f898"
+      "size": 29559,
+      "sha256": "428ee3d2ef89e39c6c1cfadf3a82410c552bd3d23116dc3f623c695ea6d5e286"
     },
     {
       "path": "editor-extension/test/watchers.test.ts",
