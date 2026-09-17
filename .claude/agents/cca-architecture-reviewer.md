@@ -24,6 +24,12 @@ Main agent가 제공한 diff를 사용하고 shell을 실행하지 않는다. �
 - failure domain, blast radius, rollback
 - feature flag, migration, 배포 순서
 - 확장 지점과 backward compatibility
+- 하위 호환을 깨는 public contract 변경과 그 소비자. 어떤 호출자가 어떤 버전에서
+  깨지는지 짚는다
+- 기본값과 feature flag 기본 상태의 변경. 기존 배포가 새 기본값을 만났을 때의
+  동작과, 값을 명시하지 않은 호출자의 영향을 확인한다
+- schema·저장 형식 변경에 필요한 migration 누락. `review-gates.md` §2는 이를
+  MAJOR 차단 사유로 둔다
 
 취향 기반 재설계나 범위 밖 대규모 리팩터링은 finding으로 만들지 않는다.
 

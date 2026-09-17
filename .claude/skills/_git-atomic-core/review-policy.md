@@ -34,7 +34,9 @@ requirements:
 - `max_parallel`은 1~8이며 이 파일에 쓸 때 권장하는 값은 4다. 지정하면
   `review-execution.md` §1의 동시 실행 수 상한이 된다. **이 값은 `review.yml`이
   없는 저장소의 기본값이 아니다.** 정책 파일이 없으면 §1의 기본 목표 6이 적용된다.
-- Line, Correctness, Security는 비활성화할 수 없다.
+- 해당 skill의 필수 관점은 `disabled_reviewers`로 비활성화할 수 없다. 기본은
+  Line, Correctness, Security이고 `/cr`은 Architecture, Performance를 더한
+  5개다. 적용되지 않는 관점은 비활성화가 아니라 근거 있는 `N_A`로 기록한다.
 - trigger가 확인된 조건부 reviewer는 비활성화할 수 없다.
 - `blocking_severity`는 `CRITICAL`, `MAJOR`, `MINOR` 중 하나다.
 - `confidence_threshold`는 1~10 정수이며 기본 8이다. `review-execution.md` §3.6의

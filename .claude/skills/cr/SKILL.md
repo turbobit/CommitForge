@@ -245,8 +245,13 @@ Guard `begin` 직후에는 아직 범위를 모르므로 `working`만 선언한�
 
 ```bash
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
-  --session "$COMMITFORGE_SESSION_ID" --scope working
+  --session "$COMMITFORGE_SESSION_ID" --scope working --skill cr
 ```
+
+`--skill cr`은 이 원장의 필수 reviewer 관점 집합을 정한다. `/cr`은 Line,
+Correctness, Security에 더해 **Architecture와 Performance**를 요구하며, 다섯
+관점 중 하나라도 기록이 없으면 `finish`가 `ledger_reviewer_missing`으로
+차단한다. 생략하면 기존 3개 관점만 강제되므로 빠뜨리지 않는다.
 
 §2에서 `<A>..<B>`를 계산한 뒤, 커밋 범위를 리뷰하는 모드면 `init`을 한 번 더
 실행해 그 scope를 추가한다. `init`은 파괴적이지 않다. 기존 scope에 **합집합**으로
@@ -257,6 +262,9 @@ python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
 python3 ".claude/skills/_git-atomic-core/scripts/ledger.py" init \
   --session "$COMMITFORGE_SESSION_ID" --scope "range:<A>..<B>"
 ```
+
+두 번째 `init`에는 `--skill`을 다시 넘기지 않아도 된다. 첫 호출이 저장한 값이
+보존되며, 넘기더라도 같은 값이면 결과가 같다.
 
 ### 1.5.3 분모 생성
 
@@ -363,7 +371,7 @@ JSON
 - 원장 기록은 lead만 수행한다. reviewer subagent와 Agent Team teammate는 기록하지 않는다.
 - `inventory`에 없는 id는 거부된다. 판정 대상은 분모에서만 고른다.
 
-- hunk 판정과 별개로 **reviewer 관점**을 `reviewers`에 기록한다. 필수 관점 Line·Correctness·Security가 빠지면 `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`가 차단된다. `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용하고 `N/A` 철자는 batch 전체가 거부된다. 상세는 `review-execution.md` §3.5다.
+- hunk 판정과 별개로 **reviewer 관점**을 `reviewers`에 기록한다. `/cr`의 필수 관점 Line·Correctness·Security·Architecture·Performance 중 하나라도 빠지면 `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`가 차단된다. 해당 변경에 적용되지 않는 관점은 근거를 적어 `N_A`로 기록하며, 이때도 차단되지 않는다. `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용하고 `N/A` 철자는 batch 전체가 거부된다. 상세는 `review-execution.md` §3.5다.
 
 ## 4. Gate, 수정, 전면 재리뷰
 

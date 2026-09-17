@@ -84,6 +84,11 @@ Agent Team 선택 시:
      public contract, 버전별 API 의미, maintainability, backward/forward
      compatibility와 deprecation
 
+  teammate 이름은 각 묶음의 role 키워드를 축약 없이 포함한다. 예:
+  `core-correctness-line-state`, `core-security-privacy-supply-chain`,
+  `core-architecture-language-quality-compatibility`. 축약하면 §3.5의 관점
+  게이트가 역할을 인식하지 못한다.
+
 - 다음 trigger는 core에 억지로 합치지 않고 조건부 specialist로 다룬다.
   - 문서·주석·표시용 metadata만의 변경이 아닌 실행 코드·설정·API·schema·bug
     fix·refactoring: **Testing/Independent Verification** 필수
@@ -171,7 +176,9 @@ git diff --binary > "<snapshot>/agent-input/working.diff"
 
 ## 2. 필수성과 실패 정책
 
-- 필수: Line, Correctness, Security
+- 필수: Line, Correctness, Security. `/cr`은 여기에 Architecture(계약·호환성)와
+  Performance를 더한 5개다. 집합은 원장을 만든 skill이 결정하며 `ledger.py`의
+  `REQUIRED_REVIEWER_ROLES`가 정본이다.
 - 변경 유형상 활성화된 조건부 reviewer도 해당 변경에서는 필수
 - agent 시작 실패·timeout·turn 소진 시 main agent가 같은 관점을 직접 수행한다.
 - fallback도 완료하지 못하면 해당 관점은 `UNKNOWN`이며 성공 또는 commit을 차단한다.
@@ -272,12 +279,19 @@ hunk 분모는 "누가 봤는지"를 표현하지 못한다. reviewer 하나가 
 
 - `reviewers`의 `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. `N/A` 철자는
   `ledger_invalid_reviewer_status`로 **batch 전체**가 거부된다. verdict와 같은 함정이다.
-- 필수 관점인 **Line, Correctness, Security**는 매 실행에서 반드시 기록한다.
-  하나라도 없으면 `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로
-  `finish`와 `verify-review`가 차단된다.
+- 필수 관점은 매 실행에서 반드시 기록한다. 하나라도 없으면
+  `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로
+  `finish`와 `verify-review`가 차단된다. 기본 집합은 **Line, Correctness,
+  Security**이고 `/cr`은 **Architecture, Performance**를 더한 5개다. 어느
+  집합인지는 `init --skill`이 저장한 값이 결정한다.
 - 관점 판정은 agent 파일명이 아니라 **이름에 포함된 역할 키워드**로 해석한다.
   Agent Team의 `core-correctness-line-state` 같은 teammate 하나가 두 역할을 함께
   만족시킬 수 있다.
+- **role 키워드는 축약하지 않는다.** 매칭이 부분일치이므로 `architecture`를
+  `arch`로 줄인 `core-arch-lang-quality`는 그 역할을 만족시키지 못하고, 제대로
+  수행한 리뷰가 `ledger_reviewer_missing`으로 차단된다. teammate 이름에는
+  `line`, `correctness`, `security`, `architecture`, `performance`를 철자 그대로
+  포함한다.
 - **같은 이름**을 다시 기록하면 나중 값이 이긴다. 시작에 실패해 `UNKNOWN`이던
   reviewer가 재시도에 성공하면 `ACTIVE`로 다시 기록해 해소한다.
 - **다른 이름**이 같은 역할을 덮으면 가장 나쁜 상태가 채택된다.

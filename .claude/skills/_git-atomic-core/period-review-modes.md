@@ -51,7 +51,7 @@ finding에는 원인을 다음 중 하나로 귀속한다.
 
 ## 3. 리뷰 강도
 
-- 기간의 모든 최종 net hunk를 Line·Correctness·Security와 적용 가능한 reviewer에 배정한다.
+- 기간의 모든 최종 net hunk를 `/cr`의 필수 관점(Line·Correctness·Security·Architecture·Performance)과 적용 가능한 reviewer에 배정한다.
 - 제거된 동작, wrapper/proxy 의미 보존, cross-file contract를 commit 경계와 net diff 양쪽에서 확인한다.
 - 기간 중 추가됐다가 제거된 위험 동작도 이력상 회귀 신호로 보고하되 현재 blocker와 구분한다.
 - 테스트가 중간 commit에서 깨졌다가 후속 commit에서 복구됐는지, 최종 HEAD에서 실제로 통과하는지 구분한다.
