@@ -2,7 +2,7 @@
   "name": "commitforge",
   "displayName": "CommitForge",
   "description": "Claude Code용 Atomic Git Assistant를 설치·관리하고 명령을 실행합니다",
-  "version": "1.16.0",
+  "version": "1.18.0",
   "publisher": "commitforge",
   "license": "MIT",
   "engines": {

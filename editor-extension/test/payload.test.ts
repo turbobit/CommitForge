@@ -93,11 +93,17 @@ const payloadRoot = join(__dirname, "..", "payload");
 // pretest에서 sync-payload를 먼저 실행하므로 정상 환경에서는 항상 존재해야 하고,
 // 값진 회귀 검증(61/52 분류, 명령 9개 파생)이 조용한 skip 뒤에 숨지 않아야 한다.
 describe("실제 payload", () => {
-  it(".claude/ 항목이 61개고 그중 52개가 해시 대조 대상이다", async () => {
+  it("rewritten SKILL.md만 해시 대조에서 빠진다", async () => {
     const manifest = await loadManifest(payloadRoot);
+    const all = claudeEntries(manifest);
+    const exact = exactEntries(manifest);
 
-    expect(claudeEntries(manifest)).toHaveLength(61);
-    expect(exactEntries(manifest)).toHaveLength(52);
+    // 절대 개수는 파일이 추가되는 릴리스마다 바뀌므로 고정하지 않는다. 지킬
+    // 불변식은 분류다: 설치 시 core 경로가 치환되는 SKILL.md만 해시 대조에서
+    // 빠지고 나머지는 전부 대조 대상이어야 한다. 페이로드가 비거나 깨진 경우를
+    // 잡기 위해 하한만 둔다.
+    expect(all.length).toBeGreaterThan(50);
+    expect(all.length - exact.length).toBe(rewrittenSkillPaths(manifest).length);
   });
 
   it("실제 페이로드에서 명령 9개를 파생한다", async () => {
