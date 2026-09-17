@@ -39,11 +39,35 @@ VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
 
 # review-execution.md §2 makes Line, Correctness and Security mandatory on
-# every change. Matching is by role keyword rather than by exact agent
-# filename: Agent Team mode packs these perspectives into named core teammates
+# every change, and Architecture (which owns contract and compatibility) and
+# Performance are mandatory for `/cr`. The set is keyed by the skill that
+# created the ledger because `/cca`, `/cpr`, `/cp` and `/ccr` will each carry a
+# different one when they adopt the ledger; only `cr` creates one today.
+#
+# Matching is by role keyword rather than by exact agent filename: Agent Team
+# mode packs these perspectives into named core teammates
 # (`core-correctness-line-state`), and a filename match would make the rule
-# unsatisfiable in the structure the skill selects by default.
-REQUIRED_REVIEWER_ROLES = ("line", "correctness", "security")
+# unsatisfiable in the structure the skill selects by default. That is also why
+# review-execution.md §3.5 forbids abbreviating a role keyword in a teammate
+# name -- `core-arch-...` would silently fail to satisfy `architecture` and
+# would block a review that actually covered it.
+REQUIRED_REVIEWER_ROLES: dict[str, tuple[str, ...]] = {
+    "cr": ("line", "correctness", "security", "architecture", "performance"),
+}
+
+# A ledger with no `skill` field predates the mapping, and an unmapped name is a
+# skill that has not declared its set yet. Both fall back to the original three
+# rather than to `/cr`'s five: widening the requirement under a review that is
+# already in flight would block it for a perspective its own skill never asked
+# for.
+DEFAULT_REVIEWER_ROLES = ("line", "correctness", "security")
+
+
+def required_roles_for(skill: Any) -> tuple[str, ...]:
+    """Return the mandatory role keywords for the skill that owns a ledger."""
+    if not isinstance(skill, str):
+        return DEFAULT_REVIEWER_ROLES
+    return REQUIRED_REVIEWER_ROLES.get(skill, DEFAULT_REVIEWER_ROLES)
 
 # review-execution.md §3's finding schema. Every field here is optional so a
 # reviewer that omits them still records, but a supplied value must be valid:
@@ -911,7 +935,7 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         matches = None
 
     reviewers = (guard.read_json(gen_dir / REVIEWERS_NAME) or {}) if gen_dir else {}
-    roles = reviewer_roles(reviewers)
+    roles = reviewer_roles(reviewers, required_roles_for(data.get("skill")))
 
     return {
         # `complete` stays a statement about the hunk denominator. Reviewer
@@ -943,7 +967,10 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
     }
 
 
-def reviewer_roles(reviewers: dict[str, Any]) -> dict[str, str | None]:
+def reviewer_roles(
+    reviewers: dict[str, Any],
+    required: tuple[str, ...] = DEFAULT_REVIEWER_ROLES,
+) -> dict[str, str | None]:
     """Resolve recorded reviewer names onto the mandatory role keywords.
 
     A name satisfies a role when it contains that role's keyword, so both
@@ -957,7 +984,7 @@ def reviewer_roles(reviewers: dict[str, Any]) -> dict[str, str | None]:
     record.
     """
     severity = {"ACTIVE": 0, "N_A": 1, "UNKNOWN": 2}
-    resolved: dict[str, str | None] = {role: None for role in REQUIRED_REVIEWER_ROLES}
+    resolved: dict[str, str | None] = {role: None for role in required}
     for name, status in reviewers.items():
         if not isinstance(name, str):
             continue
@@ -967,7 +994,7 @@ def reviewer_roles(reviewers: dict[str, Any]) -> dict[str, str | None]:
         if status not in REVIEWER_STATUSES:
             status = "UNKNOWN"
         lowered = name.lower()
-        for role in REQUIRED_REVIEWER_ROLES:
+        for role in required:
             if role not in lowered:
                 continue
             current = resolved[role]
@@ -1009,6 +1036,7 @@ def cmd_init(args: argparse.Namespace) -> None:
                 "iteration": 1,
                 "active_generation": "",
                 "scopes": scopes,
+                "skill": args.skill or "",
             }
             added = list(scopes)
         else:
@@ -1018,6 +1046,12 @@ def cmd_init(args: argparse.Namespace) -> None:
             data["session"] = guard.safe_session(args.session)
             data["token"] = resolved_token
             data["scopes"] = declared + added
+            # `/cr` calls `init` twice: once for `working` right after Guard
+            # `begin`, then again for `range:<A>..<B>` once §2 has computed the
+            # range. The second call need not repeat `--skill`, so an absent
+            # value must not erase what the first call stored.
+            if args.skill:
+                data["skill"] = args.skill
             if added and data.get("active_generation"):
                 data["active_generation"] = ""
                 data["stage"] = "init"
@@ -1451,6 +1485,10 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument("--session", required=True)
     init.add_argument("--token")
     init.add_argument("--scope", action="append", default=[])
+    init.add_argument(
+        "--skill",
+        help="이 원장을 만든 skill 이름(예: cr). 필수 reviewer 관점 집합을 결정한다",
+    )
 
     status = sub.add_parser("status", help="Report ledger progress and coverage")
     status.add_argument("--session", required=True)

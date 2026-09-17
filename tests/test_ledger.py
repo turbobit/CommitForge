@@ -1999,5 +1999,120 @@ class ReviewerCoverageGateTest(LedgerTestCase):
         self.assertEqual(verified["ledger"]["bypassed_reason"], "ledger_reviewer_missing")
 
 
+class SkillScopedReviewerRolesTest(LedgerTestCase):
+    """필수 role 집합은 원장을 만든 skill이 결정한다.
+
+    `--skill` 없이 만든 원장은 기존 3개 role만 요구한다. 진행 중이던 리뷰가
+    강제 확대로 갑자기 차단되지 않게 하는 폴백이며, 위 ReviewerCoverageGateTest가
+    그대로 통과하는 것이 이 폴백의 회귀 테스트다.
+    """
+
+    CR_ACTIVE = [
+        {"name": "cca-line-reviewer", "status": "ACTIVE"},
+        {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
+        {"name": "cca-security-reviewer", "status": "ACTIVE"},
+        {"name": "cca-architecture-reviewer", "status": "ACTIVE"},
+        {"name": "cca-performance-reviewer", "status": "ACTIVE"},
+    ]
+
+    def prepared(self, *skill: str) -> tuple[dict, list[str]]:
+        (self.tmp / "tracked.txt").write_text("base\nadded\n", encoding="utf-8")
+        started = self.begin()
+        argv = ["init", "--session", started["session"], "--scope", "working"]
+        if skill:
+            argv += ["--skill", skill[0]]
+        self.ledger(*argv)
+        _, built = self.ledger("inventory", "--session", started["session"])
+        return started, [entry["id"] for entry in built["entries"]]
+
+    def cover(self, session: str, ids: list[str], reviewers: list[dict]) -> None:
+        self.record(
+            session,
+            {
+                "verdicts": [{"id": i, "verdict": "PASS"} for i in ids],
+                "reviewers": reviewers,
+            },
+        )
+
+    def verify(self, session: str, check: bool = True):
+        return self.guard(
+            "verify-review", "--session", session,
+            "--source-read-only", "--require-ledger", check=check,
+        )
+
+    def test_cr_requires_architecture_and_performance(self) -> None:
+        started, ids = self.prepared("cr")
+        self.cover(started["session"], ids, self.CR_ACTIVE[:3])
+        proc, refused = self.verify(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_missing")
+        self.assertEqual(
+            sorted(refused["reviewer_roles_missing"]), ["architecture", "performance"]
+        )
+
+    def test_cr_passes_with_all_five_roles(self) -> None:
+        started, ids = self.prepared("cr")
+        self.cover(started["session"], ids, self.CR_ACTIVE)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+        self.assertEqual(verified["ledger"]["reviewer_roles_missing"], [])
+
+    def test_ledger_without_skill_keeps_the_three_base_roles(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, self.CR_ACTIVE[:3])
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+        self.assertEqual(
+            sorted(verified["ledger"]["reviewer_roles"]),
+            ["correctness", "line", "security"],
+        )
+
+    def test_unmapped_skill_falls_back_to_the_base_roles(self) -> None:
+        started, ids = self.prepared("cfr")
+        self.cover(started["session"], ids, self.CR_ACTIVE[:3])
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_agent_team_bundled_name_satisfies_architecture(self) -> None:
+        # review-execution.md §0의 core 3번은 한 teammate가 Architecture,
+        # Language/API, Quality, Compatibility를 함께 맡는다. role은 이름
+        # 부분일치로 판정하므로 묶음 이름 하나가 architecture를 만족해야 한다.
+        started, ids = self.prepared("cr")
+        reviewers = [
+            {"name": "core-correctness-line-state", "status": "ACTIVE"},
+            {"name": "core-security-privacy-supply-chain", "status": "ACTIVE"},
+            {"name": "core-architecture-language-quality-compatibility",
+             "status": "ACTIVE"},
+            {"name": "spec-performance-reliability", "status": "ACTIVE"},
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+        self.assertEqual(verified["ledger"]["reviewer_roles_missing"], [])
+
+    def test_reasoned_n_a_satisfies_performance(self) -> None:
+        # 문서 전용 diff에는 성능 차원이 없다. 게이트는 명시적 N_A를 요구할
+        # 뿐 ACTIVE를 강요하지 않는다.
+        started, ids = self.prepared("cr")
+        reviewers = self.CR_ACTIVE[:4] + [
+            {"name": "cca-performance-reviewer", "status": "N_A"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_empty_denominator_still_passes_with_extra_roles(self) -> None:
+        # guard.py의 `if summary["total"]:`가 빈 분모에서 관점 게이트를
+        # 건너뛴다. role이 늘어도 "검토 대상 없음" 종료는 열려 있어야 한다.
+        started = self.begin()
+        self.ledger(
+            "init", "--session", started["session"],
+            "--scope", "working", "--skill", "cr",
+        )
+        self.ledger("inventory", "--session", started["session"])
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()
