@@ -51,6 +51,9 @@ requirements:
   - 복구 불가능한 migration·데이터 변환. `review-gates.md` §2 CRITICAL의
     "잘못된 migration으로 복구 곤란한 상태"와 같은 기준이다
   - 재시작 없이 회복되지 않는 자원 고갈
+- **이 목록은 두 게이트를 함께 관장한다.** `confidence_threshold`의 일괄 기각뿐
+  아니라 `review-execution.md` §3.6의 도달성 강등(`조건부` + `확인불가`)에서도
+  같은 목록, 같은 판정 방식으로 제외된다. 항목을 고치면 두 게이트가 함께 바뀐다.
 - 이 목록은 **어느 reviewer가 찾았는지가 아니라 피해 유형으로** 판정한다.
   Performance reviewer가 찾은 데이터 손실도 보호되고, Security reviewer가 찾은
   저영향 finding은 보호되지 않는다.

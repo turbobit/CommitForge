@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import os
+import re
 import runpy
 import subprocess
 import sys
@@ -729,6 +730,57 @@ class PackageMetadataTest(unittest.TestCase):
             "hydration",
         ):
             self.assertIn(topic, performance)
+
+    def test_every_reviewer_separates_theoretical_risk_from_real_risk(self) -> None:
+        # `confidence` only measures whether a claim holds in the code, so a
+        # theoretical path traced end to end still scores 10 and sails past the
+        # threshold. Reachability is the second axis that catches it, and it
+        # only works if every reviewer carries it -- one agent without the
+        # section is the hole the noise comes back through.
+        agents = sorted((ROOT / ".claude/agents").glob("cca-*.md"))
+        self.assertTrue(agents)
+        for path in agents:
+            body = path.read_text(encoding="utf-8")
+            for section in ("도달성", "보고 제외", "판정 precedent"):
+                # Some reviewers number their sections ("## 5. 도달성"), so the
+                # heading is matched by name rather than by exact string.
+                self.assertRegex(
+                    body,
+                    rf"(?m)^## (?:\d+\. )?{re.escape(section)}$",
+                    f"{path.name} is missing the {section} section",
+                )
+            for grade in ("`실재`", "`조건부`", "`이론`"):
+                self.assertIn(
+                    grade,
+                    body,
+                    f"{path.name} does not use the {grade} reachability grade",
+                )
+            # Pointing at the shared definition is what keeps seventeen
+            # reviewers on one ruler instead of seventeen private ones.
+            self.assertIn("§3.2", body, f"{path.name} does not cite the shared axis")
+
+    def test_reachability_axis_is_defined_and_enforced_in_the_core(self) -> None:
+        core = ROOT / ".claude/skills/_git-atomic-core"
+        execution = (core / "review-execution.md").read_text(encoding="utf-8")
+        gates = (core / "review-gates.md").read_text(encoding="utf-8")
+        policy = (core / "review-policy.md").read_text(encoding="utf-8")
+
+        self.assertIn("## 3.2 도달성 등급 기준", execution)
+        # The two questions must stay split: merged, confidence in whether a
+        # claim holds leaks into whether it actually happens.
+        for marker in ("### 두 질문", "성립불가", "확인불가"):
+            self.assertIn(marker, execution)
+        # A downgrade that also lowers severity would erase the finding from
+        # the report, which is the opposite of what the axis is for.
+        self.assertIn("`blocking`을 `false`로 바꾼다", execution)
+        self.assertIn("심각도를 낮추지 않는다", execution)
+        # Irreversible damage keeps its teeth. The list lives in review-policy
+        # and must not be forked into a second copy here.
+        self.assertIn("되돌릴 수 없는 피해는 이 강등에서 제외한다", execution)
+        self.assertIn("되돌릴 수", policy)
+
+        self.assertIn("도달성", gates)
+        self.assertIn("차단은 심각도 × 도달성이다", gates)
 
 
 if __name__ == "__main__":

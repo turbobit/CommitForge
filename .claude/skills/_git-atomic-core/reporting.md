@@ -90,6 +90,9 @@ reviewer 파이프라인을 돌리는 `/cr`과 `/cca`는 세부 항목을 나열
 - 격리 검증: `ISOLATED`·`SELF`·`UNVERIFIED` finding 수와 `REJECTED` 수.
   `ledger.py report`의 `verification`에서 가져온다. `SELF`·`UNVERIFIED`가 있으면
   그 이유도 적는다.
+- 도달성: `이론`·`성립불가`로 기각한 수와 `확인불가`로 비차단 강등한 수.
+  `review-execution.md` §3.6의 판정 결과다. 강등분은 심각도를 유지하므로
+  미해결 MAJOR와 **별도 줄**로 적고 무엇을 확인하지 못했는지 밝힌다.
 - 채택·기각한 finding과 근거
 - 원장 커버리지 수치는 `ledger.py report`의 `coverage`에서 가져온다. 기억으로
   집계하지 않는다. `--format json`·`sarif` 산출물도 같은 출력에서 만든다.
@@ -251,6 +254,8 @@ snapshot 경로를 그대로 보고한다.
 - hunk coverage: 전체/PASS/FINDING/N_A/미검토 수
 - 격리 검증: `ISOLATED`·`SELF`·`UNVERIFIED` finding 수와 `REJECTED` 수.
   `SELF`·`UNVERIFIED`가 있으면 그 이유도 적는다.
+- 도달성: `이론`·`성립불가` 기각 수와 `확인불가` 비차단 강등 수. 강등분은
+  심각도를 유지하므로 미해결 MAJOR와 별도 줄로 적는다
 - Architecture, Language/API, UX/A11y, Observability, Quality reviewer 결과
 - 조건부 Data/Migration, Dependency/Supply Chain, Reliability/Recovery, Privacy/Governance, Requirements/Product 결과
 - reviewer 실행·fallback·UNKNOWN 수와 finding fingerprint

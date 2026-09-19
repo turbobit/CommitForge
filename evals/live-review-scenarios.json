@@ -50,5 +50,21 @@
       ["today", "오늘", "기간"]
     ],
     "expected_reviewers": ["cca-correctness-reviewer", "cca-language-api-reviewer"]
+  },
+  {
+    "name": "reachable risk carries the reachability axis",
+    "base_files": {
+      "app/handler.py": "def lookup(conn, user_id):\n    cur = conn.execute(\"SELECT * FROM users WHERE id = ?\", (user_id,))\n    return cur.fetchone()\n"
+    },
+    "changed_files": {
+      "app/handler.py": "def lookup(conn, request):\n    # request.args is the raw HTTP query string.\n    user_id = request.args[\"id\"]\n    cur = conn.execute(\"SELECT * FROM users WHERE id = '\" + user_id + \"'\")\n    return cur.fetchone()\n"
+    },
+    "prompt": "/cr 이 변경의 보안 위험을 엄격히 리뷰",
+    "expected_terms": [
+      ["injection", "인젝션", "주입"],
+      ["도달성"],
+      ["실재"]
+    ],
+    "expected_reviewers": ["cca-security-reviewer", "cca-correctness-reviewer"]
   }
 ]
