@@ -47,16 +47,25 @@ AGENTS = (
     "cca-requirements-product-reviewer.md",
 )
 MARKER_NAME = ".commitforge-install.json"
-POWERSHELL_ENCODED_PREFIX = (
-    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+POWERSHELL_ENCODED_SWITCHES = (
+    " -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
+# Accept both the absolute path written now and the bare `powershell.exe`
+# written by older installers, so upgrades and uninstalls still find them.
+POWERSHELL_ENCODED_COMMAND = re.compile(
+    r"(?:[^\s'\"]*[\\/])?powershell\.exe"
+    + re.escape(POWERSHELL_ENCODED_SWITCHES)
+    + r"(\S+)",
+    re.IGNORECASE,
 )
 
 
 def lifecycle_script_from_command(command: str) -> Path | None:
     """Return the script target only for a generated two-argument hook."""
-    if command.startswith(POWERSHELL_ENCODED_PREFIX):
+    powershell_match = POWERSHELL_ENCODED_COMMAND.fullmatch(command)
+    if powershell_match is not None:
         try:
-            encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+            encoded = powershell_match.group(1)
             command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
         except (UnicodeError, ValueError):
             return None

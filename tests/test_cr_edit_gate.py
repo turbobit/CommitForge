@@ -16,15 +16,21 @@ GATE = (
     / ".claude/skills/_git-atomic-core/scripts/cr_edit_gate.py"
 )
 INSTALLER = ROOT / "install.py"
-POWERSHELL_ENCODED_PREFIX = (
-    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+POWERSHELL_ENCODED_SWITCHES = (
+    " -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
+# Hook shells may not have WindowsPowerShell on PATH, so the installer writes
+# the absolute executable path.
+POWERSHELL_ENCODED_PREFIX = (
+    Path(os.environ.get("SystemRoot", "C:/Windows"))
+    / "System32/WindowsPowerShell/v1.0/powershell.exe"
+).as_posix() + POWERSHELL_ENCODED_SWITCHES
 
 
 def decoded_command(command: str) -> str:
-    if not command.startswith(POWERSHELL_ENCODED_PREFIX):
+    if POWERSHELL_ENCODED_SWITCHES not in command:
         return command
-    encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+    encoded = command.split(POWERSHELL_ENCODED_SWITCHES, 1)[1]
     return base64.b64decode(encoded, validate=True).decode("utf-16-le")
 
 
@@ -129,7 +135,7 @@ class CrEditGateTest(unittest.TestCase):
                 if line.strip().startswith("command:")
                 and (
                     "cr_edit_gate.py" in line
-                    or POWERSHELL_ENCODED_PREFIX in line
+                    or POWERSHELL_ENCODED_SWITCHES in line
                 )
             )
             scalar = hook_line.split("command:", 1)[1].strip()

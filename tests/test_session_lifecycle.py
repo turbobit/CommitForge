@@ -16,15 +16,22 @@ GUARD = ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
 LIFECYCLE = ROOT / ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py"
 INSTALLER = ROOT / "install.py"
 UNINSTALLER = ROOT / "uninstall.py"
-POWERSHELL_ENCODED_PREFIX = (
-    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+POWERSHELL_ENCODED_SWITCHES = (
+    " -NoLogo -NoProfile -NonInteractive -EncodedCommand "
 )
+# Hook shells may not have WindowsPowerShell on PATH, so the installer writes
+# the absolute executable path.
+POWERSHELL_EXE = (
+    Path(os.environ.get("SystemRoot", "C:/Windows"))
+    / "System32/WindowsPowerShell/v1.0/powershell.exe"
+).as_posix()
+POWERSHELL_ENCODED_PREFIX = POWERSHELL_EXE + POWERSHELL_ENCODED_SWITCHES
 
 
 def decoded_command(command: str) -> str:
-    if not command.startswith(POWERSHELL_ENCODED_PREFIX):
+    if POWERSHELL_ENCODED_SWITCHES not in command:
         return command
-    encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+    encoded = command.split(POWERSHELL_ENCODED_SWITCHES, 1)[1]
     return base64.b64decode(encoded, validate=True).decode("utf-16-le")
 
 
@@ -263,7 +270,7 @@ class LifecycleInstallerTest(unittest.TestCase):
                     (
                         "powershell",
                         [
-                            "powershell.exe",
+                            POWERSHELL_EXE,
                             "-NoProfile",
                             "-NonInteractive",
                             "-Command",
@@ -294,6 +301,13 @@ class LifecycleInstallerTest(unittest.TestCase):
                     env_file = project / f"{shell_name}-claude-env"
                     env = os.environ.copy()
                     env["CLAUDE_ENV_FILE"] = str(env_file)
+                    if shell_name != "powershell":
+                        # Reproduce hook shells whose PATH lacks PowerShell.
+                        env["PATH"] = os.pathsep.join(
+                            entry
+                            for entry in env.get("PATH", "").split(os.pathsep)
+                            if "windowspowershell" not in entry.lower()
+                        )
                     result = run(
                         shell_argv,
                         project,

@@ -51,8 +51,16 @@ AGENTS = (
 CORE_REFERENCE = ".claude/skills/_git-atomic-core"
 MARKER_NAME = ".commitforge-install.json"
 MARKER_SCHEMA = "commitforge-install/v1"
-POWERSHELL_ENCODED_PREFIX = (
-    "powershell.exe -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+POWERSHELL_ENCODED_SWITCHES = (
+    " -NoLogo -NoProfile -NonInteractive -EncodedCommand "
+)
+# Accept both the absolute path written now and the bare `powershell.exe`
+# written by older installers, so upgrades and uninstalls still find them.
+POWERSHELL_ENCODED_COMMAND = re.compile(
+    r"(?:[^\s'\"]*[\\/])?powershell\.exe"
+    + re.escape(POWERSHELL_ENCODED_SWITCHES)
+    + r"(\S+)",
+    re.IGNORECASE,
 )
 
 
@@ -76,7 +84,25 @@ def python_hook_command(
     encoded = base64.b64encode(powershell.encode("utf-16-le")).decode("ascii")
     # The outer shell only sees a fixed executable, switches, and Base64. Paths
     # therefore survive Git Bash, PowerShell, and cmd.exe without re-parsing.
-    return POWERSHELL_ENCODED_PREFIX + encoded
+    return windows_powershell_executable() + POWERSHELL_ENCODED_SWITCHES + encoded
+
+
+def windows_powershell_executable() -> str:
+    """Return Windows PowerShell by absolute path; hook shells may lack it on PATH."""
+    system_root = os.environ.get("SystemRoot") or os.environ.get("windir")
+    if system_root:
+        candidate = (
+            Path(system_root)
+            / "System32"
+            / "WindowsPowerShell"
+            / "v1.0"
+            / "powershell.exe"
+        )
+        # Forward slashes stay literal in Git Bash, cmd.exe, and PowerShell.
+        posix = candidate.as_posix()
+        if candidate.is_file() and not re.search(r"[\s'\"]", posix):
+            return posix
+    return "powershell.exe"
 
 
 def yaml_single_quoted(value: str) -> str:
@@ -154,9 +180,10 @@ def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
 
 def lifecycle_script_from_command(command: str) -> Path | None:
     """Return the script target only for a generated two-argument hook."""
-    if command.startswith(POWERSHELL_ENCODED_PREFIX):
+    powershell_match = POWERSHELL_ENCODED_COMMAND.fullmatch(command)
+    if powershell_match is not None:
         try:
-            encoded = command.removeprefix(POWERSHELL_ENCODED_PREFIX)
+            encoded = powershell_match.group(1)
             command = base64.b64decode(encoded, validate=True).decode("utf-16-le")
         except (UnicodeError, ValueError):
             return None
