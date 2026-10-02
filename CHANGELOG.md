@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.21.1 — 2026-10-02
+
+- Windows에서 SessionStart·SessionEnd 훅이 `powershell.exe: command not found`로
+  실패하던 문제를 고쳤다. Claude Code가 훅을 실행하는 Git Bash의 PATH에
+  WindowsPowerShell 디렉터리가 없으면 훅 명령 맨 앞의 `powershell.exe`를 찾지
+  못했다. 이제 설치기가 `SystemRoot` 기준 절대 경로
+  (`C:/Windows/System32/WindowsPowerShell/v1.0/powershell.exe`)를 슬래시 형태로
+  기록해 Git Bash·cmd.exe·PowerShell 어디서든 PATH와 무관하게 실행된다.
+  `/cr` 편집 훅도 같다
+- 설치기·제거기가 이전 형식(`powershell.exe`만 쓴 명령)과 새 형식을 모두
+  CommitForge 훅으로 인식한다. 기존 Windows 설치는 `install.py`를 다시 실행하면
+  훅이 교체된다
+
 ## 1.21.0 — 2026-10-03
 
 - `/ccf`를 **`/cc`에서 hunk 단위 분리만 뺀 명령**으로 개편했다. 이전 `/ccf`는

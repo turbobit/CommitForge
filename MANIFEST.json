@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.21.0",
+  "version": "1.21.1",
   "reproducible": true,
   "file_count": 154,
-  "total_bytes": 1846139,
+  "total_bytes": 1849238,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -342,8 +342,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 37222,
-      "sha256": "f6f3a684cc6ffd53b3dde49781a8918d833979bb0eb8f8bfc091c98968901a75"
+      "size": 38012,
+      "sha256": "54b88f458b9685a0121fbd801130ec8ca59e8f9da21ca5c501f27eac03af74de"
     },
     {
       "path": "INSTALL.md",
@@ -368,7 +368,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "65a6bd97a4a6b72911ae6c3d45991f4326c95f792e196f8bf74857a557b27585"
+      "sha256": "d41ddd0252685d9b7797956399957e1a65ce1c124b4e14794430fb8275ef6618"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -418,12 +418,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "8e617d767355c2dc8a44fabd392653d0e7d35ad228b24a9a20c3553206456935"
+      "sha256": "db65716261659345ca37f52092f2f51dfd3ce8d1c06d8c4728e04803a3449e0e"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11669,
-      "sha256": "14baa7358b25d0f869e4a7617bd26c3893a740ccb3d38d101337369ddc2a27b5"
+      "sha256": "599fe72eb85651315fdf174aadfb9a2bd479bb99049f5f9b506f81d2f63bb8ba"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "install.py",
-      "size": 14946,
-      "sha256": "e598632a432767bdb181bcdeb1a00ece05cd088b55e70195da12473ea066f54c"
+      "size": 15951,
+      "sha256": "c35fa3f72982dc6fbda3b88886800c72a8ca7eb6ec350dc04d2f63ddcc3d3ff1"
     },
     {
       "path": "install.sh",
@@ -697,8 +697,8 @@
     },
     {
       "path": "tests/test_cr_edit_gate.py",
-      "size": 7093,
-      "sha256": "a2943bb768b575c23a6a55c2f719f87fde42c364fa66f0f4fd4dacde2ced3f3c"
+      "size": 7368,
+      "sha256": "c7a54fcfd168124cc994090ce234f2574fbb3a14fcb8de96f0aaab348e628fe2"
     },
     {
       "path": "tests/test_guard.py",
@@ -752,8 +752,8 @@
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 15494,
-      "sha256": "5d20b46790b58dc1f3c72d99f37604d9f129e60d3c5cf90463bef70a221552ad"
+      "size": 16191,
+      "sha256": "d898aa5392d1bd5b4dfded18489936a15a2629395aa5ba597fc5af479a7c4f97"
     },
     {
       "path": "uninstall.ps1",
@@ -762,8 +762,8 @@
     },
     {
       "path": "uninstall.py",
-      "size": 7344,
-      "sha256": "977d5dbbb3545c19b3e8042516b8ca4b9dbab96b70e9d474773134bb9704688b"
+      "size": 7676,
+      "sha256": "c299808351ee02a529b07f2dba7efc2d415ee735c85050af7519ea11484070f7"
     },
     {
       "path": "uninstall.sh",
