@@ -121,8 +121,8 @@ Source Control 패널(diff·staging·commit이 있는 그 패널) 제목 줄에�
 
 - 제목 줄 아이콘 두 개: $(search) `/cr`(리뷰), $(git-commit) `/cc`(순차 커밋).
   아이콘 자리가 좁아 이 둘만 상시 노출합니다.
-- "..." 메뉴(넘침 메뉴) 안의 **CommitForge** 하위 메뉴: `/ccf`(파일 단위
-  빠른 커밋), `/cf`(전체를 한 커밋으로), `/cca`(리뷰·수정·검증·commit 전체
+- "..." 메뉴(넘침 메뉴) 안의 **CommitForge** 하위 메뉴: `/ccf`(hunk 분리
+  없는 파일 단위 커밋), `/cf`(전체를 한 커밋으로), `/cca`(리뷰·수정·검증·commit 전체
   실행), `CommitForge: 명령 실행`(옵션까지 고르는 전체 QuickPick).
 
 버튼을 누르면 옵션 없이 바로 그 명령을 보냅니다(QuickPick에서 Enter를 누른

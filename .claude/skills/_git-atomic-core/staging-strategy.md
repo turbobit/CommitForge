@@ -42,6 +42,8 @@ git add -- path/to/file-a path/to/file-b
 
 ## 4. 한 파일에 여러 의도가 섞인 경우
 
+`/ccf`는 이 절과 5절의 선택 patch 재구성, 6절을 적용하지 않는다. 파일 전체를 가장 지배적인 의도의 커밋에 넣고, staged·unstaged가 공존하는 파일은 `git add -- <file>`로 합친다(`ccf/SKILL.md`의 파일 단위 분리 규칙).
+
 우선순위:
 
 1. 현재 환경에서 신뢰할 수 있으면 `git add -p -- <path>`

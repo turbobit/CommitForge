@@ -237,7 +237,7 @@ class PackageMetadataTest(unittest.TestCase):
             )
 
     def test_every_command_supports_current_project_lock_clean(self) -> None:
-        for command in ("ccr", "cc", "cf", "cfr", "cr", "cca", "cpr", "cp"):
+        for command in ("ccr", "cc", "ccf", "cf", "cfr", "cr", "cca", "cpr", "cp"):
             skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
                 encoding="utf-8"
             )
@@ -535,47 +535,74 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("## `/cf`", reporting)
         self.assertIn("## `/cfr`", reporting)
 
-    def test_ccf_splits_by_intent_and_trades_the_lock_for_speed(self) -> None:
+    def test_ccf_is_cc_without_hunk_splitting(self) -> None:
+        cc = (ROOT / ".claude/skills/cc/SKILL.md").read_text(encoding="utf-8")
         ccf = (ROOT / ".claude/skills/ccf/SKILL.md").read_text(encoding="utf-8")
+        cc_frontmatter = cc.split("\n---\n", 1)[0]
         ccf_frontmatter = ccf.split("\n---\n", 1)[0]
 
         self.assertIn("disable-model-invocation: true", ccf)
-        self.assertIn("fast-commit-rules.md", ccf)
         self.assertIn("Bash(git add *)", ccf_frontmatter)
         self.assertIn("Bash(git commit *)", ccf_frontmatter)
-        self.assertIn('guard.sh" snapshot', ccf)
         for forbidden in (
             "\n  - Edit\n",
             "\n  - Write\n",
             "Bash(git push ",
             "Bash(git rebase ",
             "Bash(git reset ",
+            # Selective patches are the hunk path `/ccf` deliberately drops.
+            "Bash(git apply ",
         ):
             self.assertNotIn(forbidden, ccf_frontmatter)
 
-        # `/ccf` keeps meaning-based separation; it is not the single-bundle path.
+        # Apart from patch application, `/ccf` is pre-approved for exactly
+        # what `/cc` is, so it cannot silently lose a `/cc` safety step.
+        def tools(frontmatter: str) -> set[str]:
+            block = frontmatter.split("allowed-tools:\n", 1)[1]
+            return {
+                line.strip()[2:]
+                for line in block.splitlines()
+                if line.startswith("  - ")
+            }
+
+        self.assertEqual(
+            tools(cc_frontmatter) - {"Bash(git apply --cached *)", "Bash(git apply --check *)"},
+            tools(ccf_frontmatter),
+        )
+
+        # The full `/cc` Guard contract is kept.
+        for contract in (
+            'guard.sh" begin',
+            'guard.sh" fingerprint',
+            'guard.sh" finish',
+            'guard.sh" abort',
+            "lock-cleanup.md",
+            "atomic-commit-rules.md",
+            "staging-strategy.md",
+            "safety-and-concurrency.md",
+            "선행 커밋 의존성",
+            "`--no-verify`가 없으면",
+        ):
+            self.assertIn(contract, ccf, contract)
+        self.assertNotIn('guard.sh" snapshot', ccf)
+        self.assertNotIn("release-snapshot", ccf)
+        self.assertNotIn("fast-commit-rules.md", ccf)
+
+        # The only difference: no hunk-level splitting.
         for contract in (
             "의미별로 분리",
             "여러 개의 commit",
-            "파일 단위로만 분리한다",
             "hunk 단위로 분리하지 않는다",
-        ):
-            self.assertIn(contract, ccf, contract)
-
-        # It trades the Guard lock for speed, so the accepted risk must be stated.
-        for contract in (
-            "worktree lock을 획득하지 않는다",
-            "Diff snapshot은 남긴다",
-            "동시에 실행하지 않는다",
+            "파일 단위로만 분리한다",
+            "가장 지배적인 의도",
             "완전한 Atomic Commit이 아닐 수 있다",
         ):
             self.assertIn(contract, ccf, contract)
 
-        # Even the fastest path must not commit secrets or conflict markers.
         for contract in ("secret", "merge conflict marker", "중단"):
             self.assertIn(contract, ccf, contract)
 
-    def test_ccf_snapshot_and_grouping_contract_is_documented(self) -> None:
+    def test_ccf_contract_is_documented_in_core(self) -> None:
         rules = (
             ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"
         ).read_text(encoding="utf-8")
@@ -588,18 +615,20 @@ class PackageMetadataTest(unittest.TestCase):
         recovery = (
             ROOT / ".claude/skills/_git-atomic-core/recovery.md"
         ).read_text(encoding="utf-8")
+        staging = (
+            ROOT / ".claude/skills/_git-atomic-core/staging-strategy.md"
+        ).read_text(encoding="utf-8")
 
         self.assertIn("## `/ccf`", reporting)
-        self.assertIn("fast-commit-rules.md", core_readme)
+        self.assertIn("`/cc` 형식을 그대로 따르고", reporting)
         self.assertIn("`/ccf`", core_readme)
-        for contract in (
-            "guard.sh snapshot",
-            "lock을 획득하지 않",
-            "빠른 의미 분리",
-            "파일 단위 그룹",
-        ):
-            self.assertIn(contract, rules, contract)
-        self.assertIn("`/ccf`", recovery)
+        self.assertIn("`/ccf`는 이 절", staging)
+        # Fast Commit rules no longer govern `/ccf`.
+        self.assertIn("`/ccf`는 이 문서를 따르지 않는다", rules)
+        self.assertNotIn("## 8. `/ccf`", rules)
+        # Lock-free snapshots left by older `/ccf` stay recoverable.
+        self.assertIn("1.20.0 이하 `/ccf`", recovery)
+        self.assertIn("release-snapshot", recovery)
 
     def test_fast_commit_verification_policy_is_explicit(self) -> None:
         cf = (ROOT / ".claude/skills/cf/SKILL.md").read_text(encoding="utf-8")

@@ -80,7 +80,7 @@
       },
       {
         "command": "commitforge.send.ccf",
-        "title": "CommitForge: 파일 단위로 빠르게 커밋 (/ccf)"
+        "title": "CommitForge: 파일 단위로 의미 분리 커밋 (/ccf)"
       },
       {
         "command": "commitforge.send.cf",

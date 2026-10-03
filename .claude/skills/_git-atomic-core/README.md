@@ -1,12 +1,12 @@
 # Shared Git Atomic Core
 
-이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다. `/ccf`는 속도를 위해 `fast-commit-rules.md`와 `reporting.md`만 읽습니다.
+이 디렉터리는 CommitForge의 `/cc`, `/ccr`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`가 필요할 때 읽는 공통 지침과 안전 guard를 포함합니다. `/ccf`는 `/cc`와 같은 지침을 읽되 hunk 분리 절은 적용하지 않습니다.
 
 `SKILL.md`가 없으므로 독립 slash command로 등록되지 않습니다.
 
 - `atomic-commit-rules.md`: 분리·그룹화·순서
-- `fast-commit-rules.md`: `/cf`·`/cfr`의 단일 묶음 커밋과 대표 type, `/ccf`의 빠른 의미 분리, 공통 차단 스캔
-- `staging-strategy.md`: hunk/index 구성
+- `fast-commit-rules.md`: `/cf`·`/cfr`의 단일 묶음 커밋과 대표 type, 차단 스캔
+- `staging-strategy.md`: hunk/index 구성 (`/ccf`는 파일 단위만)
 - `commit-message-guide.md`: 한글 메시지
 - `safety-and-concurrency.md`: 잠금·스냅샷·금지 명령
 - `lock-cleanup.md`: 모든 명령의 현재 worktree `clean` 조기 종료 계약

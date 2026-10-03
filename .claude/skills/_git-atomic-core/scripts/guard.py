@@ -1111,9 +1111,10 @@ def cmd_begin(args: argparse.Namespace) -> None:
 def cmd_snapshot(args: argparse.Namespace) -> None:
     """Capture a Diff snapshot without acquiring the worktree lock.
 
-    `/ccf` uses this to keep a recoverable diff while intentionally skipping the
-    rest of the Guard contract. The snapshot is never owned by a lock, so it is
-    always preserved and only `clean` or manual deletion removes it.
+    `/ccf` up to 1.20.0 used this to keep a recoverable diff while intentionally
+    skipping the rest of the Guard contract; it is kept for those callers. The
+    snapshot is never owned by a lock, so it is always preserved and only
+    `clean` or manual deletion removes it.
     """
     cwd = Path.cwd().resolve()
     ctx = repo_context(cwd)
@@ -1706,10 +1707,10 @@ def cmd_finish(args: argparse.Namespace) -> None:
 def cmd_release_snapshot(args: argparse.Namespace) -> None:
     """Delete a lock-free Diff snapshot after its owner succeeded completely.
 
-    `/ccf` takes no worktree lock, so `finish` cannot serve it: that path
-    verifies lock ownership before deleting anything. Ownership is checked
-    against the snapshot's own marker instead, and the lock is never read,
-    written or released. The caller is expected to skip this command whenever
+    `/ccf` up to 1.20.0 took no worktree lock, so `finish` cannot serve its
+    snapshots: that path verifies lock ownership before deleting anything.
+    Ownership is checked against the snapshot's own marker instead, and the
+    lock is never read, written or released. The caller is expected to skip this command whenever
     it failed or stopped early, which is what preserves the snapshot.
     """
     ctx = repo_context(Path.cwd().resolve())

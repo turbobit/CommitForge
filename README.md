@@ -12,7 +12,7 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | `/cc` | 현재 변경을 의미 단위별로 순차 commit | 안 함 | staging·commit |
 | `/cfr` | `/cf`가 만들 단일 묶음 커밋 미리보기 | 안 함 | 안 함 |
 | `/cf` | 미커밋 변경 전부를 단일 commit으로 묶음 | 안 함 | staging·commit |
-| `/ccf` | 파일 단위로 빠르게 의미 분리해 다중 commit | 안 함 | staging·commit |
+| `/ccf` | `/cc`와 같되 hunk 분리 없이 파일 단위로 의미 분리해 다중 commit | 안 함 | staging·commit |
 | `/cr` | line-by-line 심층 코드 리뷰 | 기본 안 함, 일반 모드의 `--fix`만 허용 | 안 함 |
 | `/cca` | 리뷰·국소 수정·검증·Atomic Commit 전체 실행 | 필요 시 | staging·commit |
 | `/cpr` | committed branch의 PR 리뷰·제목·본문 미리보기 | 안 함 | 안 함 |
@@ -26,7 +26,7 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | 변경된 소스를 건드리지 않고 commit | `/cc` |
 | 미커밋 변경을 한 덩어리로 빠르게 commit | `/cf` |
 | `/cf`가 만들 커밋을 먼저 확인 | `/cfr` |
-| 의미 분리는 유지하되 최대한 빠르게 commit | `/ccf` |
+| `/cc`의 안전장치는 유지하고 hunk 분리 없이 파일 단위로 commit | `/ccf` |
 | 현재 변경·branch·PR을 읽기 전용으로 심층 리뷰 | `/cr` |
 | 리뷰에서 확인한 현재 문제만 고치고 commit하지 않음 | `/cr --fix` |
 | 리뷰부터 수정·검증·commit까지 한 번에 실행 | `/cca` |
@@ -37,7 +37,7 @@ CommitForge는 Claude Code에서 **코드 리뷰 → 안전한 수정 → 검증
 | release 준비·hotfix·프로필 저장을 실제 실행 | `/cca release`, `/cca emergency`, `/cca learn` |
 | PR 생성 전 결과와 blocker만 확인 | `/cpr --base main` |
 | 검증된 현재 branch로 GitHub PR 생성 | `/cp --base main` |
-| 현재 프로젝트에 남은 CommitForge 잠금 해제 | `/cr clean` 등 `/ccf`를 제외한 모든 명령의 `clean` |
+| 현재 프로젝트에 남은 CommitForge 잠금 해제 | `/cr clean` 등 모든 명령의 `clean` |
 
 > [!IMPORTANT]
 > **Release tag 실행 경계**
@@ -68,7 +68,7 @@ Claude Code를 열고 목적에 맞는 명령을 실행합니다.
 /ccr   # Atomic Commit 계획
 /cc    # 계획·staging·commit
 /cf    # 미커밋 변경 전부를 단일 commit (fast)
-/ccf   # 파일 단위 의미 분리 다중 commit (fast)
+/ccf   # hunk 분리 없는 파일 단위 의미 분리 다중 commit
 /cca   # 리뷰·수정·검증·commit 전체 실행
 /cpr   # Pull Request 읽기 전용 미리보기
 /cp    # branch push와 Pull Request 실제 생성
@@ -266,7 +266,6 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 ```text
 /cfr   # /cf가 만들 커밋 미리보기 (읽기 전용)
 /cf    # 미커밋 변경 전부를 단일 commit
-/ccf   # 파일 단위로 의미를 나눈 다중 commit
 ```
 
 ```text
@@ -277,6 +276,12 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 /cf --scope lib/auth --verify
 ```
 
+`/cf`의 커밋은 여러 의도가 한 덩어리에 들어가므로 Atomic Commit이 아닙니다. 공유 branch와 release 히스토리에는 `/cc` 또는 `/cca`를 사용하십시오. secret·자격 파일·merge conflict marker·산출물 대량 유입을 발견하면 **commit하지 않고 중단합니다.** 이 차단 스캔은 어떤 인자로도 끌 수 없습니다.
+
+### 파일 단위 분리 커밋 (`/ccf`)
+
+`/ccf`는 `/cc`에서 **hunk 단위 분리만 뺀** 버전입니다. Guard lock, Diff snapshot, 커밋마다의 fingerprint 재검사, 의존성 계획, 프로젝트 검증, secret 차단은 `/cc`와 똑같이 수행합니다. `git add -p`나 선택 patch를 쓰지 않으므로 hunk 분리에서 생기는 patch 적용 실패와 index 재구성 위험이 없습니다.
+
 ```text
 /ccf 캐시 레이어 정리
 ```
@@ -285,18 +290,13 @@ domain shard와 cross-file dependency task를 세 owner에게 나눕니다. 명�
 |---|---|---|---|
 | 커밋 수 | 의미 단위 여러 개 | 의미 단위 여러 개 | 단일 |
 | 분리 단위 | 파일 + hunk | 파일만 | 없음 |
-| worktree lock | 획득 | 획득하지 않음 | 획득 |
-| Diff snapshot | 생성·정리 | 성공 시 정리 · 실패 시 보관 | 생성·정리 |
-| 프로젝트 검증 | 기본 실행 | 실행하지 않음 | `--verify`일 때만 |
+| worktree lock | 획득 | 획득 | 획득 |
+| Diff snapshot | 생성·정리 | 생성·정리 | 생성·정리 |
+| fingerprint 재검사 | 커밋마다 | 커밋마다 | 함 |
+| 프로젝트 검증 | 기본 실행 | 기본 실행 | `--verify`일 때만 |
 | secret·conflict 차단 | 함 | 함 | 함 |
 
-세 명령 모두 소스 코드를 수정하지 않으며, secret·자격 파일·merge conflict marker·산출물 대량 유입을 발견하면 **commit하지 않고 중단합니다.** 이 차단 스캔은 어떤 인자로도 끌 수 없습니다.
-
-`/cf`의 커밋은 여러 의도가 한 덩어리에 들어가고, `/ccf`의 커밋은 파일 단위로만 나뉘므로 한 파일에 섞인 의도는 분리되지 않습니다. 두 결과 모두 완전한 Atomic Commit이 아닐 수 있으므로 공유 branch와 release 히스토리에는 `/cc` 또는 `/cca`를 사용하십시오.
-
-`/ccf`는 속도를 위해 worktree lock을 획득하지 않습니다. 같은 worktree에서 다른 CommitForge 명령과 **동시에 실행하지 마십시오.** 대신 Diff snapshot은 남기므로 보고에 기록된 시작 HEAD로 `git reset --soft <시작 HEAD>` 하여 되돌릴 수 있습니다.
-
-이 snapshot은 **전부 성공했을 때만 정리됩니다.** 차단 스캔에 걸리거나 커밋 도중 실패·중단하면 보존하므로, 복구가 필요한 상황에서는 항상 남아 있습니다. 성공해도 보존하려면 `--keep-snapshot`을 쓰십시오. `clean`은 이 snapshot을 삭제하지 않습니다.
+한 파일에 여러 의도가 섞여 있으면 그 파일은 가장 지배적인 의도의 커밋에 통째로 들어가며, 커밋 본문과 최종 보고에 함께 들어간 의도를 적습니다. 이런 커밋은 완전한 Atomic Commit이 아닐 수 있으므로 섞인 파일이 많으면 `/cc`를 사용하십시오.
 
 ### 심층 코드 리뷰만 실행
 
@@ -733,7 +733,7 @@ Claude가 종료 hook을 전달할 수 없거나 API 실패 후 세션을 더 �
 
 ### 현재 프로젝트 잠금 정리
 
-`/ccf`를 제외한 모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
+모든 명령에서 첫 번째 인자로 `clean`을 사용할 수 있습니다.
 
 ```text
 /cr clean
@@ -793,7 +793,7 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py begin \
 
 ### 같은 worktree
 
-`/cc`, `/cf`, `/cfr`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다. `/ccf`는 속도를 위해 lock을 획득하지 않으므로 다른 명령과 동시에 실행하면 안 됩니다.
+`/cc`, `/ccf`, `/cf`, `/cfr`, `/cr`, `/cca`, `/cpr`, `/cp`는 worktree별 advisory lock을 사용합니다. 같은 worktree에서 두 번째 실행은 중단됩니다.
 
 다만 이 lock은 다른 IDE, terminal, Git GUI를 강제로 막지 못합니다. 실행 중 다른 세션이 파일이나 index를 바꾸면 fingerprint 불일치로 재분석 또는 중단합니다.
 
@@ -810,7 +810,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 ## 작업 전 Diff 보존
 
-`/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다. `/ccf`의 snapshot은 lock 없이 만들어지므로 `finish`·`abort` 대신 `release-snapshot`으로만 삭제되며, 전부 성공했을 때만 정리됩니다.
+`/cc`, `/cf`, `/cfr`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp` 시작 시 실제 worktree의 Git directory 아래에 세션 전용 snapshot을 만듭니다. 1.20.0 이하 `/ccf`가 lock 없이 남긴 snapshot은 `finish`·`abort` 대신 `release-snapshot`으로만 삭제됩니다.
 
 ```text
 <git-dir>/claude-atomic-snapshots/<timestamp-session-random>/

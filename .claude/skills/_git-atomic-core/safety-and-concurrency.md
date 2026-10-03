@@ -30,7 +30,7 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 
 ## 2. Diff 스냅샷
 
-`/cc`, `/cr`, `/cca`, `/cpr`, `/cp`는 작업 시작 전에 guard를 실행한다.
+`/cc`, `/ccf`, `/cf`, `/cfr`, `/cr`, `/cca`, `/cpr`, `/cp`는 작업 시작 전에 guard를 실행한다.
 
 스냅샷은 현재 worktree의 실제 Git directory 아래에 생성된다.
 
@@ -76,7 +76,7 @@ guard는 worktree별 Git directory에 원자적으로 잠금 디렉터리를 만
   보존한다.
 - 수동·자동 `/compact`는 같은 세션의 연속 실행이므로 잠금을 해제하지 않는다.
   compact 뒤 `SessionStart`가 같은 ID를 다시 바인딩한다.
-- 같은 worktree에서 동시에 `/cc`, `/cr`, `/cca`, `/cpr`, `/cp`를 실행하면 두 번째 실행은 중단
+- 같은 worktree에서 동시에 `/cc`, `/ccf`, `/cr`, `/cca`, `/cpr`, `/cp`를 실행하면 두 번째 실행은 중단
 - 잠금 식별자는 명령 이름이나 부모 폴더가 아니라 `git rev-parse --git-dir`로 얻은 실제 worktree Git directory
 - 같은 부모 폴더 아래의 서로 다른 Git 저장소는 각자의 Git directory를 사용하므로 서로 차단하지 않음
 - 같은 저장소의 일반 하위 폴더는 동일한 Git directory로 해석되므로 서로 차단
@@ -181,7 +181,7 @@ git worktree add ../repo-feature-b -b feature/b
 
 - 편집 세션과 커밋 세션을 동시에 실행하지 않음
 - `/ccr`은 read-only이지만 분석 중 변경되면 계획이 낡을 수 있음
-- `/cc`·`/cr`·`/cca`·`/cpr`·`/cp` 시작 후 다른 세션의 Git/파일 변경을 중지
+- `/cc`·`/ccf`·`/cr`·`/cca`·`/cpr`·`/cp` 시작 후 다른 세션의 Git/파일 변경을 중지
 - 예상하지 못한 fingerprint 변화 시 중단
 
 ## 5. 진행 중 Git 작업

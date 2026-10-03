@@ -172,8 +172,8 @@ def resolve_ledger(
 ) -> tuple[dict[str, Path], Path, Path, str]:
     """Bind to the snapshot owned by this session, token and project root.
 
-    Reuses guard's resolution so a lock-free `/ccf` snapshot, which carries a
-    different token, is never selected. The resolved token is returned so
+    Reuses guard's resolution so a lock-free snapshot (`/ccf` up to 1.20.0),
+    which carries a different token, is never selected. The resolved token is returned so
     callers never resolve it a second time.
     """
     ctx = guard.repo_context(Path.cwd().resolve())
