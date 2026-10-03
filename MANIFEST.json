@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.20.0",
+  "version": "1.21.0",
   "reproducible": true,
   "file_count": 154,
-  "total_bytes": 1815146,
+  "total_bytes": 1846139,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -92,8 +92,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
-      "size": 3183,
-      "sha256": "88765be3eafae44a80012076412245b1808c5db65f08b3b3be059ca6b4856c45"
+      "size": 3177,
+      "sha256": "31a0bfcbb3c8cdd4437fae0d65cdd9dfa9b4203446a10a4656b9ba58df5a5307"
     },
     {
       "path": ".claude/skills/_git-atomic-core/atomic-commit-rules.md",
@@ -132,8 +132,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/fast-commit-rules.md",
-      "size": 9601,
-      "sha256": "11f1d47a12bc8c67dd25c2cf935faf84f7e58fd4ee2fd5b56fca76831ac49b8c"
+      "size": 6162,
+      "sha256": "4653333dfe61be4fb9f89a2e4e9288e377eab087b25560bc5a2efe8a57a466ef"
     },
     {
       "path": ".claude/skills/_git-atomic-core/graceful-stop.md",
@@ -172,8 +172,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/recovery.md",
-      "size": 7365,
-      "sha256": "d792d678351136bda134c73bfcf4814a42a78888e0b7b9add61ec10422ca9278"
+      "size": 8024,
+      "sha256": "2c495e0c2ad335cbe0bc83a67ecfccac47c8484e009ea5e0739743e2aac66bda"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
@@ -182,8 +182,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting.md",
-      "size": 10203,
-      "sha256": "63079a05d0e3d3b7a904f39c7b316ecd7035b011af2aba3882aeefbc4709f094"
+      "size": 10001,
+      "sha256": "061d9136548f72035d2bd15e00d36307561f43d9cc64f238175e77ab3537f027"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
@@ -207,8 +207,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 12217,
-      "sha256": "613d5c2da066b8c7195dae314a2970826a93bce55009c717782fb94c3ae28c8f"
+      "size": 15301,
+      "sha256": "e132488ead10d2c1100fbec7eb6820963dc5e0ea305baaac345e5c9d9ea8b6f4"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
@@ -227,8 +227,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 91042,
-      "sha256": "e24250c2c30fbe26df762d4869e964504c8aecbe1c28c6d1d2eddd5d7da6f2bb"
+      "size": 101511,
+      "sha256": "aa2a263f05b23b56b28445e5ada40547e37b75007e3cf81de03a2378c57deda3"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -237,8 +237,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 67973,
-      "sha256": "2be3395477ef9d3868c31aa17d1961980e284872c811a71c10132f0be15c07ec"
+      "size": 67988,
+      "sha256": "ada5707511c8964e756e3a6b15052d019e4cfba00ad8186793df1e7e3819c009"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -272,8 +272,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/staging-strategy.md",
-      "size": 5574,
-      "sha256": "8d433bc0e7099beaa53a5b9876f3d5fa026fd1122aa7bdbb40af9149499574eb"
+      "size": 5849,
+      "sha256": "69ce3a5a0f6a94b02df5763676ab880e1686371328f499d5a336681ab25746d6"
     },
     {
       "path": ".claude/skills/_git-atomic-core/validation-strategy.md",
@@ -282,18 +282,18 @@
     },
     {
       "path": ".claude/skills/cc/SKILL.md",
-      "size": 12707,
-      "sha256": "62ad441ebdad030b6b78483960195b20041e189dd9ad5024f061f82a627dfe3a"
+      "size": 14263,
+      "sha256": "83c43e7e215a4b77883aca6fced786916dcfe21b964a9b69da7ad353061f1445"
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 25793,
-      "sha256": "5d92e10a276ccdb97192dde136769c052758660d1ed7d1c71859e22433420293"
+      "size": 26342,
+      "sha256": "5520e3b04650aaa798f2c7ccc2d00534a238879d7838ecac9a3acf6089a903e4"
     },
     {
       "path": ".claude/skills/ccf/SKILL.md",
-      "size": 12627,
-      "sha256": "f7c4af8e2173e80abbe52145802d65520fcc9da0ba8500cb9749094ccdc54411"
+      "size": 18188,
+      "sha256": "b299e7a8160b9a7006c80a097778aefd269dd34f710e6c6b25379e2f6b9a3ccc"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
@@ -302,8 +302,8 @@
     },
     {
       "path": ".claude/skills/cf/SKILL.md",
-      "size": 12686,
-      "sha256": "31b6360e6320e0506517f937eace80b56b6c1e568cb59be8f658e74249e3972d"
+      "size": 14257,
+      "sha256": "2bbef8a4828e171c28e34ed90622450ce57a60818781b35d156b8a7558783dc6"
     },
     {
       "path": ".claude/skills/cfr/SKILL.md",
@@ -342,8 +342,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 34743,
-      "sha256": "70f711a46fec84527e5e668640a78b7a87b3c81a4d783d81ef36e392449eee36"
+      "size": 37222,
+      "sha256": "f6f3a684cc6ffd53b3dde49781a8918d833979bb0eb8f8bfc091c98968901a75"
     },
     {
       "path": "INSTALL.md",
@@ -362,13 +362,13 @@
     },
     {
       "path": "README.md",
-      "size": 51973,
-      "sha256": "942d0d6147345d2dbbab3b2299b411b355309dc5804e7dfb59e8e3fa43ec756a"
+      "size": 52775,
+      "sha256": "b0a90dbab06fdde1a626a4a76a24fac6a65ac0f6711f868feff68035204ae178"
     },
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "26ac7beccb7951efb69255974ffc70a13bb2e68ae84dcb5456c3fb46294bdba8"
+      "sha256": "65a6bd97a4a6b72911ae6c3d45991f4326c95f792e196f8bf74857a557b27585"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -407,8 +407,8 @@
     },
     {
       "path": "editor-extension/README.md",
-      "size": 12683,
-      "sha256": "9e136906f10766a0ae7651db2f053cf88b6e73a3fe123bb99f37e4809b9ede26"
+      "size": 12695,
+      "sha256": "59b835fbcc2800f6b7af1232fda656d832314dcfa4b8bd013b7a5006c500d564"
     },
     {
       "path": "editor-extension/esbuild.mjs",
@@ -418,12 +418,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "7612c379d5a56450ffae7cd95482497bd0708a3909c54049ccb0efe12cb30053"
+      "sha256": "8e617d767355c2dc8a44fabd392653d0e7d35ad228b24a9a20c3553206456935"
     },
     {
       "path": "editor-extension/package.json",
-      "size": 11665,
-      "sha256": "19b41e929113a84bd3a982eab64510fecd371a27ca87dc77afd9347b0c7773ab"
+      "size": 11669,
+      "sha256": "14baa7358b25d0f869e4a7617bd26c3893a740ccb3d38d101337369ddc2a27b5"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -682,8 +682,8 @@
     },
     {
       "path": "install.py",
-      "size": 14931,
-      "sha256": "038d51eb6adcde08a35ce742273ea0529696a1796a6cfb0f3388a68ca672e09d"
+      "size": 14946,
+      "sha256": "e598632a432767bdb181bcdeb1a00ece05cd088b55e70195da12473ea066f54c"
     },
     {
       "path": "install.sh",
@@ -702,8 +702,8 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 46021,
-      "sha256": "fb8614683538ef4c7b6db60120f340b0c4fbec53fca90659b027132f512f9b0c"
+      "size": 51122,
+      "sha256": "1d6557d210709872c0b7caab4ad37b2bdd0ddd259fbbfe08b4a07f3dd80d43e3"
     },
     {
       "path": "tests/test_install_marker.py",
@@ -717,8 +717,8 @@
     },
     {
       "path": "tests/test_package.py",
-      "size": 34634,
-      "sha256": "b81b9d1231f76d9deb6876514469e83a90289772ecbce45deafddd17e682ad70"
+      "size": 37122,
+      "sha256": "ae66e58aa1bc0fa3e7d20daf899d0c5df3f3f650867dc7b8fb50325681814b21"
     },
     {
       "path": "tests/test_pr_context.py",

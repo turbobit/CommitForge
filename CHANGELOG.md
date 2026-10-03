@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.21.0 — 2026-10-03
+
+- `/ccf`를 **`/cc`에서 hunk 단위 분리만 뺀 명령**으로 개편했다. 이전 `/ccf`는
+  속도를 위해 worktree lock, fingerprint 재검사, 의존성 계획, 프로젝트 검증을
+  건너뛰고 staging 규칙 문서도 읽지 않았다. 이제 Guard `begin`·`finish`·`abort`,
+  커밋마다 fingerprint 재검사, 의존성 계획, 기본 프로젝트 검증, `clean`을 `/cc`와
+  똑같이 쓴다. `git add -p`와 `git apply --cached`는 쓰지 않으므로 patch 적용
+  실패와 index 재구성 위험이 없다
+- 한 파일에 의도가 섞이면 가장 지배적인 의도의 커밋에 파일째 넣고 커밋 본문과
+  보고에 함께 들어간 의도를 적는다. 선행 조건이 깨지면 커밋을 합치거나 그
+  파일의 커밋을 앞에 둔다
+- `fast-commit-rules.md`는 `/cf`·`/cfr` 전용이 됐다. 1.20.0 이하 `/ccf`가 lock
+  없이 남긴 snapshot을 지우는 `release-snapshot`은 유지한다
+- Guard에 **변경 보존 검사**를 추가했다. 다른 장비에서 `/ccf`가 `git add` 뒤
+  `git reset --hard`를 실행해 기존 파일 수정 수백 개가 사라졌는데, working
+  tree가 깨끗해 성공으로 처리되고 snapshot까지 지워진 사례가 계기다. clean
+  여부는 성공의 증거가 아니다
+- `begin`이 시작 working tree 전체를 git tree로 기록하고
+  `refs/commitforge/snapshots/<snapshot>` ref로 고정한다. 실제 index와 파일은
+  바꾸지 않는다. snapshot 디렉터리가 사라져도 git 안에서 복원할 수 있다
+- 새 `conserve` 명령과 `finish`·`release-snapshot`은 시작 시점에 바뀌어 있던
+  경로가 시작 HEAD 내용으로 돌아갔거나 사라졌는지(`lost`), HEAD가 되감겼는지
+  (`head_rewound`)를 확인하고, 해당하면 `worktree_changes_lost`로 거부해
+  snapshot과 ref를 보존한다. 우회 옵션은 없다. 정상 `finish`는 ref도 지운다
+- `/cc`·`/ccf`·`/cf`는 커밋마다 `conserve`를 실행하고, 유실을 감지하면 커밋을
+  멈추고 `abort`한 뒤 `git restore --source=<ref> --worktree -- <path>` 복원
+  명령을 안내한다. staging 정리 용도로 reset·checkout·stash·clean을 쓰지
+  않는다는 규칙도 명시했다
+- 검사는 `finish`에 들어가므로 `/cca`, `/cr --fix`, `/cp`에도 적용된다.
+  `/cca` 자동 수정이 파일 전체를 시작 HEAD와 같게 되돌리면 유실로 판정해
+  실패로 끝나고 snapshot이 남는다
+
 ## 1.20.0 — 2026-09-19
 
 - 리뷰 heuristic에 **도달성(reachability)** 축을 도입해 "이론적 가능성"과 "실제
