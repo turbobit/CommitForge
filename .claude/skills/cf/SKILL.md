@@ -97,7 +97,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
-JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`를 작업 완료까지 보관한다.
+JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`, `recovery_ref`를 작업 완료까지 보관한다.
 
 - `ok: false`이면 어떤 Git 변경도 수행하지 않고 원인을 보고한다.
 - Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
@@ -117,6 +117,7 @@ JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`를 작업 �
   사용자 승인을 받아 실행한다.
 - snapshot 경고가 있으면 위험을 평가하고 결과에 기록한다.
 - 이후 실패하거나 중단하면 반드시 `abort`로 **자신의 lock만 해제하고 snapshot은 보존**한다.
+- 작업 중 working tree를 바꾸거나 HEAD를 되돌리는 명령(`git reset`, `git checkout`, `git restore --worktree`, `git stash`, `git clean`)을 실행하지 않는다. staging이 꼬여도 `git restore --staged -- <경로>`로 index만 되돌리고, 그래도 설명할 수 없으면 `abort`한다 (`safety-and-concurrency.md` 2.1절).
 
 ## 2. 대상 인벤토리
 
@@ -246,6 +247,17 @@ git status --short --branch --untracked-files=all
 
 hook이 파일을 수정했거나 예상하지 않은 변경이 생겼으면 그 사실을 그대로 보고한다. 추가 커밋으로 덮지 않는다.
 
+커밋 뒤 정리 전에 변경 보존을 확인한다.
+
+```bash
+bash ".claude/skills/_git-atomic-core/scripts/guard.sh" conserve \
+  --session "<session>" \
+  --token "<token>" \
+  --snapshot "<snapshot>"
+```
+
+`conserve`는 시작 시점의 변경이 커밋되지 않은 채 사라졌는지(`lost`) 확인한다. `ok: false`·`reason=worktree_changes_lost`이면 더 이상 stage·commit하지 않고 아래 “변경 유실 감지” 절차를 따른다.
+
 ## 9. 완료 조건
 
 기본 모드에서는 모든 미커밋 변경이 단일 커밋에 들어가고 working tree/index가 깨끗해야 한다.
@@ -284,6 +296,16 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
 
 snapshot을 삭제하지 않는다.
 
+### 변경 유실 감지 (`reason=worktree_changes_lost`)
+
+`conserve` 또는 `finish`가 이 사유로 실패하면 working tree가 깨끗해 보여도 **성공이 아니다.**
+
+1. 더 이상 stage·commit하지 않는다. reset·checkout·stash로 "정리"하지 않는다.
+2. `abort`로 lock만 해제한다. snapshot과 recovery ref는 남는다.
+3. `conservation.lost` 경로, `head_rewound`, `recovery_ref`를 그대로 보고하고 복원 명령(`git restore --source=<recovery_ref> --worktree -- <path>`)을 안내한다. 복원은 사용자 승인 없이 실행하지 않는다.
+
+`finish`를 다른 옵션으로 다시 실행해 이 검사를 우회하지 않는다.
+
 ## 11. 최종 보고
 
 `.claude/skills/_git-atomic-core/reporting.md`의 `/cf` 형식을 따라 한글로 보고한다.
@@ -297,6 +319,7 @@ snapshot을 삭제하지 않는다.
 - 시작/최종 HEAD
 - 남은 변경과 clean 여부
 - snapshot 삭제/보존 위치
+- 변경 보존 검사 결과 (`reporting.md` 공통 변경 보존 형식)
 - lock 해제 여부
 - push하지 않았음
 - **이 커밋은 Atomic Commit이 아니다**는 경고와, 공유 히스토리에는 `/cc` 또는 `/cca`를 권장한다는 안내

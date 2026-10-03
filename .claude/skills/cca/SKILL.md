@@ -488,12 +488,16 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
 
 snapshot은 삭제하지 않는다.
 
+### 변경 유실 감지
+
+`finish`가 `reason=worktree_changes_lost`로 거부하면 시작 시점의 변경 일부가 커밋되지 않은 채 사라진 것이다. 자동 수정이 파일 전체를 시작 HEAD 내용으로 되돌린 경우에도 같은 판정이 나므로 성공으로 보지 않는다. 더 이상 commit하지 않고 `abort`한 뒤 `conservation.lost`, `head_rewound`, `recovery_ref`와 복원 명령을 보고한다 (`safety-and-concurrency.md` 2.1절). `finish`를 다른 옵션으로 다시 실행해 우회하지 않는다.
+
 ## 10. 최종 보고
 
 `.claude/skills/_git-atomic-core/reporting.md`의 `/cca` 형식으로 한글 보고한다.
 
 포함: 공통 판정과 한 줄 근거, reviewer별 finding과 Gate, 격리 검증의 `ISOLATED`·`SELF`·`UNVERIFIED`·`REJECTED` 수, 채택/기각 finding, 자동 수정, 실행·생략 검증,
 commit hash·제목·목적·통계, 시작·최종 HEAD, breaking/migration/deployment,
-남은 변경·clean 여부, snapshot, lock 해제, push하지 않았음, 실패 복구 방법.
+남은 변경·clean 여부, snapshot, 변경 보존 검사 결과, lock 해제, push하지 않았음, 실패 복구 방법.
 
 완료되지 않은 작업을 성공으로 표현하지 않는다.

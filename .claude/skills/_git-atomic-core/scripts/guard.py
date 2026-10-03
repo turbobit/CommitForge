@@ -5,6 +5,8 @@ The guard provides:
 - a per-worktree advisory lock;
 - a session-unique snapshot of staged/unstaged diffs and untracked files;
 - repository fingerprints for TOCTOU detection;
+- a recovery ref pinning the starting working tree, and a conservation check
+  that refuses to call a run successful when a starting change was discarded;
 - an explicit current-worktree lock cleanup command that preserves snapshots;
 - safe cleanup that only removes the snapshot owned by the invoking session.
 
@@ -25,6 +27,7 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 from typing import Any, Optional
 
 
@@ -32,6 +35,8 @@ SCHEMA_VERSION = 1
 LOCK_DIR_NAME = "claude-atomic.lock"
 SNAPSHOT_DIR_NAME = "claude-atomic-snapshots"
 MARKER_NAME = ".cca-snapshot.json"
+RECOVERY_REF_PREFIX = "refs/commitforge/snapshots/"
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 DEFAULT_STALE_AFTER_SECONDS = 3600
 DEFAULT_GIT_LOCK_STALE_AFTER_SECONDS = 300
 
@@ -902,6 +907,189 @@ def resolve_owned_review_context(
     return resolved_token, matches[0]
 
 
+def run_git_env(args: list[str], *, cwd: Path, env: dict[str, str]) -> bytes:
+    proc = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env={**os.environ, **env},
+        check=False,
+    )
+    if proc.returncode != 0:
+        stderr = proc.stderr.decode("utf-8", "replace").strip()
+        raise GuardError(f"git {' '.join(args)} 실패: {stderr or 'unknown error'}")
+    return proc.stdout
+
+
+def worktree_tree(ctx: dict[str, Path], *, include_untracked: bool) -> str:
+    """Write the current working-tree content as a tree object.
+
+    A throwaway copy of the index is used, so the real index and the working
+    tree are never touched; copying (instead of starting from `read-tree`)
+    keeps git's stat cache, so only files that actually changed are hashed.
+    The resulting objects outlive the snapshot directory, which is what lets a
+    change destroyed by `reset --hard` or `stash` be restored from git itself.
+    """
+    root = ctx["root"]
+    fd, raw = tempfile.mkstemp(prefix="claude-atomic-index-", dir=str(ctx["git_dir"]))
+    os.close(fd)
+    temp_index = Path(raw)
+    try:
+        real_index = ctx["git_dir"] / "index"
+        env = {"GIT_INDEX_FILE": str(temp_index)}
+        if real_index.is_file():
+            shutil.copyfile(real_index, temp_index)
+        else:
+            temp_index.unlink()
+            head = current_head(root)
+            run_git_env(
+                ["read-tree", head] if head != "UNBORN" else ["read-tree", "--empty"],
+                cwd=root,
+                env=env,
+            )
+        run_git_env(
+            ["add", "-A" if include_untracked else "-u", "--", "."],
+            cwd=root,
+            env=env,
+        )
+        return decode(run_git_env(["write-tree"], cwd=root, env=env)).strip()
+    finally:
+        temp_index.unlink(missing_ok=True)
+
+
+def recovery_ref_name(snapshot: Path) -> str:
+    # Session ids may contain "..", which a ref name may not.
+    return RECOVERY_REF_PREFIX + snapshot.name.replace(".", "_")
+
+
+def pin_recovery_ref(
+    ctx: dict[str, Path], snapshot: Path, tree: str, head: str
+) -> tuple[str, str]:
+    """Point a ref at a commit of the starting working tree so gc keeps it."""
+    env = {
+        "GIT_AUTHOR_NAME": "CommitForge Guard",
+        "GIT_AUTHOR_EMAIL": "guard@commitforge.invalid",
+        "GIT_COMMITTER_NAME": "CommitForge Guard",
+        "GIT_COMMITTER_EMAIL": "guard@commitforge.invalid",
+    }
+    # A signing config would make this internal commit prompt or fail.
+    argv = [
+        "-c", "commit.gpgSign=false",
+        "commit-tree", tree, "-m", f"CommitForge snapshot {snapshot.name}",
+    ]
+    if head != "UNBORN":
+        argv[4:4] = ["-p", head]
+    commit = decode(run_git_env(argv, cwd=ctx["root"], env=env)).strip()
+    ref = recovery_ref_name(snapshot)
+    run_git(["update-ref", ref, commit], cwd=ctx["root"])
+    return ref, commit
+
+
+def drop_recovery_ref(ctx: dict[str, Path], metadata: dict[str, Any]) -> bool:
+    ref = metadata.get("recovery_ref")
+    if not isinstance(ref, str) or not ref.startswith(RECOVERY_REF_PREFIX):
+        return False
+    commit = metadata.get("recovery_commit")
+    argv = ["update-ref", "-d", ref]
+    if isinstance(commit, str) and commit:
+        argv.append(commit)
+    proc = subprocess.run(
+        ["git", *argv],
+        cwd=str(ctx["root"]),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return proc.returncode == 0
+
+
+def changed_paths(root: Path, left: str, right: str) -> set[str]:
+    raw = run_git(
+        ["diff-tree", "-r", "--no-renames", "--name-only", "-z", left, right],
+        cwd=root,
+    )
+    return {decode(item) for item in raw.split(b"\0") if item}
+
+
+def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[str, Any]:
+    """Check that every change present at the start still exists somewhere.
+
+    A clean working tree is not proof that the changes were committed:
+    `reset --hard`, `checkout -- .`, `stash` and `clean` also leave it clean.
+    The commands only stage and commit, so every path that differed from the
+    starting HEAD must still differ from it in the current working tree. A path
+    that went back to its starting-HEAD content (or vanished, for a new file)
+    was discarded, not committed.
+    """
+    start_tree = metadata.get("worktree_tree")
+    if not isinstance(start_tree, str) or not start_tree:
+        return {
+            "ok": True,
+            "available": False,
+            "reason": metadata.get("worktree_tree_error") or "snapshot_without_worktree_tree",
+            "lost": [],
+            "altered": [],
+            "head_rewound": False,
+        }
+    root = ctx["root"]
+    head = metadata.get("head")
+    base = head if isinstance(head, str) and head != "UNBORN" else EMPTY_TREE
+    current = worktree_tree(
+        ctx, include_untracked=metadata.get("worktree_tree_scope") == "all"
+    )
+    started = changed_paths(root, base, start_tree)
+    still_changed = changed_paths(root, base, current)
+    lost = sorted(started - still_changed)
+    altered = sorted((changed_paths(root, start_tree, current) & started) - set(lost))
+
+    head_rewound = False
+    if base != EMPTY_TREE:
+        now = current_head(root)
+        if now == "UNBORN":
+            head_rewound = True
+        else:
+            proc = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", base, now],
+                cwd=str(root),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            head_rewound = proc.returncode != 0
+
+    ref = metadata.get("recovery_ref")
+    return {
+        "ok": not lost and not head_rewound,
+        "available": True,
+        "start_tree": start_tree,
+        "current_tree": current,
+        "started_paths": len(started),
+        "lost": lost,
+        "altered": altered,
+        "head_rewound": head_rewound,
+        "recovery_ref": ref,
+        "restore_hint": (
+            f"git restore --source={ref} --worktree -- <path>"
+            if isinstance(ref, str)
+            else None
+        ),
+    }
+
+
+def require_conservation(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[str, Any]:
+    report = conservation_report(ctx, metadata)
+    if not report["ok"]:
+        raise GuardError(
+            "시작 시점의 변경이 커밋되지 않은 채 사라져 스냅샷을 삭제하지 않습니다. "
+            "작업을 abort하고 recovery_ref에서 복원하십시오. "
+            f"lost={report['lost'][:20]} head_rewound={report['head_rewound']}",
+            reason="worktree_changes_lost",
+            conservation=report,
+        )
+    return report
+
+
 def release_lock(ctx: dict[str, Path], session: str, token: str) -> None:
     verify_owner(ctx, session, token)
     lock_dir, _ = lock_paths(ctx)
@@ -927,6 +1115,28 @@ def capture_snapshot(
     warnings: list[str] = []
     manifest, untracked_total = untracked_manifest(root)
     fingerprint = repository_fingerprint(root)
+    start_head = current_head(root)
+
+    # Large untracked sets are left out of the tree for the same reason they
+    # are left out of the archive: hashing them would bloat the object store.
+    tree_scope = "all" if untracked_total <= max_untracked_bytes else "tracked"
+    start_tree: Optional[str] = None
+    tree_error: Optional[str] = None
+    ref: Optional[str] = None
+    ref_commit: Optional[str] = None
+    try:
+        start_tree = worktree_tree(ctx, include_untracked=tree_scope == "all")
+        ref, ref_commit = pin_recovery_ref(ctx, snapshot, start_tree, start_head)
+    except (GuardError, OSError) as exc:
+        tree_error = str(exc)
+        warnings.append(
+            "작업 트리를 git 객체로 고정하지 못해 변경 보존 검사를 할 수 없습니다: "
+            f"{tree_error}"
+        )
+    if tree_scope == "tracked" and start_tree:
+        warnings.append(
+            "추적되지 않은 파일이 한도를 넘어 변경 보존 검사는 추적 파일만 대상으로 합니다."
+        )
 
     files: dict[str, bytes] = {
         "status.txt": run_git(["status", "--short", "--branch", "--untracked-files=all"], cwd=root),
@@ -982,9 +1192,14 @@ def capture_snapshot(
         "project_root": str(root),
         "git_dir": str(ctx["git_dir"]),
         "common_dir": str(ctx["common_dir"]),
-        "head": current_head(root),
+        "head": start_head,
         "branch": branch_name(root),
         "fingerprint": fingerprint,
+        "worktree_tree": start_tree,
+        "worktree_tree_scope": tree_scope,
+        "worktree_tree_error": tree_error,
+        "recovery_ref": ref,
+        "recovery_commit": ref_commit,
         "untracked_total_bytes": untracked_total,
         "untracked_archived": archived_untracked,
         "untracked_manifest": manifest,
@@ -993,7 +1208,7 @@ def capture_snapshot(
     }
     marker = snapshot / MARKER_NAME
     marker.write_text(json.dumps(metadata, ensure_ascii=True, indent=2), encoding="utf-8")
-    return snapshot, warnings, fingerprint
+    return snapshot, warnings, fingerprint, ref
 
 
 def validate_snapshot(ctx: dict[str, Path], snapshot: Path, session: str, token: str) -> dict[str, Any]:
@@ -1073,7 +1288,7 @@ def cmd_begin(args: argparse.Namespace) -> None:
         stale_after=int(getattr(args, "stale_after", DEFAULT_STALE_AFTER_SECONDS)),
     )
     try:
-        snapshot, warnings, fingerprint = capture_snapshot(
+        snapshot, warnings, fingerprint, recovery_ref = capture_snapshot(
             ctx,
             session,
             token,
@@ -1096,6 +1311,7 @@ def cmd_begin(args: argparse.Namespace) -> None:
             "head": current_head(ctx["root"]),
             "branch": branch_name(ctx["root"]),
             "fingerprint": fingerprint["fingerprint"],
+            "recovery_ref": recovery_ref,
             "warnings": warnings,
             "reclaimed_lock": reclaimed is not None,
             "reclaim_reason": reclaimed["reason"] if reclaimed else None,
@@ -1130,7 +1346,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
     # the worktree lock, which this command never takes, so the only way to
     # spend the token is `release-snapshot`.
     token = secrets.token_hex(24)
-    snapshot, warnings, fingerprint = capture_snapshot(
+    snapshot, warnings, fingerprint, recovery_ref = capture_snapshot(
         ctx,
         session,
         token,
@@ -1144,6 +1360,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
             "locked": False,
             "token": token,
             "snapshot": str(snapshot),
+            "recovery_ref": recovery_ref,
             "project_root": str(ctx["root"]),
             "head": current_head(ctx["root"]),
             "branch": branch_name(ctx["root"]),
@@ -1170,6 +1387,23 @@ def cmd_fingerprint(args: argparse.Namespace) -> None:
         }
     )
     emit(payload)
+
+
+def cmd_conserve(args: argparse.Namespace) -> None:
+    """Read-only mid-run check that no starting change has been discarded."""
+    ctx = repo_context(Path.cwd().resolve())
+    session = safe_session(args.session)
+    metadata = validate_snapshot(ctx, Path(args.snapshot), session, args.token)
+    report = conservation_report(ctx, metadata)
+    if not report["ok"]:
+        raise GuardError(
+            "시작 시점의 변경이 커밋되지 않은 채 사라졌습니다. 즉시 중단하고 "
+            "abort한 뒤 recovery_ref에서 복원하십시오. "
+            f"lost={report['lost'][:20]} head_rewound={report['head_rewound']}",
+            reason="worktree_changes_lost",
+            conservation=report,
+        )
+    emit({"ok": True, "conservation": report})
 
 
 def review_invariants(
@@ -1671,6 +1905,8 @@ def cmd_finish(args: argparse.Namespace) -> None:
 
     ledger_result, ledger_bypassed = apply_ledger_gate(ctx, snapshot, args)
 
+    conservation = require_conservation(ctx, metadata)
+
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
     )
@@ -1685,13 +1921,17 @@ def cmd_finish(args: argparse.Namespace) -> None:
     # is capped at a 20-id sample, so deleting the snapshot here would destroy
     # the audit trail of the very thing that was bypassed. Keep it.
     keep_snapshot = args.keep_snapshot or ledger_bypassed
+    ref_removed = False
     if not keep_snapshot:
         shutil.rmtree(snapshot)
+        ref_removed = drop_recovery_ref(ctx, metadata)
     release_lock(ctx, session, token)
     emit(
         {
             "ok": True,
             "snapshot_removed": not keep_snapshot,
+            "recovery_ref_removed": ref_removed,
+            "conservation": conservation,
             "snapshot": str(snapshot),
             "snapshot_kept_for_bypass": bool(ledger_bypassed and not args.keep_snapshot),
             "lock_released": True,
@@ -1730,6 +1970,8 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
                 reason="snapshot_audit_failed",
             )
 
+    conservation = require_conservation(ctx, metadata)
+
     dirty = decode(
         run_git(["status", "--porcelain", "--untracked-files=all"], cwd=ctx["root"])
     )
@@ -1741,12 +1983,15 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
         )
 
     shutil.rmtree(snapshot.resolve())
+    ref_removed = drop_recovery_ref(ctx, metadata)
     emit(
         {
             "ok": True,
             "session": session,
             "snapshot": str(snapshot),
             "snapshot_removed": True,
+            "recovery_ref_removed": ref_removed,
+            "conservation": conservation,
             "lock_released": False,
             "worktree_clean": not bool(dirty),
             "snapshot_audit": audit_result,
@@ -1778,13 +2023,21 @@ def cmd_abort(args: argparse.Namespace) -> None:
                 matching_snapshots=[str(path) for path in matches],
             )
         snapshot = matches[0]
-    validate_snapshot(ctx, snapshot, session, args.token)
+    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    # Informational only: abort must release the lock even when the check
+    # itself cannot run, and it never deletes anything either way.
+    try:
+        conservation: dict[str, Any] = conservation_report(ctx, metadata)
+    except (GuardError, OSError) as exc:
+        conservation = {"ok": None, "available": False, "reason": str(exc)}
     release_lock(ctx, session, args.token)
     emit(
         {
             "ok": True,
             "snapshot_removed": False,
             "snapshot": str(snapshot),
+            "recovery_ref": metadata.get("recovery_ref"),
+            "conservation": conservation,
             "lock_released": True,
             "message": "작업 실패/중단으로 Diff 스냅샷은 보존했습니다.",
         }
@@ -2224,6 +2477,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("fingerprint", help="Compute a read-only repository fingerprint")
 
+    conserve = sub.add_parser(
+        "conserve",
+        help="Verify that no change present at begin was discarded without a commit",
+    )
+    conserve.add_argument("--session", required=True)
+    conserve.add_argument("--token", required=True)
+    conserve.add_argument("--snapshot", required=True)
+
     finish = sub.add_parser("finish", help="Delete owned snapshot and release lock")
     finish.add_argument("--session", required=True)
     finish.add_argument(
@@ -2335,6 +2596,7 @@ def main() -> None:
         "snapshot": cmd_snapshot,
         "release-snapshot": cmd_release_snapshot,
         "fingerprint": cmd_fingerprint,
+        "conserve": cmd_conserve,
         "verify-review": cmd_verify_review,
         "audit-snapshot": cmd_audit_snapshot,
         "finish": cmd_finish,

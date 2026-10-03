@@ -602,6 +602,35 @@ class PackageMetadataTest(unittest.TestCase):
         for contract in ("secret", "merge conflict marker", "중단"):
             self.assertIn(contract, ccf, contract)
 
+    def test_commit_commands_verify_change_conservation(self) -> None:
+        """A clean tree after `reset --hard` must never pass as success."""
+        safety = (
+            ROOT / ".claude/skills/_git-atomic-core/safety-and-concurrency.md"
+        ).read_text(encoding="utf-8")
+        for contract in (
+            "### 2.1 변경 보존 검사",
+            "working tree가 깨끗하다는 것은 성공의 증거가 아니다",
+            "worktree_changes_lost",
+            "recovery ref",
+        ):
+            self.assertIn(contract, safety, contract)
+
+        for command in ("cc", "ccf", "cf"):
+            skill = (ROOT / f".claude/skills/{command}/SKILL.md").read_text(
+                encoding="utf-8"
+            )
+            for contract in (
+                'guard.sh" conserve',
+                "recovery_ref",
+                "변경 유실 감지",
+                "우회하지 않는다",
+                "`git reset`, `git checkout`, `git restore --worktree`, `git stash`, `git clean`",
+            ):
+                self.assertIn(contract, skill, f"{command}: {contract}")
+
+        cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("worktree_changes_lost", cca)
+
     def test_ccf_contract_is_documented_in_core(self) -> None:
         rules = (
             ROOT / ".claude/skills/_git-atomic-core/fast-commit-rules.md"

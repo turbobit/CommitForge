@@ -45,6 +45,102 @@ class GuardIntegrationTest(unittest.TestCase):
             raise AssertionError(f"invalid JSON: {proc.stdout}\n{proc.stderr}") from exc
         return proc, payload
 
+    def begin_with_changes(self, session: str) -> dict:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        (self.tmp / "other.txt").write_text("other\n", encoding="utf-8")
+        _, started = self.guard("begin", "--session", session)
+        self.assertTrue(started["recovery_ref"].startswith("refs/commitforge/snapshots/"))
+        return started
+
+    def owner_args(self, started: dict) -> list[str]:
+        return [
+            "--session", started["session"],
+            "--token", started["token"],
+            "--snapshot", started["snapshot"],
+        ]
+
+    def test_finish_refuses_when_reset_hard_discarded_uncommitted_changes(self) -> None:
+        """A clean tree after `reset --hard` must not pass as a successful run."""
+        started = self.begin_with_changes("conserve-reset")
+        run(["git", "add", "other.txt"], self.tmp)
+        run(["git", "commit", "-qm", "partial"], self.tmp)
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+        self.assertEqual(run(["git", "status", "--porcelain"], self.tmp).stdout, "")
+
+        proc, mid = self.guard("conserve", *self.owner_args(started), check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(mid["reason"], "worktree_changes_lost")
+        self.assertEqual(mid["conservation"]["lost"], ["tracked.txt"])
+
+        proc, refused = self.guard("finish", *self.owner_args(started), check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "worktree_changes_lost")
+        self.assertTrue(Path(started["snapshot"]).is_dir())
+
+        _, aborted = self.guard("abort", *self.owner_args(started))
+        self.assertEqual(aborted["conservation"]["lost"], ["tracked.txt"])
+        run(
+            ["git", "restore", f"--source={started['recovery_ref']}", "--worktree",
+             "--", "tracked.txt"],
+            self.tmp,
+        )
+        self.assertEqual(
+            (self.tmp / "tracked.txt").read_text(encoding="utf-8"), "base\nchanged\n"
+        )
+
+    def test_conserve_detects_stash_and_deleted_untracked_file(self) -> None:
+        started = self.begin_with_changes("conserve-stash")
+        run(["git", "stash", "-q", "--include-untracked"], self.tmp)
+        proc, report = self.guard("conserve", *self.owner_args(started), check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(report["conservation"]["lost"], ["other.txt", "tracked.txt"])
+        self.guard("abort", *self.owner_args(started))
+
+    def test_conserve_detects_rewound_head(self) -> None:
+        started = self.begin_with_changes("conserve-rewind")
+        run(["git", "add", "-A"], self.tmp)
+        run(["git", "commit", "-qm", "all"], self.tmp)
+        run(["git", "reset", "-q", "--soft", "HEAD~1"], self.tmp)
+        run(["git", "reset", "-q", "--hard", "HEAD~0"], self.tmp)
+        proc, report = self.guard("conserve", *self.owner_args(started), check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(report["conservation"]["lost"])
+        self.guard("abort", *self.owner_args(started))
+
+    def test_committed_changes_pass_and_finish_drops_recovery_ref(self) -> None:
+        started = self.begin_with_changes("conserve-ok")
+        run(["git", "add", "other.txt"], self.tmp)
+        run(["git", "commit", "-qm", "other"], self.tmp)
+        _, mid = self.guard("conserve", *self.owner_args(started))
+        self.assertEqual(mid["conservation"]["lost"], [])
+        run(["git", "add", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-qm", "tracked"], self.tmp)
+
+        _, finished = self.guard("finish", *self.owner_args(started))
+        self.assertTrue(finished["conservation"]["ok"])
+        self.assertTrue(finished["recovery_ref_removed"])
+        refs = run(["git", "for-each-ref", "refs/commitforge/"], self.tmp).stdout
+        self.assertEqual(refs, "")
+
+    def test_begin_leaves_real_index_and_worktree_untouched(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nstaged\n", encoding="utf-8")
+        run(["git", "add", "tracked.txt"], self.tmp)
+        (self.tmp / "tracked.txt").write_text("base\nstaged\nunstaged\n", encoding="utf-8")
+        (self.tmp / "new.txt").write_text("new\n", encoding="utf-8")
+        before = run(["git", "status", "--porcelain=v2"], self.tmp).stdout
+        cached = run(["git", "diff", "--cached"], self.tmp).stdout
+
+        _, started = self.guard("begin", "--session", "conserve-index")
+
+        self.assertEqual(run(["git", "status", "--porcelain=v2"], self.tmp).stdout, before)
+        self.assertEqual(run(["git", "diff", "--cached"], self.tmp).stdout, cached)
+        self.assertEqual(
+            list(Path(run(["git", "rev-parse", "--absolute-git-dir"], self.tmp).stdout.strip())
+                 .glob("claude-atomic-index-*")),
+            [],
+        )
+        self.guard("abort", *self.owner_args(started))
+
     def test_snapshot_lock_fingerprint_abort_and_finish(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
         (self.tmp / "untracked.txt").write_text("new\n", encoding="utf-8")
@@ -167,7 +263,10 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertIn("unexpected=['stray.diff']", rejected["error"])
         stray.unlink()
 
-        run(["git", "restore", "--worktree", "--staged", "."], self.tmp)
+        # Commit rather than discard: finish now refuses a run whose starting
+        # change vanished without a commit.
+        run(["git", "add", "tracked.txt"], self.tmp)
+        run(["git", "commit", "-qm", "change"], self.tmp)
         _, finished = self.guard(
             "finish",
             "--session", started["session"],

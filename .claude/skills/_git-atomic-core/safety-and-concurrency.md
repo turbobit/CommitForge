@@ -40,8 +40,55 @@ tag 생성도 기본적으로 금지한다. 유일한 예외는 `/cca release --
 - untracked manifest와 가능한 경우 tar archive
 - HEAD/branch/fingerprint
 - 세션 소유권 token
+- 시작 시점 working tree 전체를 담은 git tree와 이를 가리키는 recovery ref
+  (`refs/commitforge/snapshots/<snapshot 이름>`)
 
 성공적으로 모든 의도된 커밋과 검증이 끝나면 `finish`로 해당 세션 스냅샷만 제거한다.
+
+### 2.1 변경 보존 검사
+
+working tree가 깨끗하다는 것은 성공의 증거가 아니다. `git reset --hard`,
+`git checkout -- .`, `git stash`, `git clean`도 working tree를 깨끗하게 만든다.
+과거 `/ccf`에서 `git add` 뒤 `git reset --hard`가 실행되어 기존 파일 수정 수백 개가
+사라졌는데도 결과가 깨끗해 성공으로 처리된 사례가 있다.
+
+그래서 guard는 다음을 함께 확인한다.
+
+- `begin`은 시작 시점 working tree(추적하지 않는 파일 포함, 한도 초과 시 추적
+  파일만)를 임시 index로 git tree에 기록하고 recovery ref로 고정한다. 실제 index와
+  working tree는 바꾸지 않는다. snapshot 디렉터리가 지워져도 git 안에 남는다.
+- `conserve`(읽기 전용)와 `finish`·`release-snapshot`은 시작 HEAD와 달랐던 경로가
+  지금 working tree에서도 여전히 시작 HEAD와 다른지 확인한다. 시작 HEAD 내용으로
+  돌아갔거나 사라진 경로는 `lost`로, 시작 HEAD가 현재 HEAD의 조상이 아니면
+  `head_rewound`로 판정한다.
+- 커밋만 하는 명령은 working tree 파일을 바꾸지 않으므로, 커밋된 변경은 working
+  tree에도 그대로 남아 `lost`가 되지 않는다. `lost`는 곧 버려진 변경이다.
+- `lost`나 `head_rewound`가 있으면 `finish`는 `reason=worktree_changes_lost`로
+  거부하고 snapshot과 recovery ref를 지우지 않는다. 우회 옵션은 없다.
+- `abort`는 lock만 해제하고 보존 검사 결과와 recovery ref를 함께 보고한다.
+
+`reason=worktree_changes_lost`를 받으면:
+
+1. 더 이상 stage·commit하지 않는다. 원인을 "정리"하려고 reset·checkout·stash를
+   실행하지 않는다.
+2. `abort`로 lock만 해제한다. snapshot과 recovery ref는 남는다.
+3. `lost` 경로, `head_rewound` 여부, recovery ref를 그대로 보고하고 복원 명령을
+   안내한다. 복원은 working tree를 바꾸므로 사용자 승인 없이 실행하지 않는다.
+
+```bash
+git diff HEAD <recovery_ref> -- <path>          # 사라진 내용 확인
+git restore --source=<recovery_ref> --worktree -- <path>   # 해당 경로 복원
+```
+
+정상 종료한 `finish`는 snapshot과 함께 recovery ref를 삭제한다. `abort`나
+`--keep-snapshot`으로 남은 ref는 복구가 끝난 뒤 `git update-ref -d <ref>`로 지운다.
+
+커밋 skill이 작업 중 실행할 수 있는 index 조작은 `git add`, `git restore --staged`,
+`git apply --cached`(`/cc`·`/cca`)뿐이다. working tree를 바꾸거나 HEAD를 되돌리는
+명령(`git reset`(모든 형태), `git checkout`, `git restore --worktree`,
+`git stash`, `git clean`, `git rm`(`--cached` 없이))은 staging이 꼬였을 때의
+"정리" 용도로도 쓰지 않는다. index가 계획과 어긋나면 `git restore --staged -- <경로>`
+로 index만 되돌리고, 그래도 설명할 수 없으면 `abort`한다.
 
 스냅샷 metadata에는 보존 파일별 크기와 SHA-256이 기록된다. `finish`는 삭제 직전에 이 inventory를 다시 감사하며 누락·크기 변화·해시 불일치가 있으면 성공 처리와 삭제를 차단한다. 필요하면 `audit-snapshot`으로 중간 상태를 별도 확인한다.
 

@@ -831,6 +831,21 @@ git worktree add ../repo-feature-b -b feature/b
 
 실패, 중단, 불확실한 dirty 상태면 lock만 해제하고 snapshot은 보존합니다.
 
+### 변경 보존 검사
+
+working tree가 깨끗하다고 해서 변경이 커밋됐다는 뜻은 아닙니다. `git reset --hard`, `git stash`, `git checkout -- .`도 tree를 깨끗하게 만듭니다. 그래서 Guard는 시작할 때 working tree 전체를 git 객체로 저장하고 `refs/commitforge/snapshots/<snapshot 이름>` ref로 고정합니다. 실제 index와 파일은 건드리지 않습니다.
+
+`/cc`, `/ccf`, `/cf`는 커밋마다 `conserve`로, 모든 명령은 `finish` 직전에, 시작 시점에 바뀌어 있던 경로가 아직도 바뀐 상태인지 확인합니다. 시작 HEAD 내용으로 되돌아갔거나 사라진 경로가 있거나 HEAD가 시작 지점 앞으로 되감겼으면 성공으로 처리하지 않고 snapshot과 ref를 보존합니다. 이 검사는 끌 수 없습니다.
+
+```bash
+git for-each-ref refs/commitforge/snapshots/
+git diff HEAD <ref> --stat
+git restore --source=<ref> --worktree -- <사라진 경로>
+git update-ref -d <ref>     # 복구를 마친 뒤
+```
+
+정상 종료하면 ref도 함께 삭제됩니다.
+
 ## 리뷰 원장
 
 `/cr`은 검토해야 할 hunk 목록(커버리지의 분모)을 모델의 대화 기억이 아니라

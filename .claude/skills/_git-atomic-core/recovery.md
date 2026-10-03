@@ -75,6 +75,24 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py release-snapshot \
 guard는 무결성 검증 실패나 dirty working tree일 때 삭제를 거부한다. token을 잃었으면
 `status`로 경로를 확인한 뒤 수동으로 제거한다.
 
+## Recovery ref (`worktree_changes_lost`)
+
+`begin`은 시작 시점 working tree 전체를 `refs/commitforge/snapshots/<snapshot 이름>`
+commit으로 고정한다. 부모는 시작 HEAD이므로 `git diff <시작 HEAD> <ref>`가 곧 시작
+시점의 미커밋 변경 전체다. snapshot 디렉터리를 잃어도, `reset --hard`나 `stash`로
+변경이 사라져도 이 ref가 남아 있으면 복원할 수 있다.
+
+```bash
+git for-each-ref refs/commitforge/snapshots/          # 남은 ref 목록
+git diff HEAD <ref> --stat                            # 지금과 무엇이 다른가
+git restore --source=<ref> --worktree -- <path...>    # 사라진 경로만 복원
+git update-ref -d <ref>                               # 복구를 마친 뒤 정리
+```
+
+`git restore --source`는 index를 바꾸지 않고 지정 경로의 working tree만 덮어쓴다.
+`lost`에 없는 경로까지 `.`로 복원하면 그 뒤에 한 작업을 덮을 수 있으니 경로를
+지정한다.
+
 ## 수동 복구 원칙
 
 복구 전에 현재 작업을 별도로 보존하고, 원래 snapshot의 `head`와 동일한 기준인지 확인한다. 자동으로 기존 작업 위에 덮어쓰지 않는다.
