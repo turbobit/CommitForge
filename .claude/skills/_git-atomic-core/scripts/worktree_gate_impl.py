@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 
@@ -18,6 +19,11 @@ LOCK_DIR_NAME = "claude-atomic.lock"
 SNAPSHOT_DIR_NAME = "claude-atomic-snapshots"
 MARKER_NAMES = {LOCK_DIR_NAME, SNAPSHOT_DIR_NAME}
 EVIDENCE_TEXT = re.compile(r"claude-atomic|refs/commitforge|commitforge/recovery")
+# Looser text match for values the gate cannot resolve (variables, inline
+# interpreter code, xargs input): any mention of the recovery copies' home.
+RECOVERY_TEXT = re.compile(r"commitforge|\.claude\b", re.IGNORECASE)
+# macOS and Windows default filesystems ignore case: `~/.CLAUDE` is `~/.claude`.
+CASE_INSENSITIVE = sys.platform in ("darwin", "win32")
 LEDGER_LOCK = re.compile(r"/" + SNAPSHOT_DIR_NAME + r"/[^/]+/ledger/\.lock$")
 COMMITFORGE_COMMANDS = {"cc", "ccr", "cf", "cfr", "ccf", "cr", "cca", "cp", "cpr"}
 GUARD_SCRIPTS = {"guard.sh", "guard.py"}
@@ -517,14 +523,27 @@ def recovery_copy_root() -> str:
     return os.path.normpath(os.path.abspath(root)).replace("\\", "/")
 
 
-def in_recovery_copies(normal: str) -> bool:
-    root = recovery_copy_root()
-    return normal == root or normal.startswith(root + "/")
+def canonical(path: str) -> str:
+    """Path with symlinks resolved, case-folded where the filesystem folds case."""
+    real = os.path.realpath(path).replace("\\", "/")
+    return real.casefold() if CASE_INSENSITIVE else real
 
 
-def covers_recovery_copies(normal: str) -> bool:
-    root = recovery_copy_root()
-    return root.startswith(normal.rstrip("/") + "/") and os.path.isdir(root)
+def mentions_evidence(text: str) -> bool:
+    if EVIDENCE_TEXT.search(text) or RECOVERY_TEXT.search(text):
+        return True
+    override = os.environ.get("COMMITFORGE_RECOVERY_DIR")
+    return bool(override) and override in text
+
+
+def in_recovery_copies(path: str) -> bool:
+    candidate, root = canonical(path), canonical(recovery_copy_root())
+    return candidate == root or candidate.startswith(root + "/")
+
+
+def covers_recovery_copies(path: str) -> bool:
+    candidate, root = canonical(path), canonical(recovery_copy_root())
+    return root.startswith(candidate.rstrip("/") + "/") and os.path.isdir(recovery_copy_root())
 
 
 def is_protected(path: str, *, allow_ledger_lock: bool = False) -> bool:
@@ -534,13 +553,16 @@ def is_protected(path: str, *, allow_ledger_lock: bool = False) -> bool:
         return False
     if in_recovery_copies(normal) or covers_recovery_copies(normal):
         return True
-    parts = normal.split("/")
-    if MARKER_NAMES & set(parts):
-        return True
-    if in_recovery_refs(parts):
-        return True
-    if parts[-1] == "packed-refs" and packed_refs_mention(normal):
-        return True
+    # A symlink or a case variant (`.GIT`, `Refs`) reaches the same evidence.
+    for candidate in {normal, canonical(normal)}:
+        parts = candidate.split("/")
+        folded = [part.casefold() for part in parts] if CASE_INSENSITIVE else parts
+        if MARKER_NAMES & set(folded):
+            return True
+        if in_recovery_refs(folded):
+            return True
+        if folded[-1] == "packed-refs" and packed_refs_mention(candidate):
+            return True
     return os.path.isdir(normal) and holds_evidence(normal)
 
 
@@ -1343,7 +1365,7 @@ class Gate:
         # and regex matching them would block verification runs.
 
     def check_code(self, code: str, cwd: Optional[Path]) -> None:
-        if EVIDENCE_TEXT.search(code) and REMOVE_HINT.search(code):
+        if mentions_evidence(code) and REMOVE_HINT.search(code):
             raise Deny(evidence_message("인터프리터 코드로 snapshot·잠금·recovery ref 삭제"))
         if GIT_WORD.search(code) and GIT_DESTRUCTIVE_WORD.search(code):
             lock = self.lock_near(cwd)
@@ -1351,7 +1373,7 @@ class Gate:
                 raise Deny(lock_message("인터프리터 코드 안의 git 명령"))
 
     def remover(self, program: str, words: List[Word], local: Dict[str, Optional[str]], cwd: Optional[Path], unknown_args: bool) -> None:
-        if unknown_args and EVIDENCE_TEXT.search(self.root_text):
+        if unknown_args and mentions_evidence(self.root_text):
             raise Deny(evidence_message(f"{program}로 snapshot·잠금·recovery ref 삭제"))
         after = False
         for word in words[1:]:
@@ -1359,7 +1381,7 @@ class Gate:
             if value is None:
                 # `S=$(...)/claude-atomic-snapshots; rm -rf "$S"` hides the path
                 # in a variable whose value is unknown, so look at the whole command.
-                if EVIDENCE_TEXT.search(word.raw()) or EVIDENCE_TEXT.search(self.root_text):
+                if mentions_evidence(word.raw()) or mentions_evidence(self.root_text):
                     raise Deny(evidence_message(f"{program}로 snapshot·잠금·recovery ref 삭제"))
                 continue
             if not after and value == "--":
@@ -1374,12 +1396,12 @@ class Gate:
     def overwriter(self, program: str, words: List[Word], local: Dict[str, Optional[str]], cwd: Optional[Path], unknown_args: bool) -> None:
         """Deny cp/tee/dd/... whose destination is a lock, recovery ref or snapshot file."""
         reason = f"{program}로 snapshot·잠금·recovery ref 덮어쓰기"
-        if unknown_args and EVIDENCE_TEXT.search(self.root_text):
+        if unknown_args and mentions_evidence(self.root_text):
             raise Deny(evidence_message(reason))
         base = cwd or self.base_cwd
         pairs = [(word, self.value(word, local, cwd)) for word in words[1:]]
         if any(value is None for _, value in pairs):
-            if EVIDENCE_TEXT.search(self.root_text):
+            if mentions_evidence(self.root_text):
                 raise Deny(evidence_message(reason))
         known = [(word, value) for word, value in pairs if value is not None]
         values = [value for _, value in known]
@@ -1668,7 +1690,7 @@ class Gate:
                 continue
             value = self.value(target, local, cwd)
             if value is None:
-                if target is not None and EVIDENCE_TEXT.search(target.raw()):
+                if target is not None and mentions_evidence(target.raw()):
                     raise Deny(evidence_message("리다이렉션으로 snapshot·잠금 덮어쓰기"))
                 continue
             if op == ">&" and (value.isdigit() or value == "-"):

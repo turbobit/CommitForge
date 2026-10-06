@@ -295,6 +295,22 @@ class WorktreeGateTest(unittest.TestCase):
                 proc = self.gate(command)
                 self.assertEqual(proc.returncode, 2, command)
                 self.assertIn("복구 근거", proc.stderr)
+        link = self.tmp / "copies-link"
+        link.symlink_to(root, target_is_directory=True)
+        bypasses = [
+            f"rm -rf {link}/*",
+            "D=$(printf %s ~/.claude/commitforge); rm -rf \"$D\"",
+            "echo ~/.claude/commitforge | xargs rm -rf",
+            "python3 -c \"import shutil,os; shutil.rmtree(os.path.expanduser('~/.claude/commitforge'))\"",
+            "python3 -c \"import shutil,os; shutil.rmtree(os.path.join(os.path.expanduser('~'),'.claude'))\"",
+        ]
+        if sys.platform in ("darwin", "win32"):
+            bypasses.append(f"rm -rf {str(root).upper()}")
+        for command in bypasses:
+            with self.subTest(command=command):
+                proc = self.gate(command)
+                self.assertEqual(proc.returncode, 2, command)
+                self.assertIn("복구 근거", proc.stderr)
         for command in (
             f"ls {copy}",
             f"tar -xf {copy}/changes.tar -C {self.tmp} -- a.txt",
