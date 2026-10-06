@@ -401,8 +401,8 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" verify-review \
 Guard는 현재 worktree에서 session과 일치하는 owner token과 유일한 snapshot을
 직접 해석한다. `snapshot-path` 같은 문서화되지 않은 하위 명령을 만들거나,
 basename을 `--snapshot`으로 넘기거나, 종료 단계에서 `begin`을 다시 호출하지
-않는다. 명시적 `--token`·`--snapshot`은 진단상 정확한 원본 값을 그대로 재사용할
-때만 전달한다.
+않는다. `--token`은 넘기지 않는다(현재 lock owner와 다르면 무시된다). 명시적
+`--snapshot`은 진단상 정확한 원본 값을 그대로 재사용할 때만 전달한다.
 
 검증 항목:
 

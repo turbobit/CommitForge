@@ -846,6 +846,20 @@ git update-ref -d <ref>     # 복구를 마친 뒤
 
 정상 종료하면 ref도 함께 삭제됩니다.
 
+### 변경 보존 게이트
+
+보존 검사는 사후 판정이라, 모델이 규칙을 무시하고 검사 자체를 건너뛰면 막지 못합니다. 실제로 한 `/ccf` 실행은 커밋 순서를 고친다며 `checkout <commit> -- .`, `reset --hard`, cherry-pick으로 커밋되지 않은 파일을 잃었습니다. token을 잘못 옮겨 적어 Guard 명령이 모두 실패하자 스스로 `clean`을 실행하고 snapshot과 recovery ref까지 지웠습니다.
+
+설치 스크립트는 그래서 모든 Claude 세션의 Bash 호출에 `PreToolUse` 훅(`worktree_gate.py`)을 등록합니다. 훅은 따옴표·heredoc·`$(...)`·반복문·파이프·`cd`·변수 대입을 직접 해석해 실제로 실행될 명령을 찾습니다.
+
+- **잠금 중에는 git 허용 목록만 통과합니다.** 읽기 명령, `add`, `--amend` 없는 `commit`, `restore --staged`, `apply --cached`, `rm --cached`, `/cp`의 `switch -c` 같은 커밋 skill의 명령만 허용합니다. 변수나 alias, `bash -c` 등으로 정적으로 확인할 수 없는 명령은 추측하지 않고 거부합니다.
+- **Guard 명령은 현재 세션 이름으로만** 실행할 수 있어 다른 세션의 잠금을 풀 수 없습니다. 잠금 중 `clean`은 사용자가 직전에 `/<명령> clean`을 입력했을 때만 통과합니다.
+- **복구 근거 삭제는 잠금과 관계없이 막습니다.** snapshot, 잠금, `refs/commitforge`를 glob·`cd`·변수·find로 지우는 경우까지 해석합니다. xargs로 넘긴 경로는 명령에 그 이름이 있을 때만 막습니다. 복구를 마친 ref는 `! git update-ref -d <ref>`처럼 `!` 접두어로 직접 지웁니다.
+
+인터프리터가 실행하는 스크립트 파일, Edit·Write 도구, `sed -i` 같은 git 밖의 파일 수정은 검사하지 않습니다. 훅 스크립트가 사라지면 launcher가 통과시켜 셸이 막히지 않습니다.
+
+Guard의 `conserve`·`finish`·`abort`는 session으로 현재 잠금의 snapshot을 고르고, 옮겨 적은 `--token`이 틀리면 무시합니다. 잠금이 이미 풀렸으면 `lock_not_owned`와 함께 사라진 경로와 recovery ref를 보고합니다.
+
 ## 리뷰 원장
 
 `/cr`은 검토해야 할 hunk 목록(커버리지의 분모)을 모델의 대화 기억이 아니라
@@ -1042,6 +1056,8 @@ Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을
 │           ├── ledger.py
 │           ├── reviewer_triggers.py
 │           ├── report_validator.py
+│           ├── worktree_gate.py
+│           ├── worktree_gate_impl.py
 │           ├── baseline.py
 │           ├── period_range.py
 │           ├── pr_context.py

@@ -96,7 +96,8 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
-JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`, `recovery_ref`를 작업 완료까지 보관한다.
+JSON 결과의 `snapshot`, `fingerprint`, `head`, `recovery_ref`를 작업 완료까지 보관한다.
+이후 `conserve`·`finish`·`abort`에는 `--session "$COMMITFORGE_SESSION_ID"`만 넘긴다. Guard가 세션으로 현재 lock owner의 snapshot을 고르고, 옮겨 적은 `--token`은 무시한다(`token_ignored`). token을 다시 입력하지 않는다.
 
 - `ok: false`이면 어떤 Git 변경도 수행하지 않고 원인을 보고한다.
 - Guard 명령이 아예 실행되지 못한 경우도 같은 실패다. exit code 126·127,
@@ -112,8 +113,8 @@ JSON 결과의 `session`, `token`, `snapshot`, `fingerprint`, `head`, `recovery_
   `git -C <경로>`로 우회해 작업을 이어가지 않는다.
 - `reason=guard_lock_conflict`이면 `stale_candidate`, `lock_owner_same_host`,
   `lock_owner_same_session`, `lock_age_seconds`를 그대로 보고한다. stale 후보여도
-  스스로 회수하지 않고 `/cc clean` 또는 `begin --reclaim-stale`을 안내한 뒤
-  사용자 승인을 받아 실행한다.
+  스스로 회수하지 않는다. `/cc clean`은 사용자가 직접 입력해야 실행된다.
+  `begin --reclaim-stale`은 사용자의 명시적 승인을 받은 뒤에만 실행한다.
 - snapshot 경고가 있으면 위험을 평가하고 결과에 기록한다.
 - 이후 실패하거나 중단하면 반드시 `abort`로 **자신의 lock만 해제하고 snapshot은 보존**한다.
 - 작업 중 working tree를 바꾸거나 HEAD를 되돌리는 명령(`git reset`, `git checkout`, `git restore --worktree`, `git stash`, `git clean`)을 실행하지 않는다. staging이 꼬여도 `git restore --staged -- <경로>`로 index만 되돌리고, 그래도 설명할 수 없으면 `abort`한다 (`safety-and-concurrency.md` 2.1절).
@@ -186,9 +187,7 @@ git status --short --branch --untracked-files=all
 
 ```bash
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" conserve \
-  --session "<session>" \
-  --token "<token>" \
-  --snapshot "<snapshot>"
+  --session "$COMMITFORGE_SESSION_ID"
 ```
 
 `conserve`는 시작 시점의 변경이 커밋되지 않은 채 사라졌는지(`lost`) 확인한다. `ok: false`·`reason=worktree_changes_lost`이면 더 이상 stage·commit하지 않고 아래 “변경 유실 감지” 절차를 따른다.
@@ -295,9 +294,7 @@ hook이 파일을 수정했거나 예상하지 않은 변경이 생겼으면 이
 
 ```bash
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
-  --session "<session>" \
-  --token "<token>" \
-  --snapshot "<snapshot>"
+  --session "$COMMITFORGE_SESSION_ID"
 ```
 
 `--keep-snapshot`이면 `--keep-snapshot`을 추가한다.
@@ -310,9 +307,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 
 ```bash
 bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
-  --session "<session>" \
-  --token "<token>" \
-  --snapshot "<snapshot>"
+  --session "$COMMITFORGE_SESSION_ID"
 ```
 
 snapshot을 삭제하지 않는다.
@@ -326,6 +321,18 @@ snapshot을 삭제하지 않는다.
 3. `conservation.lost` 경로, `head_rewound`, `recovery_ref`를 그대로 보고하고 복원 명령(`git restore --source=<recovery_ref> --worktree -- <path>`)을 안내한다. 복원은 사용자 승인 없이 실행하지 않는다.
 
 `finish`를 다른 옵션으로 다시 실행해 이 검사를 우회하지 않는다.
+
+### Guard 명령 실패 (그 밖의 모든 `ok: false`)
+
+`conserve`·`finish`·`abort`가 다른 사유로 실패하면 보존 검사가 끝나지 않은 것이다. 성공으로 보지 않는다.
+
+- `reason=lock_not_owned`는 이 실행의 잠금이 다른 세션이나 `clean`으로 풀렸다는 뜻이다. 결과에 함께 온 `conservation.lost`, `recovery_ref`, `snapshot`을 그대로 보고하고 멈춘다. 잠금을 다시 잡거나 다른 세션의 잠금을 풀지 않는다.
+
+- 더 이상 stage·commit하지 않고 `abort --session`을 한 번 실행한다. 그것도 실패하면 오류를 그대로 보고하고 멈춘다.
+- Guard `clean`, snapshot·lock 디렉터리 삭제, `git update-ref -d refs/commitforge/...`로 빠져나가지 않는다. `clean`은 사용자가 `/cc clean`을 직접 입력했을 때만 실행된다.
+- 커밋 순서나 구성이 틀렸음을 알게 되어도 reset·rebase·cherry-pick으로 history를 고치지 않는다. 그때까지 만든 커밋과 문제를 보고하고 재구성은 사용자에게 맡긴다.
+
+설치된 `worktree_gate.py` 훅은 Guard 잠금이 걸린 동안 허용 목록 밖의 git 명령(정적으로 해석할 수 없는 명령 포함), 다른 세션 이름의 Guard 명령, 사용자 입력 없는 `clean`, snapshot·recovery ref 삭제를 차단한다 (`safety-and-concurrency.md` 2.2절). 차단되면 다른 명령으로 우회하지 말고 이 절차를 따른다.
 
 ## 7. 최종 보고
 

@@ -53,7 +53,8 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py status
 `record`·`inventory`·`advance`가 강제 종료되면 `ledger/.lock` 디렉터리가 남아
 이후 모든 변경 명령이 `ledger_lock_timeout`으로 실패한다. 해당 실행이 더 이상
 진행 중이 아님을 확인했으면 이 디렉터리만 삭제하면 복구된다 (`rmdir
-<snapshot>/ledger/.lock`). 원장 데이터 파일은 지우지 않는다.
+<snapshot>/ledger/.lock`). `worktree_gate.py`는 snapshot 삭제를 막지만 이 경로만은
+허용한다. 원장 데이터 파일은 지우지 않는다.
 
 ## Lock 없는 snapshot (1.20.0 이하 `/ccf`)
 
@@ -73,7 +74,8 @@ python3 ~/.claude/skills/_git-atomic-core/scripts/guard.py release-snapshot \
 ```
 
 guard는 무결성 검증 실패나 dirty working tree일 때 삭제를 거부한다. token을 잃었으면
-`status`로 경로를 확인한 뒤 수동으로 제거한다.
+`status`로 경로를 확인한 뒤 사용자가 `!` 접두어로 직접 제거한다. `worktree_gate.py`
+훅은 Claude가 실행하는 snapshot·recovery ref 삭제를 항상 차단한다.
 
 ## Recovery ref (`worktree_changes_lost`)
 
@@ -86,7 +88,7 @@ commit으로 고정한다. 부모는 시작 HEAD이므로 `git diff <시작 HEAD
 git for-each-ref refs/commitforge/snapshots/          # 남은 ref 목록
 git diff HEAD <ref> --stat                            # 지금과 무엇이 다른가
 git restore --source=<ref> --worktree -- <path...>    # 사라진 경로만 복원
-git update-ref -d <ref>                               # 복구를 마친 뒤 정리
+! git update-ref -d <ref>                             # 복구를 마친 뒤 사용자가 직접 정리
 ```
 
 `git restore --source`는 index를 바꾸지 않고 지정 경로의 working tree만 덮어쓴다.
@@ -126,14 +128,13 @@ session/token과 snapshot을 확인한다. 잠금은 표시된 `git_dir`에만 �
 
 생성 시각이 오래됐다는 사실만으로 stale lock이라고 단정하지 않는다. 원래
 세션이 종료됐거나 더 이상 해당 작업을 수행하지 않는다는 것을 확인한 뒤
-owner의 session/token으로 `abort`를 실행한다. Guard는 두 값과 정확히 일치하는
-스냅샷이 하나면 경로를 자동 선택한다. 원래 세션으로 돌아갈 수 없는 경우에도
-이 확인을 마쳤다면 현재 세션에서 같은 명령을 실행할 수 있다.
+owner의 session으로 `abort`를 실행한다. Guard는 그 세션의 현재 잠금 snapshot을
+자동 선택한다. `worktree_gate.py`는 Claude가 다른 세션 이름으로 Guard를 호출하는
+것을 막으므로, 원래 세션으로 돌아갈 수 없으면 사용자가 `!` 접두어로 직접 실행하거나
+`/<명령> clean`을 입력한다.
 
 ```bash
-python3 .../guard.py abort \
-  --session "<owner-session>" \
-  --token "<owner-token>"
+! python3 .../guard.py abort --session "<owner-session>"
 ```
 
 일치하는 스냅샷이 없거나 여러 개라 자동 선택할 수 없을 때만 `status`의

@@ -81,7 +81,56 @@ git restore --source=<recovery_ref> --worktree -- <path>   # 해당 경로 복�
 ```
 
 정상 종료한 `finish`는 snapshot과 함께 recovery ref를 삭제한다. `abort`나
-`--keep-snapshot`으로 남은 ref는 복구가 끝난 뒤 `git update-ref -d <ref>`로 지운다.
+`--keep-snapshot`으로 남은 ref는 복구가 끝난 뒤 사용자가 `! git update-ref -d <ref>`로 지운다
+(`worktree_gate.py`가 Claude의 recovery ref 삭제를 막는다).
+
+### 2.2 변경 보존 게이트 (`worktree_gate.py`)
+
+보존 검사는 사후 판정이고, 모델이 맞는 인자로 호출해야만 실행된다. 실제로 한
+`/ccf` 실행은 token을 잘못 옮겨 `conserve`·`finish`·`abort`가 모두 소유권 오류로
+실패하자 사용자 요청 없이 `clean`으로 잠금을 풀고 snapshot 디렉터리와 recovery
+ref를 직접 지웠다. 그 전에 커밋 순서를 고친다며 `checkout <commit> -- .`,
+`reset --hard`, cherry-pick을 실행해 커밋되지 않은 파일 세 개를 잃었다.
+
+그래서 설치 시 모든 세션의 Bash 호출에 `PreToolUse` 훅을 등록한다. 훅은 bash 문법
+(따옴표, heredoc, `$(...)`, 반복문·조건문, 파이프, `cd`, 변수 대입)을 직접 해석해
+실제로 실행될 단순 명령을 찾는다.
+
+- **잠금 중 git 허용 목록.** git 명령이 작용할 worktree에 CommitForge 잠금이 있으면,
+  어느 세션이 실행하든 다음만 통과한다: 읽기 명령(`status`, `diff`, `log`, `show` 등.
+  `--output` 제외, 작업 트리 파일로의 리다이렉션 제외), `add`, `--amend` 없는 `commit`,
+  `restore --staged`(`--worktree` 없이), `apply --cached`·`--check`, `rm --cached`,
+  `checkout -b <branch>`, `switch -c <branch>`, `stash list|show`, `clean -n`,
+  `worktree list`, 삭제·강제 이동이 없는 `branch`·`tag`, 강제·삭제가 없는 `push`,
+  `fetch`, `config`, `remote`. 그 밖의 하위 명령, 알 수 없는 옵션(약어 포함),
+  변수·`$(...)`로만 정해지는 하위 명령·옵션·대상 저장소, alias로 정의되지 않은
+  이름, xargs·find가 인자를 붙이는 플래그 의존 명령, `bash -c`·heredoc·파이프로 셸에
+  넘긴 해석 불가 코드는 모두 거부한다. 셸 alias(`!`)와 git alias는 펼쳐서 검사한다.
+- **공유 ref.** `update-ref`, `branch` 삭제·강제 이동, `worktree` 변경, `gc`·`prune`,
+  `reflog expire`는 저장소의 어느 worktree에 잠금이 있어도 거부한다. 다른 worktree의
+  잠금이 그 worktree 전용 명령(`reset` 등)을 막지는 않는다.
+- **Guard 세션 바인딩.** `begin`·`conserve`·`finish`·`abort` 등 Guard 명령의
+  `--session`은 훅이 받은 현재 세션이어야 한다(`"$COMMITFORGE_SESSION_ID"`). 다른
+  세션의 잠금을 풀 수 없다. 잠금 중 `clean`은 사용자의 직전 입력이
+  `/<CommitForge 명령> clean`일 때만 통과한다. 평문 승인으로는 통과하지 않는다.
+- **복구 근거 보호(잠금과 무관).** snapshot 디렉터리, 잠금 디렉터리,
+  `refs/commitforge`(packed-refs 포함) 삭제·덮어쓰기와 이를 담은 상위 디렉터리(`.git`
+  등) 삭제를 거부한다. glob, `cd` 뒤 상대경로, 같은 명령 안에서 대입한 변수,
+  `find -delete`·`-exec rm`, `update-ref --stdin`, 인터프리터 인라인 코드를 해석한다.
+  xargs처럼 실행 시점에 경로가 정해지는 삭제는 명령 문자열에 snapshot·잠금·
+  recovery ref 이름이 있을 때만 거부한다.
+  `ledger/.lock` 제거만 예외로 허용한다. 사용자는 `!` 접두어로 직접 지울 수 있다
+  (`!` 명령은 훅을 거치지 않는다).
+- 잠금이 없고 복구 근거를 건드리지 않으면 아무것도 막지 않는다. 훅 입력이 손상됐거나
+  훅 스크립트가 사라졌으면(설치기가 launcher로 감싼다) 셸을 막지 않도록 통과시킨다.
+
+한계: `find .git -name '*.json' | xargs rm`처럼 이름 없이 넘긴 경로의 삭제,
+인터프리터가 실행하는 스크립트 파일(`python script.py`), Edit·Write 도구,
+git 밖의 파일 수정 명령(`sed -i`, `cp`)은 검사하지 않는다. 이 범위는 skill 규칙과
+보존 검사(2.1절)가 맡는다.
+
+차단 메시지를 받으면 다른 명령으로 우회하지 않는다. 커밋 순서·구성이 틀렸어도
+history를 고치지 않고, 더 이상 커밋하지 않은 채 `abort --session`으로 멈춰 보고한다.
 
 커밋 skill이 작업 중 실행할 수 있는 index 조작은 `git add`, `git restore --staged`,
 `git apply --cached`(`/cc`·`/cca`)뿐이다. working tree를 바꾸거나 HEAD를 되돌리는
@@ -96,10 +145,18 @@ git restore --source=<recovery_ref> --worktree -- <path>   # 해당 경로 복�
 
 `/cr`은 `verify-review`와 `finish --review-only`를 사용한다. Guard가 시작 snapshot과 종료 시점의 HEAD, branch, staged binary diff를 비교하며 하나라도 달라지면 snapshot을 삭제하거나 성공 처리하지 않는다. 기본 `/cr`은 두 명령에 `--source-read-only`도 사용해 working binary diff, porcelain status, untracked 내용까지 일치시킨다. 일반 리뷰에서 사용자가 `--fix`를 명시한 경우에만 source read-only 검사를 생략한다. `release`·`emergency`·`learn`은 `--fix`와 관계없이 source read-only다.
 
-`verify-review`와 `finish`는 `--session`만 주면 현재 worktree에서 동일 session인
-lock owner의 token과 유일한 snapshot을 자동 선택한다. 명시적인 token 또는
-snapshot이 있으면 자동으로 대체하지 않고 정확히 검증한다. 따라서 잘못된
-cross-worktree 경로나 basename은 계속 fail-closed다.
+`verify-review`, `conserve`, `finish`, `abort`, `audit-snapshot`의 신원은 session이다.
+현재 worktree 잠금의 owner session과 같으면 owner의 token과 유일한 snapshot을 자동
+선택하고, 넘겨받은 `--token`이 다르면 무시한 뒤 `token_ignored`로 알린다. 옮겨 적은
+token 한 글자 때문에 모든 Guard 명령이 실패해 보존 검사가 실행되지 못한 사고가 있었다.
+명시적인 `--snapshot`은 대체하지 않고 정확히 검증하므로 잘못된 cross-worktree 경로나
+basename은 계속 fail-closed다. 잠금 없는 snapshot을 지우는 `release-snapshot`만
+token을 계속 요구한다.
+
+잠금이 이미 풀렸거나 다른 세션으로 넘어가면 `conserve`와 `abort`는
+`reason=lock_not_owned`로 실패하되, 그 세션의 최신 snapshot으로 계산한
+`conservation`(lost, recovery_ref)과 `snapshot`을 함께 보고한다. 잠금을 잃은 동안
+버려진 변경도 이름과 복원 위치가 남는다.
 
 `/cpr`은 같은 source read-only 불변식을 그대로 적용한다. `/cp`가 `main` 또는 `master`에서 새 branch를 만드는 경우에만 `--expected-branch`로 그 이름 하나를 허용하며 HEAD commit, staged/working diff와 untracked 내용은 모두 시작 상태와 같아야 한다.
 
