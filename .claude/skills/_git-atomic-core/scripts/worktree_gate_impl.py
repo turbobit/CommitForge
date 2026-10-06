@@ -10,14 +10,14 @@ from pathlib import Path
 import re
 import shlex
 import subprocess
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 
 # Mirrors guard.py; tests assert they stay equal.
 LOCK_DIR_NAME = "claude-atomic.lock"
 SNAPSHOT_DIR_NAME = "claude-atomic-snapshots"
 MARKER_NAMES = {LOCK_DIR_NAME, SNAPSHOT_DIR_NAME}
-EVIDENCE_TEXT = re.compile(r"claude-atomic|refs/commitforge")
+EVIDENCE_TEXT = re.compile(r"claude-atomic|refs/commitforge|commitforge/recovery")
 LEDGER_LOCK = re.compile(r"/" + SNAPSHOT_DIR_NAME + r"/[^/]+/ledger/\.lock$")
 COMMITFORGE_COMMANDS = {"cc", "ccr", "cf", "cfr", "ccf", "cr", "cca", "cp", "cpr"}
 GUARD_SCRIPTS = {"guard.sh", "guard.py"}
@@ -63,7 +63,11 @@ INTERPRETER_CODE_FLAGS = {
 }
 # Short options whose value is attached to them, ending a cluster (`-W...`).
 CLUSTER_VALUE_LETTERS = {"python": "WX", "perl": "0CdDiIlmMx", "ruby": "0CEFIKlrTx"}
-REMOVERS = {"rm","rmdir", "unlink", "mv", "shred", "trash", "srm", "truncate"}
+REMOVERS = {"rm", "rmdir", "unlink", "mv", "shred", "trash", "srm", "truncate"}
+# Programs that overwrite their destination; checked like a `>` redirection.
+OVERWRITERS = {"cp", "install", "ln", "rsync", "tee", "dd"}
+# Options taking the wrapped command's working directory.
+CHDIR_OPTIONS = {"env": {"-C", "--chdir"}, "sudo": {"-D", "--chdir"}}
 REMOVE_HINT = re.compile(r"rmtree|unlink|remove|rmdir|\brm\b|delete|update-ref")
 GIT_WORD = re.compile(r"\bgit\b")
 GIT_DESTRUCTIVE_WORD = re.compile(
@@ -472,6 +476,10 @@ def all_git_dirs(common: Path) -> List[Path]:
 
 
 def holds_evidence(directory: str) -> bool:
+    if os.path.basename(os.path.normpath(directory)) == "refs" and os.path.exists(
+        os.path.join(directory, "commitforge")
+    ):
+        return True
     for rel in (
         SNAPSHOT_DIR_NAME, LOCK_DIR_NAME, "refs/commitforge",
         ".git/" + SNAPSHOT_DIR_NAME, ".git/" + LOCK_DIR_NAME, ".git/refs/commitforge",
@@ -495,19 +503,89 @@ def packed_refs_mention(path: str) -> bool:
         return False
 
 
+def in_recovery_refs(parts: List[str]) -> bool:
+    """Whether the split path lies inside a `refs/commitforge` tree."""
+    return any(parts[i] == "refs" and parts[i + 1] == "commitforge" for i in range(len(parts) - 1))
+
+
+def recovery_copy_root() -> str:
+    """Mirrors guard.recovery_copy_root: Guard's copies outside the repository."""
+    override = os.environ.get("COMMITFORGE_RECOVERY_DIR")
+    root = os.path.expanduser(override) if override else os.path.join(
+        os.path.expanduser("~"), ".claude", "commitforge", "recovery"
+    )
+    return os.path.normpath(os.path.abspath(root)).replace("\\", "/")
+
+
+def in_recovery_copies(normal: str) -> bool:
+    root = recovery_copy_root()
+    return normal == root or normal.startswith(root + "/")
+
+
+def covers_recovery_copies(normal: str) -> bool:
+    root = recovery_copy_root()
+    return root.startswith(normal.rstrip("/") + "/") and os.path.isdir(root)
+
+
 def is_protected(path: str, *, allow_ledger_lock: bool = False) -> bool:
     """True when removing or overwriting path destroys recovery evidence."""
     normal = os.path.normpath(path).replace("\\", "/")
     if allow_ledger_lock and LEDGER_LOCK.search(normal):
         return False
+    if in_recovery_copies(normal) or covers_recovery_copies(normal):
+        return True
     parts = normal.split("/")
     if MARKER_NAMES & set(parts):
         return True
-    if any(parts[i] == "refs" and parts[i + 1] == "commitforge" for i in range(len(parts) - 1)):
+    if in_recovery_refs(parts):
         return True
     if parts[-1] == "packed-refs" and packed_refs_mention(normal):
         return True
     return os.path.isdir(normal) and holds_evidence(normal)
+
+
+def evidence_entries(directory: str) -> Iterator[str]:
+    """Every path inside the evidence directories that find could reach.
+
+    Lazy, so a matching name test stops the walk of large snapshot trees.
+    """
+    bases = [directory, os.path.join(directory, ".git")]
+    for base in list(bases):
+        bases.extend(glob.glob(os.path.join(glob.escape(base), "worktrees", "*")))
+    roots = [
+        os.path.join(base, rel)
+        for base in bases
+        for rel in (SNAPSHOT_DIR_NAME, LOCK_DIR_NAME, os.path.join("refs", "commitforge"))
+    ]
+    if os.path.basename(os.path.normpath(directory)) == "refs":
+        roots.append(os.path.join(directory, "commitforge"))
+    normal = os.path.normpath(os.path.abspath(directory)).replace("\\", "/")
+    if covers_recovery_copies(normal):
+        roots.append(recovery_copy_root())
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        yield root
+        for dirpath, dirnames, filenames in os.walk(root):
+            for name in dirnames + filenames:
+                yield os.path.join(dirpath, name)
+
+
+def overwrite_target(text: str) -> Optional[str]:
+    """What writing to path would destroy, or None when the write is harmless."""
+    normal = os.path.normpath(text).replace("\\", "/")
+    parts = normal.split("/")
+    if LOCK_DIR_NAME in parts or in_recovery_refs(parts) or parts[-1] == "packed-refs":
+        return "잠금·recovery ref"
+    if in_recovery_copies(normal):
+        return "저장소 밖 복구 사본"
+    if SNAPSHOT_DIR_NAME in parts:
+        index = parts.index(SNAPSHOT_DIR_NAME)
+        # Top-level snapshot files form the audited inventory; new files
+        # and subdirectories (ledger/, learn/, patches/) are fine.
+        if len(parts) == index + 3 and os.path.exists(text):
+            return "snapshot 파일"
+    return None
 
 
 def brace_expand(pattern: str) -> List[str]:
@@ -980,10 +1058,11 @@ class Gate:
                 self.run(text, cwd, env, depth + 1)
             return cwd
         if program in WRAPPERS:
-            inner = self.unwrap(program, words[1:], local, cwd)
+            inner, inner_cwd = self.unwrap(program, words[1:], local, cwd)
             if inner:
-                return self.argv(
-                    inner, cwd, local, env, depth, True, before, [], stdin,
+                # The wrapper's own directory change never reaches the caller.
+                self.argv(
+                    inner, inner_cwd, local, env, depth, True, before, [], stdin,
                     unknown_args or program in {"xargs", "parallel"},
                 )
             return cwd
@@ -1002,11 +1081,19 @@ class Gate:
             return cwd
         if program in REMOVERS:
             self.remover(program, words, local, cwd, unknown_args)
+        elif program in OVERWRITERS:
+            self.overwriter(program, words, local, cwd, unknown_args)
         return cwd
 
-    def unwrap(self, program: str, args: List[Word], local: Dict[str, Optional[str]], cwd: Optional[Path]) -> List[Word]:
-        interesting = WRAPPERS | SHELLS | REMOVERS | {"git", "eval", "source", "find"}
-        for index, word in enumerate(args):
+    def unwrap(self, program: str, args: List[Word], local: Dict[str, Optional[str]], cwd: Optional[Path]) -> Tuple[List[Word], Optional[Path]]:
+        """The wrapped command and the directory it runs in (`env -C`)."""
+        interesting = WRAPPERS | SHELLS | REMOVERS | OVERWRITERS | {"git", "eval", "source", "find"}
+        chdir = CHDIR_OPTIONS.get(program, set())
+        inner_cwd = cwd
+        index = 0
+        while index < len(args):
+            word = args[index]
+            index += 1
             value = self.value(word, local, cwd)
             if value is None:
                 self.unknown(cwd, f"{program}로 감싼 명령")
@@ -1016,10 +1103,25 @@ class Gate:
                 if split is not None:
                     local[split[0]] = self.value(split[1], local, cwd)
                     continue
+            target: Optional[str] = ""
+            if value in chdir:
+                target = self.value(args[index], local, cwd) if index < len(args) else None
+                index += 1
+            elif any(value.startswith(option + "=") for option in chdir if option.startswith("--")):
+                target = value.split("=", 1)[1]
+            elif any(value.startswith(option) for option in chdir if len(option) == 2) and len(value) > 2:
+                # Attached short form: `env -C.git/refs`, `sudo -D/tmp`.
+                target = value[2:]
+            if target != "":
+                resolved = self.resolve_path(inner_cwd, target) if target is not None else None
+                if resolved is None:
+                    self.unknown(cwd, f"{program}의 작업 디렉터리")
+                inner_cwd = resolved
+                continue
             name = os.path.basename(value)
             if name in interesting or interpreter_family(name) or name in GUARD_SCRIPTS:
-                return args[index:]
-        return []
+                return args[index - 1:], inner_cwd
+        return [], inner_cwd
 
     # ---- program handlers
 
@@ -1070,7 +1172,10 @@ class Gate:
         while i < len(values) and (values[i] is None or not values[i].startswith(("-", "(", "!"))):
             starts.append(values[i])
             i += 1
-        names = [values[j + 1] for j in range(len(values) - 1) if values[j] in {"-name", "-iname", "-path", "-ipath", "-wholename", "-regex", "-iregex"}]
+        tests = [
+            (values[j], values[j + 1]) for j in range(len(values) - 1)
+            if values[j] in {"-name", "-iname", "-path", "-ipath", "-wholename", "-regex", "-iregex"}
+        ]
         destructive = "-delete" in values
         j = i
         while j < len(values):
@@ -1081,7 +1186,7 @@ class Gate:
                 inner = words[j + 1:k]
                 if inner:
                     program = self.value(inner[0], local, cwd)
-                    if program is not None and os.path.basename(program) in REMOVERS:
+                    if program is not None and os.path.basename(program) in REMOVERS | OVERWRITERS:
                         destructive = True
                     self.argv(inner, cwd, local, dict(local), depth + 1, True, None, [], [], True)
                 j = k + 1
@@ -1098,10 +1203,13 @@ class Gate:
             if path is None:
                 continue
             text = str(path)
+            parts = text.replace("\\", "/").split("/")
             if is_protected(text) and (
-                MARKER_NAMES & set(text.replace("\\", "/").split("/"))
-                or not names
-                or any(n is None or self.pattern_hits_evidence(n) for n in names)
+                MARKER_NAMES & set(parts)
+                or in_recovery_refs(parts)
+                or in_recovery_copies(os.path.normpath(text).replace("\\", "/"))
+                or not tests
+                or any(self.find_test_hits_evidence(flag, pattern, text, start) for flag, pattern in tests)
             ):
                 raise Deny(evidence_message("find로 snapshot·잠금·recovery ref 삭제"))
 
@@ -1109,6 +1217,36 @@ class Gate:
     def pattern_hits_evidence(pattern: str) -> bool:
         targets = list(MARKER_NAMES) + ["commitforge", "refs", ".git", "packed-refs"]
         return any(fnmatch.fnmatch(target, pattern) for target in targets) or EVIDENCE_TEXT.search(pattern) is not None
+
+    @classmethod
+    def find_test_hits_evidence(cls, flag: str, pattern: Optional[str], start: str, shown: str) -> bool:
+        """Whether a find name test can select a file inside the evidence.
+
+        Matching only the evidence directory names would let
+        `find .git -name '.cca-snapshot.json' -delete` through, so the test is
+        run against every path inside them, printed as find would print it.
+        """
+        if pattern is None or cls.pattern_hits_evidence(pattern):
+            return True
+        fold = flag in {"-iname", "-ipath", "-iregex"}
+        if fold:
+            pattern = pattern.lower()
+        for entry in evidence_entries(start):
+            if flag in {"-name", "-iname"}:
+                subject = os.path.basename(entry)
+            else:
+                subject = os.path.join(shown, os.path.relpath(entry, start))
+            if fold:
+                subject = subject.lower()
+            if flag in {"-regex", "-iregex"}:
+                try:
+                    if re.fullmatch(pattern, subject):
+                        return True
+                except re.error:
+                    return True
+            elif fnmatch.fnmatchcase(subject, pattern):
+                return True
+        return False
 
     def shell(self, words: List[Word], local: Dict[str, Optional[str]], env: Dict[str, Optional[str]], cwd: Optional[Path], depth: int, stdin: List[Optional[str]], before: Optional[str]) -> None:
         i = 1
@@ -1219,7 +1357,9 @@ class Gate:
         for word in words[1:]:
             value = self.value(word, local, cwd)
             if value is None:
-                if EVIDENCE_TEXT.search(word.raw()):
+                # `S=$(...)/claude-atomic-snapshots; rm -rf "$S"` hides the path
+                # in a variable whose value is unknown, so look at the whole command.
+                if EVIDENCE_TEXT.search(word.raw()) or EVIDENCE_TEXT.search(self.root_text):
                     raise Deny(evidence_message(f"{program}로 snapshot·잠금·recovery ref 삭제"))
                 continue
             if not after and value == "--":
@@ -1230,6 +1370,61 @@ class Gate:
             for path in self.expand(word, value, local, cwd):
                 if is_protected(path, allow_ledger_lock=program in {"rm", "rmdir", "unlink"}):
                     raise Deny(evidence_message(f"{program}로 snapshot·잠금·recovery ref 삭제"))
+
+    def overwriter(self, program: str, words: List[Word], local: Dict[str, Optional[str]], cwd: Optional[Path], unknown_args: bool) -> None:
+        """Deny cp/tee/dd/... whose destination is a lock, recovery ref or snapshot file."""
+        reason = f"{program}로 snapshot·잠금·recovery ref 덮어쓰기"
+        if unknown_args and EVIDENCE_TEXT.search(self.root_text):
+            raise Deny(evidence_message(reason))
+        base = cwd or self.base_cwd
+        pairs = [(word, self.value(word, local, cwd)) for word in words[1:]]
+        if any(value is None for _, value in pairs):
+            if EVIDENCE_TEXT.search(self.root_text):
+                raise Deny(evidence_message(reason))
+        known = [(word, value) for word, value in pairs if value is not None]
+        values = [value for _, value in known]
+        sources: List[str] = []
+        # (word, value); a None word marks a value that is not a shell word.
+        targets: List[Tuple[Optional[Word], str]] = []
+        if program == "dd":
+            targets = [(None, value[3:]) for value in values if value.startswith("of=")]
+        else:
+            positionals: List[Tuple[Optional[Word], str]] = []
+            directory: Optional[Tuple[Optional[Word], str]] = None
+            after = False
+            i = 0
+            while i < len(known):
+                word, value = known[i]
+                i += 1
+                if not after and value == "--":
+                    after = True
+                elif not after and value in {"-t", "--target-directory"}:
+                    directory = known[i] if i < len(known) else None
+                    i += 1
+                elif not after and value.startswith("--target-directory="):
+                    directory = (None, value.split("=", 1)[1])
+                elif after or not value.startswith("-") or value == "-":
+                    positionals.append((word, value))
+            if program == "tee":
+                targets = positionals
+            elif directory is not None:
+                targets, sources = [directory], [value for _, value in positionals]
+            elif positionals:
+                targets, sources = positionals[-1:], [value for _, value in positionals[:-1]]
+        deleting = program == "rsync" and any(value.startswith("--delete") for value in values)
+        for word, target in targets:
+            if word is not None:
+                # Globs reach existing snapshot files the literal path does not name.
+                texts = self.expand(word, target, local, cwd)
+            else:
+                path = self.resolve_path(base, target)
+                texts = [str(path)] if path is not None else []
+            for text in texts:
+                candidates = [text]
+                if os.path.isdir(text):
+                    candidates.extend(os.path.join(text, os.path.basename(src.rstrip("/"))) for src in sources)
+                if any(overwrite_target(candidate) for candidate in candidates) or (deleting and is_protected(text)):
+                    raise Deny(evidence_message(reason))
 
     def expand(self, word: Word, value: str, local: Dict[str, Optional[str]], cwd: Optional[Path]) -> List[str]:
         base = cwd or self.base_cwd
@@ -1327,7 +1522,10 @@ class Gate:
             shared_lock = shared_lock or tree_lock
 
         if sub == "update-ref" or (sub is None and i < len(args)):
-            self.check_ref_evidence(rest, repo if known else self.base_cwd)
+            # xargs/parallel append refs the command line never shows.
+            self.check_ref_evidence(rest, repo if known else self.base_cwd, unknown_args)
+        elif sub in {"push", "fetch", "notes", "symbolic-ref"}:
+            self.check_ref_targets(sub, rest)
         if i >= len(args):
             return
         if sub is None:
@@ -1398,12 +1596,42 @@ class Gate:
             self._alias_cache[key] = found or None
         return self._alias_cache[key]
 
-    def check_ref_evidence(self, values: List[Optional[str]], repo: Optional[Path]) -> None:
+    def check_ref_evidence(self, values: List[Optional[str]], repo: Optional[Path], unknown_args: bool = False) -> None:
         if any(v is not None and "refs/commitforge" in v for v in values):
             raise Deny(evidence_message("git update-ref로 recovery ref 변경"))
-        uncertain = any(v is None for v in values) or "--stdin" in values
+        uncertain = unknown_args or any(v is None for v in values) or "--stdin" in values
         if uncertain and (EVIDENCE_TEXT.search(self.root_text) or self.repo_has_recovery_refs(repo)):
             raise Deny(evidence_message("확인할 수 없는 git update-ref"))
+
+    @staticmethod
+    def check_ref_targets(sub: str, values: List[Optional[str]]) -> None:
+        """Deny push/fetch/notes/symbolic-ref that write or delete refs/commitforge.
+
+        Reading a recovery ref (`git push origin refs/commitforge/x:refs/heads/b`)
+        stays allowed; only a recovery ref on the destination side is denied.
+        """
+        deleting = sub == "push" and any(
+            v is not None and (
+                (v.startswith("--") and abbreviates(v, "--delete"))
+                or (v.startswith("-") and not v.startswith("--") and "d" in v[1:])
+            )
+            for v in values
+        )
+        for value in values:
+            if value is None:
+                continue
+            if sub in {"push", "fetch"} and ":" in value:
+                # `+refs/*:refs/*` (with --prune) rewrites or deletes recovery
+                # refs without ever naming them.
+                destination = value.split(":", 1)[1]
+                if "*" in destination and fnmatch.fnmatchcase("refs/commitforge/snapshots/x", destination):
+                    raise Deny(evidence_message(f"git {sub}로 recovery ref 변경"))
+            if "refs/commitforge" not in value:
+                continue
+            if sub in {"notes", "symbolic-ref"} or deleting:
+                raise Deny(evidence_message(f"git {sub}로 recovery ref 변경"))
+            if ":" in value and "refs/commitforge" in value.split(":", 1)[1]:
+                raise Deny(evidence_message(f"git {sub}로 recovery ref 변경"))
 
     @staticmethod
     def repo_has_recovery_refs(repo: Optional[Path]) -> bool:
@@ -1448,17 +1676,9 @@ class Gate:
             path = self.resolve_path(cwd or self.base_cwd, value)
             if path is None:
                 continue
-            text = os.path.normpath(str(path)).replace("\\", "/")
-            parts = text.split("/")
-            recovery_ref = any(parts[i] == "refs" and parts[i + 1] == "commitforge" for i in range(len(parts) - 1))
-            if LOCK_DIR_NAME in parts or recovery_ref or parts[-1] == "packed-refs":
-                raise Deny(evidence_message("리다이렉션으로 잠금·recovery ref 덮어쓰기"))
-            if SNAPSHOT_DIR_NAME in parts:
-                index = parts.index(SNAPSHOT_DIR_NAME)
-                # Top-level snapshot files form the audited inventory; new files
-                # and subdirectories (ledger/, learn/, patches/) are fine.
-                if len(parts) == index + 3 and os.path.exists(text):
-                    raise Deny(evidence_message("리다이렉션으로 snapshot 파일 덮어쓰기"))
+            target = overwrite_target(str(path))
+            if target is not None:
+                raise Deny(evidence_message(f"리다이렉션으로 {target} 덮어쓰기"))
 
     # ---- clean authorisation
 

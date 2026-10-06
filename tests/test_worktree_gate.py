@@ -19,6 +19,13 @@ sys.path.insert(0, str(ROOT))
 import guard  # noqa: E402
 import install  # noqa: E402
 import worktree_gate_impl  # noqa: E402
+import os
+
+
+# Guard begin writes a recovery copy under the home directory; keep tests out of it.
+os.environ.setdefault(
+    "COMMITFORGE_RECOVERY_DIR", tempfile.mkdtemp(prefix="commitforge-recovery-test-")
+)
 
 NL = "\n"
 
@@ -159,6 +166,17 @@ EVIDENCE_DENIED = [
     "echo x > .git/claude-atomic.lock/owner.json",
     "python3 -c 'import shutil; shutil.rmtree(\".git/claude-atomic-snapshots/x\")'",
     "rm .git/claude-atomic-snapshots/20261006-x/ledger/../.cca-snapshot.json",
+    "find .git -name '2026*' -exec rm -rf {} +",
+    "find .git/refs -name 'snapshots' -exec rm -rf {} +",
+    'S=$(git rev-parse --git-dir)/claude-atomic-snapshots; rm -rf "$S"',
+    "git for-each-ref --format='%(refname)' refs/commitforge | xargs -n1 git update-ref -d",
+    "git push . :refs/commitforge/snapshots/x",
+    "git fetch . +HEAD:refs/commitforge/snapshots/x",
+    "cp /dev/null .git/claude-atomic.lock/owner.json",
+    "find .git/refs/commitforge -name 'x' -delete",
+    "find .git -name 'snapshots' -exec cp /dev/null {} \\;",
+    "git fetch --prune origin '+refs/*:refs/*'",
+    "env -C.git/refs rm -rf commitforge",
 ]
 UNLOCKED_ALLOWED = [
     "git reset --hard",
@@ -254,6 +272,34 @@ class WorktreeGateTest(unittest.TestCase):
 
     def test_unlocked_worktree_is_not_restricted(self) -> None:
         for command in UNLOCKED_ALLOWED:
+            with self.subTest(command=command):
+                self.assert_allowed(command)
+
+    def test_recovery_copies_outside_the_repository_are_protected(self) -> None:
+        root = Path(os.environ["COMMITFORGE_RECOVERY_DIR"])
+        copy = root / "repo-0123456789abcdef" / "20261006-x"
+        copy.mkdir(parents=True, exist_ok=True)
+        (copy / "changes.tar").write_bytes(b"")
+        (copy / "manifest.json").write_text("{}", encoding="utf-8")
+        for command in (
+            f"rm -rf {root}",
+            f"rm -rf {copy}",
+            f"rm -rf {root.parent}",
+            f"cd {root} && rm -rf ./*",
+            f"find {root.parent} -name '*.tar' -delete",
+            f"cp /dev/null {copy}/changes.tar",
+            f"python3 -c 'import shutil; shutil.rmtree(\"{root}/commitforge/recovery\")'"
+            .replace(f"{root}/commitforge/recovery", "~/.claude/commitforge/recovery"),
+        ):
+            with self.subTest(command=command):
+                proc = self.gate(command)
+                self.assertEqual(proc.returncode, 2, command)
+                self.assertIn("복구 근거", proc.stderr)
+        for command in (
+            f"ls {copy}",
+            f"tar -xf {copy}/changes.tar -C {self.tmp} -- a.txt",
+            f"cat {copy}/manifest.json",
+        ):
             with self.subTest(command=command):
                 self.assert_allowed(command)
 

@@ -42,7 +42,7 @@ NEEDS_CHECK = re.compile(
     r"git|guard|claude-|commitforge|[$`\\]"
     r"|\b(?:eval|source|exec|xargs|find|parallel|sudo|doas|env|nice|timeout|nohup"
     r"|bash|sh|zsh|dash|ksh|fish|python[0-9.]*|node|perl|ruby|php|osascript|deno|bun"
-    r"|rm|rmdir|unlink|mv|shred|trash|srm|truncate)\b"
+    r"|rm|rmdir|unlink|mv|shred|trash|srm|truncate|cp|install|tee|dd|ln|rsync)\b"
     r"|(?:^|[\s;&|(])\.\s|>"
 )
 
