@@ -133,10 +133,22 @@ ref를 직접 지웠다. 그 전에 커밋 순서를 고친다며 `checkout <com
 - 잠금이 없고 복구 근거를 건드리지 않으면 아무것도 막지 않는다. 훅 입력이 손상됐거나
   훅 스크립트가 사라졌으면(설치기가 launcher로 감싼다) 셸을 막지 않도록 통과시킨다.
 
-한계: `find .git -name '*.json' | xargs rm`처럼 이름 없이 넘긴 경로의 삭제,
-인터프리터가 실행하는 스크립트 파일(`python script.py`), Edit·Write 도구,
-git 밖의 파일 수정 명령(`sed -i`, `cp`)은 검사하지 않는다. 이 범위는 skill 규칙과
-보존 검사(2.1절)가 맡는다.
+복구 사본 경로는 symlink를 풀고(`realpath`), macOS·Windows에서는 대소문자를 무시해
+비교한다. 값을 정적으로 알 수 없는 삭제·덮어쓰기와 인터프리터 인라인 코드는 명령에
+`commitforge`나 `.claude`가 보이면 거부한다.
+
+한계: 증거 보호는 셸 명령의 철자를 해석하는 최선 노력이며 완전하지 않다. 다음은
+검사하지 않거나 정확히 해석하지 못한다.
+
+- `find .git -name '*.json' | xargs rm`처럼 이름 없이 넘긴 경로의 삭제
+- `env`·`sudo`의 묶음·약어 옵션(`env -iC dir`, `--chd=dir`), `cp`·`install`·`ln`의
+  `-tDIR`·`--target=` 형태, rsync의 `-t`(시간 보존)와 `--remove-source-files`
+- GNU find `-regex`의 Emacs 정규식 문법, `refs/`를 생략한 refspec(`git push .
+  :commitforge/...`), `remote.<name>.fetch` 설정에 넣어 둔 refspec
+- 인터프리터가 실행하는 스크립트 파일(`python script.py`), Edit·Write 도구, git 밖의
+  파일 수정(`sed -i`)
+
+이 범위는 skill 규칙, 보존 검사(2.1절), 저장소 밖 복구 사본이 맡는다.
 
 차단 메시지를 받으면 다른 명령으로 우회하지 않는다. 커밋 순서·구성이 틀렸어도
 history를 고치지 않고, 더 이상 커밋하지 않은 채 `abort --session`으로 멈춰 보고한다.
