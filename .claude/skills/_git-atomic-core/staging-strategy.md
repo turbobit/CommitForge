@@ -54,7 +54,7 @@ Patch 방식:
 
 1. `git diff HEAD -- <path>`로 최종 변경을 확인한다.
 2. 현재 index에 해당 파일의 혼합 변경이 있으면 스냅샷 확보 후 그 파일만 `git restore --staged -- <path>`로 HEAD 기준으로 되돌린다.
-3. 원하는 hunk와 충분한 context만 포함한 patch 파일을 세션 스냅샷 디렉터리 아래에 만든다.
+3. 원하는 hunk와 충분한 context만 포함한 patch 파일을 세션 스냅샷의 `patches/` 하위 디렉터리에 만든다. 스냅샷 최상위에 파일을 두면 `finish`의 무결성 감사가 `unexpected`로 거부한다.
 4. `git apply --cached --check <patch>`로 검증한다.
 5. 검증 성공 시 `git apply --cached <patch>`를 수행한다.
 6. `git diff --cached -- <path>`와 `git diff -- <path>`를 모두 확인한다.

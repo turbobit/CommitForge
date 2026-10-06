@@ -62,7 +62,7 @@ class PackageMetadataTest(unittest.TestCase):
         self.assertIn("git merge-base --is-ancestor", modes)
         self.assertIn("working tree가 깨끗해도", modes)
         self.assertIn("Guard `finish --allow-dirty`", modes)
-        self.assertIn("learn-status-before.z", modes)
+        self.assertIn("learn/status-before.z", modes)
         self.assertIn("cmp -s", modes)
         self.assertIn("이 시점에 `finish`하지 않고", cca)
 

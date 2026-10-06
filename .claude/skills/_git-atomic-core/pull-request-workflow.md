@@ -201,14 +201,14 @@ git push "<remote>" "HEAD:refs/heads/<validated-branch>"
 ```
 
 9. push 후 `git ls-remote --heads`로 remote branch SHA가 현재 HEAD와 같은지 확인한다.
-10. Guard snapshot 내부에 최종 PR 본문 파일을 만들고 다음 형태로 생성한다.
+10. Guard snapshot의 `pr/` 하위 디렉터리(`mkdir -p "<snapshot>/pr"`)에 최종 PR 본문 파일을 만들고 다음 형태로 생성한다. snapshot 최상위에 두면 `finish`의 무결성 감사가 거부한다.
 
 ```bash
 gh pr create \
   --base "<base>" \
   --head "<validated-branch>" \
   --title "<title>" \
-  --body-file "<snapshot>/pull-request.md"
+  --body-file "<snapshot>/pr/pull-request.md"
 ```
 
 `--draft`가 있으면 `gh pr create`에 `--draft`를 추가한다.

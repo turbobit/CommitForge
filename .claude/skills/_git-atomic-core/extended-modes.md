@@ -242,14 +242,14 @@ python3 "<absolute-CF_CORE>/scripts/release_version.py" \
 
 안전한 실행:
 
-1. 다른 변경을 하기 전에 Guard `begin`을 호출하고 `session`, `token`, `snapshot`, 시작 fingerprint를 보관한다.
+1. 다른 변경을 하기 전에 Guard `begin`을 호출하고 `snapshot`과 시작 fingerprint를 보관한다.
 2. Git 작업 진행 상태 또는 동시 실행 lock이 있으면 변경 없이 중단한다.
-3. 프로필을 쓰기 전에 `.commitforge/profile.md`와 `.commitforge/profile.json`을 제외한 staged diff, working diff, porcelain status를 snapshot 아래의 `learn-*-before` 파일에 저장한다.
+3. 프로필을 쓰기 전에 `.commitforge/profile.md`와 `.commitforge/profile.json`을 제외한 staged diff, working diff, porcelain status를 snapshot의 `learn/` 하위 디렉터리에 `*-before` 파일로 저장한다. snapshot 최상위에 파일을 두면 `finish`의 무결성 감사가 `unexpected`로 거부한다.
 4. 기존 source/index/commit을 변경하지 않는다.
 5. `.commitforge/profile.md`와 `.commitforge/profile.json`만 새로 만들거나 갱신한다.
 6. 기존 프로필이 있으면 내용을 읽고 근거가 달라진 부분만 갱신한다.
 7. 프로필 파일을 자동 stage/commit하지 않는다.
-8. 작성 직후 같은 세 출력을 `learn-*-after` 파일에 저장하고 각각 `cmp -s`로 byte 비교한다.
+8. 작성 직후 같은 세 출력을 `learn/`의 `*-after` 파일에 저장하고 각각 `cmp -s`로 byte 비교한다.
 9. 하나라도 다르면 프로필 외 상태가 바뀐 것이다. Guard `abort`로 lock을 해제하고 snapshot을 보존한다.
 10. 세 비교가 모두 같고 `git status`에서 추가 변화가 프로필뿐이면 Guard `finish --allow-dirty`로 snapshot을 제거하고 lock을 해제한다. `--keep-snapshot`이면 snapshot만 보존한다.
 
@@ -258,21 +258,22 @@ Guard 명령:
 ```bash
 bash "<absolute-CF_CORE>/scripts/guard.sh" begin \
   --session "$COMMITFORGE_SESSION_ID"
+mkdir -p "<snapshot>/learn"
 git diff --cached --binary --full-index -- . \
   ':(exclude).commitforge/profile.md' \
-  ':(exclude).commitforge/profile.json' > "<snapshot>/learn-staged-before.diff"
+  ':(exclude).commitforge/profile.json' > "<snapshot>/learn/staged-before.diff"
 git diff --binary --full-index -- . \
   ':(exclude).commitforge/profile.md' \
-  ':(exclude).commitforge/profile.json' > "<snapshot>/learn-working-before.diff"
+  ':(exclude).commitforge/profile.json' > "<snapshot>/learn/working-before.diff"
 git status --porcelain=v2 -z --untracked-files=all -- . \
   ':(exclude).commitforge/profile.md' \
-  ':(exclude).commitforge/profile.json' > "<snapshot>/learn-status-before.z"
+  ':(exclude).commitforge/profile.json' > "<snapshot>/learn/status-before.z"
 # 프로필 작성 후 동일 명령의 출력은 각각 *-after 파일에 저장한다.
-cmp -s "<snapshot>/learn-staged-before.diff" "<snapshot>/learn-staged-after.diff"
-cmp -s "<snapshot>/learn-working-before.diff" "<snapshot>/learn-working-after.diff"
-cmp -s "<snapshot>/learn-status-before.z" "<snapshot>/learn-status-after.z"
+cmp -s "<snapshot>/learn/staged-before.diff" "<snapshot>/learn/staged-after.diff"
+cmp -s "<snapshot>/learn/working-before.diff" "<snapshot>/learn/working-after.diff"
+cmp -s "<snapshot>/learn/status-before.z" "<snapshot>/learn/status-after.z"
 bash "<absolute-CF_CORE>/scripts/guard.sh" finish \
-  --session "<session>" --token "<token>" --snapshot "<snapshot>" --allow-dirty
+  --session "$COMMITFORGE_SESSION_ID" --allow-dirty
 ```
 
 `learn`은 소스 리뷰·수정·Atomic Commit 실행 모드가 아니다. `--preview` 또는 `/cr`에서는 Guard `finish --review-only --source-read-only`로 종료하고 파일을 만들지 않는다. 실제 `/cca learn`은 프로필 생성 결과와 변경된 파일 경로를 보고한다.
