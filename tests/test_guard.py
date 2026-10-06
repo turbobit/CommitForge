@@ -122,6 +122,99 @@ class GuardIntegrationTest(unittest.TestCase):
         refs = run(["git", "for-each-ref", "refs/commitforge/"], self.tmp).stdout
         self.assertEqual(refs, "")
 
+    def test_session_only_conserve_and_abort_resolve_owner_context(self) -> None:
+        """Skills pass only --session, so no hand-copied token can break the check."""
+        started = self.begin_with_changes("conserve-session-only")
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+
+        proc, report = self.guard(
+            "conserve", "--session", started["session"], check=False
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(report["reason"], "worktree_changes_lost")
+        self.assertEqual(report["conservation"]["lost"], ["tracked.txt"])
+
+        _, aborted = self.guard("abort", "--session", started["session"])
+        self.assertTrue(aborted["lock_released"])
+        self.assertEqual(aborted["snapshot"], started["snapshot"])
+        self.assertTrue(Path(started["snapshot"]).is_dir())
+
+    def test_mistyped_token_is_ignored_so_conservation_still_runs(self) -> None:
+        """A token spliced with the fingerprint once blocked every Guard call."""
+        started = self.begin_with_changes("conserve-bad-token")
+        spliced = started["token"][:16] + started["fingerprint"][16:]
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+
+        proc, report = self.guard(
+            "conserve", "--session", started["session"], "--token", spliced,
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(report["reason"], "worktree_changes_lost")
+        self.assertTrue(report["token_ignored"])
+
+        _, aborted = self.guard(
+            "abort", "--session", started["session"], "--token", spliced
+        )
+        self.assertTrue(aborted["token_ignored"])
+        self.assertEqual(aborted["conservation"]["lost"], ["tracked.txt"])
+
+    def test_foreign_session_cannot_use_session_only_calls(self) -> None:
+        started = self.begin_with_changes("conserve-owner")
+        for command in ("conserve", "finish", "abort"):
+            proc, refused = self.guard(command, "--session", "intruder", check=False)
+            self.assertNotEqual(proc.returncode, 0, command)
+        self.assertTrue(self.tmp.joinpath(".git/claude-atomic.lock").is_dir())
+        self.guard("abort", "--session", started["session"])
+
+    def test_conserve_and_abort_report_losses_after_the_lock_is_lost(self) -> None:
+        """Another actor releasing the lock must not hide the discarded change."""
+        started = self.begin_with_changes("conserve-lock-lost")
+        self.guard("clean")
+        run(["git", "checkout", "--", "tracked.txt"], self.tmp)
+
+        for command in ("conserve", "abort"):
+            proc, report = self.guard(
+                command, "--session", started["session"], check=False
+            )
+            self.assertNotEqual(proc.returncode, 0, command)
+            self.assertEqual(report["reason"], "lock_not_owned", command)
+            self.assertEqual(report["lock_error"], "owner_not_found", command)
+            self.assertEqual(report["snapshot"], started["snapshot"], command)
+            self.assertEqual(report["conservation"]["lost"], ["tracked.txt"], command)
+            self.assertEqual(
+                report["conservation"]["recovery_ref"], started["recovery_ref"], command
+            )
+
+    def test_lock_free_snapshot_conserve_keeps_the_explicit_pair(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        _, taken = self.guard("snapshot", "--session", "lock-free")
+        _, report = self.guard(
+            "conserve", "--session", "lock-free",
+            "--token", taken["token"], "--snapshot", taken["snapshot"],
+        )
+        self.assertTrue(report["conservation"]["ok"])
+
+    def test_clean_validates_request_session_before_releasing(self) -> None:
+        self.begin_with_changes("clean-validate")
+        proc, refused = self.guard("clean", "--request-session", "", check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertTrue(self.tmp.joinpath(".git/claude-atomic.lock").is_dir())
+
+    def test_clean_reports_lost_changes_of_the_owner_snapshot(self) -> None:
+        started = self.begin_with_changes("clean-lost")
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+
+        _, cleaned = self.guard("clean")
+        self.assertTrue(cleaned["lock_released"])
+        [report] = cleaned["conservation"]
+        self.assertEqual(report["snapshot"], started["snapshot"])
+        self.assertFalse(report["ok"])
+        self.assertEqual(report["lost"], ["tracked.txt"])
+        self.assertEqual(report["recovery_ref"], started["recovery_ref"])
+        self.assertIn("사라진 변경", cleaned["message"])
+        self.assertTrue(Path(started["snapshot"]).is_dir())
+
     def test_begin_leaves_real_index_and_worktree_untouched(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nstaged\n", encoding="utf-8")
         run(["git", "add", "tracked.txt"], self.tmp)

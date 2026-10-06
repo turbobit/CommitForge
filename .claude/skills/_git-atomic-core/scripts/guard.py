@@ -444,8 +444,9 @@ def read_json(path: Path) -> dict[str, Any] | None:
 def owned_snapshots(
     ctx: dict[str, Path],
     session: str,
-    token: str,
+    token: str | None,
 ) -> list[Path]:
+    """Snapshots of this worktree owned by session (and token, unless None)."""
     snapshot_root = ctx["git_dir"] / SNAPSHOT_DIR_NAME
     if not snapshot_root.exists():
         return []
@@ -457,7 +458,9 @@ def owned_snapshots(
         metadata = read_json(candidate / MARKER_NAME)
         if not metadata:
             continue
-        if metadata.get("session") != session or metadata.get("token") != token:
+        if metadata.get("session") != session:
+            continue
+        if token is not None and metadata.get("token") != token:
             continue
         project_root = metadata.get("project_root")
         if not isinstance(project_root, str) or Path(project_root).resolve() != ctx["root"]:
@@ -846,8 +849,19 @@ def verify_owner(ctx: dict[str, Path], session: str, token: str) -> dict[str, An
     owner = read_json(owner_file)
     if not owner:
         raise GuardError(f"유효한 잠금 소유자 정보가 없습니다: {lock_dir}")
-    if owner.get("session") != session or owner.get("token") != token:
-        raise GuardError("현재 세션이 소유하지 않은 잠금은 해제할 수 없습니다.")
+    if owner.get("session") != session:
+        raise GuardError(
+            "현재 세션이 소유하지 않은 잠금은 해제할 수 없습니다.",
+            reason="owner_session_mismatch",
+        )
+    if owner.get("token") != token:
+        # A mistyped token makes every later Guard call fail the same way, so
+        # the conservation check never runs. Point at the retype-free path.
+        raise GuardError(
+            "--token이 현재 lock owner의 token과 다릅니다. token을 다시 입력하지 "
+            "말고 --token과 --snapshot을 생략해 --session만 넘기십시오.",
+            reason="owner_token_mismatch",
+        )
     if Path(owner.get("worktree", "")).resolve() != ctx["root"]:
         raise GuardError("잠금의 작업 트리가 현재 저장소와 일치하지 않습니다.")
     return owner
@@ -858,12 +872,15 @@ def resolve_owned_review_context(
     session: str,
     token: str | None,
     snapshot_arg: str | None,
-) -> tuple[str, Path]:
-    """Resolve review identity from the current worktree lock when omitted.
+) -> tuple[str, Path, bool]:
+    """Resolve the run's token and snapshot from the current worktree lock.
 
-    Explicit values remain authoritative and are never silently replaced. This
-    keeps wrong cross-worktree paths fail-closed while allowing /cr to avoid
-    reconstructing long token and snapshot arguments after a lengthy review.
+    The session is the identity: owner.json is readable, so a token copied by
+    the model authenticates nothing and a mistyped one only made every Guard
+    call fail, which kept the conservation check from running. An explicit
+    token is therefore ignored in favour of the owner's (reported through the
+    third value). An explicit snapshot stays authoritative so a wrong
+    cross-worktree path keeps failing closed.
     """
     lock_dir, owner_file = lock_paths(ctx)
     owner = read_json(owner_file)
@@ -884,11 +901,12 @@ def resolve_owned_review_context(
             "현재 잠금의 owner token을 확인할 수 없습니다.",
             reason="owner_token_unreadable",
         )
-    resolved_token = token if token is not None else owner_token
+    token_ignored = token is not None and token != owner_token
+    resolved_token = owner_token
     verify_owner(ctx, session, resolved_token)
 
     if snapshot_arg is not None:
-        return resolved_token, Path(snapshot_arg)
+        return resolved_token, Path(snapshot_arg), token_ignored
 
     matches = owned_snapshots(ctx, session, resolved_token)
     if not matches:
@@ -904,7 +922,34 @@ def resolve_owned_review_context(
             reason="owner_snapshot_ambiguous",
             matching_snapshots=[str(path) for path in matches],
         )
-    return resolved_token, matches[0]
+    return resolved_token, matches[0], token_ignored
+
+
+def lock_lost_report(ctx: dict[str, Path], session: str, snapshot_arg: str | None) -> dict[str, Any]:
+    """Conservation of this session's run after its lock was released or taken.
+
+    Losing the lock is how another actor gets to discard the run's changes, so
+    the report must still name what was lost and where to restore it from.
+    """
+    if snapshot_arg is not None:
+        candidates = [Path(snapshot_arg).resolve()]
+    else:
+        # Snapshot names start with their creation time: newest first.
+        candidates = owned_snapshots(ctx, session, None)[::-1]
+    if not candidates:
+        return {"snapshot": None, "conservation": None, "other_snapshots": []}
+    try:
+        metadata = validate_snapshot(ctx, candidates[0], session, None)
+    except GuardError as exc:
+        # Must not replace the lock_not_owned error being built by the caller.
+        conservation: dict[str, Any] = {"ok": None, "available": False, "reason": str(exc)}
+    else:
+        conservation = informational_conservation(ctx, metadata)
+    return {
+        "snapshot": str(candidates[0]),
+        "conservation": conservation,
+        "other_snapshots": [str(path) for path in candidates[1:]],
+    }
 
 
 def run_git_env(args: list[str], *, cwd: Path, env: dict[str, str]) -> bytes:
@@ -1077,6 +1122,30 @@ def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[
     }
 
 
+def snapshot_conservation(
+    ctx: dict[str, Path], snapshots: list[str]
+) -> list[dict[str, Any]]:
+    """Report, never enforce: `clean` must still release an orphaned lock."""
+    results: list[dict[str, Any]] = []
+    for path in snapshots:
+        metadata = read_json(Path(path) / MARKER_NAME)
+        if not metadata:
+            results.append({"snapshot": path, "ok": None, "available": False})
+            continue
+        results.append({"snapshot": path, **informational_conservation(ctx, metadata)})
+    return results
+
+
+def informational_conservation(
+    ctx: dict[str, Path], metadata: dict[str, Any]
+) -> dict[str, Any]:
+    """conservation_report for callers that must proceed even if it cannot run."""
+    try:
+        return conservation_report(ctx, metadata)
+    except (GuardError, OSError) as exc:
+        return {"ok": None, "available": False, "reason": str(exc)}
+
+
 def require_conservation(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[str, Any]:
     report = conservation_report(ctx, metadata)
     if not report["ok"]:
@@ -1211,7 +1280,10 @@ def capture_snapshot(
     return snapshot, warnings, fingerprint, ref
 
 
-def validate_snapshot(ctx: dict[str, Path], snapshot: Path, session: str, token: str) -> dict[str, Any]:
+def validate_snapshot(
+    ctx: dict[str, Path], snapshot: Path, session: str, token: str | None
+) -> dict[str, Any]:
+    """Check that the snapshot belongs to this session (and run, given a token)."""
     snapshot_root = (ctx["git_dir"] / SNAPSHOT_DIR_NAME).resolve()
     resolved = snapshot.resolve()
     try:
@@ -1223,8 +1295,18 @@ def validate_snapshot(ctx: dict[str, Path], snapshot: Path, session: str, token:
     metadata = read_json(marker)
     if not metadata:
         raise GuardError("스냅샷 소유권 표시가 없거나 손상되었습니다.")
-    if metadata.get("session") != session or metadata.get("token") != token:
-        raise GuardError("현재 세션이 소유하지 않은 스냅샷은 제거할 수 없습니다.")
+    if metadata.get("session") != session:
+        raise GuardError(
+            "현재 세션이 소유하지 않은 스냅샷입니다.",
+            reason="snapshot_owner_mismatch",
+        )
+    if token is not None and metadata.get("token") != token:
+        raise GuardError(
+            "스냅샷의 token이 일치하지 않습니다. begin 또는 snapshot 결과의 "
+            "token을 그대로 쓰거나, 현재 lock owner의 스냅샷이면 --snapshot을 "
+            "생략하십시오.",
+            reason="snapshot_token_mismatch",
+        )
     if Path(metadata.get("project_root", "")).resolve() != ctx["root"]:
         raise GuardError("스냅샷의 프로젝트 루트가 현재 저장소와 일치하지 않습니다.")
     return metadata
@@ -1393,7 +1475,28 @@ def cmd_conserve(args: argparse.Namespace) -> None:
     """Read-only mid-run check that no starting change has been discarded."""
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
-    metadata = validate_snapshot(ctx, Path(args.snapshot), session, args.token)
+    token_ignored = False
+    try:
+        token, snapshot, token_ignored = resolve_owned_review_context(
+            ctx, session, args.token, args.snapshot
+        )
+    except GuardError as exc:
+        if exc.details.get("reason") not in {"owner_not_found", "owner_session_mismatch"}:
+            raise
+        legacy = args.token is not None and args.snapshot is not None
+        if legacy and not lock_paths(ctx)[0].exists():
+            # A lock-free snapshot from `snapshot`: the explicit pair is its identity.
+            token, snapshot = args.token, Path(args.snapshot)
+        else:
+            raise GuardError(
+                "이 실행의 Guard 잠금이 해제되었거나 다른 세션으로 넘어갔습니다. "
+                "더 이상 stage·commit하지 말고 conservation 결과를 사용자에게 "
+                "그대로 보고하십시오.",
+                reason="lock_not_owned",
+                lock_error=exc.details.get("reason"),
+                **lock_lost_report(ctx, session, args.snapshot),
+            ) from exc
+    metadata = validate_snapshot(ctx, snapshot, session, token)
     report = conservation_report(ctx, metadata)
     if not report["ok"]:
         raise GuardError(
@@ -1402,8 +1505,9 @@ def cmd_conserve(args: argparse.Namespace) -> None:
             f"lost={report['lost'][:20]} head_rewound={report['head_rewound']}",
             reason="worktree_changes_lost",
             conservation=report,
+            token_ignored=token_ignored,
         )
-    emit({"ok": True, "conservation": report})
+    emit({"ok": True, "conservation": report, "token_ignored": token_ignored})
 
 
 def review_invariants(
@@ -1794,7 +1898,7 @@ def ledger_importable() -> bool:
 def cmd_verify_review(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
-    token, snapshot = resolve_owned_review_context(
+    token, snapshot, _ = resolve_owned_review_context(
         ctx, session, args.token, args.snapshot
     )
     metadata = validate_snapshot(ctx, snapshot, session, token)
@@ -1852,9 +1956,10 @@ def audit_snapshot(snapshot: Path, metadata: dict[str, Any]) -> dict[str, Any]:
 def cmd_audit_snapshot(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
-    verify_owner(ctx, session, args.token)
-    snapshot = Path(args.snapshot)
-    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    token, snapshot, _ = resolve_owned_review_context(
+        ctx, session, args.token, args.snapshot
+    )
+    metadata = validate_snapshot(ctx, snapshot, session, token)
     result = audit_snapshot(snapshot, metadata)
     if not result["ok"]:
         raise GuardError(
@@ -1868,7 +1973,7 @@ def cmd_audit_snapshot(args: argparse.Namespace) -> None:
 def cmd_finish(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
-    token, snapshot = resolve_owned_review_context(
+    token, snapshot, token_ignored = resolve_owned_review_context(
         ctx, session, args.token, args.snapshot
     )
     metadata = validate_snapshot(ctx, snapshot, session, token)
@@ -1932,6 +2037,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
             "snapshot_removed": not keep_snapshot,
             "recovery_ref_removed": ref_removed,
             "conservation": conservation,
+            "token_ignored": token_ignored,
             "snapshot": str(snapshot),
             "snapshot_kept_for_bypass": bool(ledger_bypassed and not args.keep_snapshot),
             "lock_released": True,
@@ -2002,35 +2108,27 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
 def cmd_abort(args: argparse.Namespace) -> None:
     ctx = repo_context(Path.cwd().resolve())
     session = safe_session(args.session)
-    verify_owner(ctx, session, args.token)
-    if args.snapshot:
-        snapshot = Path(args.snapshot)
-    else:
-        matches = owned_snapshots(ctx, session, args.token)
-        if not matches:
-            raise GuardError(
-                "현재 lock owner와 일치하는 스냅샷을 찾지 못했습니다. "
-                "`status`로 경로를 확인한 뒤 --snapshot을 명시하십시오.",
-                reason="owner_snapshot_not_found",
-                project_root=str(ctx["root"]),
-                git_dir=str(ctx["git_dir"]),
-            )
-        if len(matches) > 1:
-            raise GuardError(
-                "현재 lock owner와 일치하는 스냅샷이 여러 개입니다. "
-                "해제할 경로를 --snapshot으로 명시하십시오.",
-                reason="owner_snapshot_ambiguous",
-                matching_snapshots=[str(path) for path in matches],
-            )
-        snapshot = matches[0]
-    metadata = validate_snapshot(ctx, snapshot, session, args.token)
+    try:
+        token, snapshot, token_ignored = resolve_owned_review_context(
+            ctx, session, args.token, args.snapshot
+        )
+    except GuardError as exc:
+        if exc.details.get("reason") not in {"owner_not_found", "owner_session_mismatch"}:
+            raise
+        # Not ours to release, but the run's losses must still be reported.
+        raise GuardError(
+            "이 실행의 Guard 잠금이 이미 해제되었거나 다른 세션으로 넘어가 해제할 "
+            "잠금이 없습니다. 다른 세션의 잠금은 건드리지 마십시오. conservation "
+            "결과를 사용자에게 그대로 보고하십시오.",
+            reason="lock_not_owned",
+            lock_error=exc.details.get("reason"),
+            **lock_lost_report(ctx, session, args.snapshot),
+        ) from exc
+    metadata = validate_snapshot(ctx, snapshot, session, token)
     # Informational only: abort must release the lock even when the check
     # itself cannot run, and it never deletes anything either way.
-    try:
-        conservation: dict[str, Any] = conservation_report(ctx, metadata)
-    except (GuardError, OSError) as exc:
-        conservation = {"ok": None, "available": False, "reason": str(exc)}
-    release_lock(ctx, session, args.token)
+    conservation = informational_conservation(ctx, metadata)
+    release_lock(ctx, session, token)
     emit(
         {
             "ok": True,
@@ -2038,6 +2136,7 @@ def cmd_abort(args: argparse.Namespace) -> None:
             "snapshot": str(snapshot),
             "recovery_ref": metadata.get("recovery_ref"),
             "conservation": conservation,
+            "token_ignored": token_ignored,
             "lock_released": True,
             "message": "작업 실패/중단으로 Diff 스냅샷은 보존했습니다.",
         }
@@ -2135,6 +2234,9 @@ def cmd_session_end(args: argparse.Namespace) -> None:
 def cmd_clean(args: argparse.Namespace) -> None:
     """Explicitly release only the current worktree's CommitForge lock."""
     ctx = repo_context(Path.cwd().resolve())
+    # Validate before touching anything: a late failure would report a failed
+    # clean whose lock is in fact already gone.
+    request_session = safe_session(args.request_session)
     lock_dir, owner_file = lock_paths(ctx)
     initial_git_locks = external_lock_details(
         ctx["git_dir"],
@@ -2260,6 +2362,7 @@ def cmd_clean(args: argparse.Namespace) -> None:
                 "released_by_other": True,
                 "lock_owner": owner,
                 "lock_owner_snapshots": owner_snapshots,
+                "conservation": snapshot_conservation(ctx, owner_snapshots),
                 "snapshots_removed": 0,
                 "git_locks_removed": git_lock_cleanup["removed"],
                 "git_lock_cleanup": git_lock_cleanup,
@@ -2282,6 +2385,7 @@ def cmd_clean(args: argparse.Namespace) -> None:
         raise GuardError(
             "확인 중 잠금 owner가 바뀌어 clean을 중단합니다.",
             reason="clean_lock_owner_changed",
+            conservation=snapshot_conservation(ctx, owner_snapshots),
             project_root=str(ctx["root"]),
             git_dir=str(ctx["git_dir"]),
             lock_path=str(lock_dir),
@@ -2317,6 +2421,16 @@ def cmd_clean(args: argparse.Namespace) -> None:
             lock_path=str(lock_dir),
         ) from exc
 
+    # Computed after the release: it reads only the snapshot and the working
+    # tree, and a full temp-index pass must not widen the owner-check window.
+    owner_conservation = snapshot_conservation(ctx, owner_snapshots)
+    lost_note = (
+        " 경고: 잠금 owner의 snapshot에 커밋되지 않은 채 사라진 변경이 있습니다. "
+        "conservation의 lost·recovery_ref를 사용자에게 그대로 보고하고 snapshot과 "
+        "recovery ref를 지우지 마십시오."
+        if any(item.get("ok") is False for item in owner_conservation)
+        else ""
+    )
     emit(
         {
             "ok": True,
@@ -2329,8 +2443,9 @@ def cmd_clean(args: argparse.Namespace) -> None:
             "lock_owner": owner,
             "lock_owner_readable": owner is not None,
             "lock_owner_snapshots": owner_snapshots,
+            "conservation": owner_conservation,
             "snapshots_removed": 0,
-            "requested_by_session": safe_session(args.request_session),
+            "requested_by_session": request_session,
             "git_locks_removed": git_lock_cleanup["removed"],
             "git_lock_cleanup": git_lock_cleanup,
             "git_locks": git_locks,
@@ -2343,6 +2458,7 @@ def cmd_clean(args: argparse.Namespace) -> None:
                 "현재 Git worktree의 CommitForge 잠금을 해제했습니다."
                 + removed_git_lock_note
                 + git_lock_note
+                + lost_note
             ),
         }
     )
@@ -2482,14 +2598,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify that no change present at begin was discarded without a commit",
     )
     conserve.add_argument("--session", required=True)
-    conserve.add_argument("--token", required=True)
-    conserve.add_argument("--snapshot", required=True)
+    conserve.add_argument(
+        "--token",
+        help="Ignored when it differs from the current-worktree lock owner's token",
+    )
+    conserve.add_argument(
+        "--snapshot",
+        help="Owned snapshot path; omitted when the owner identifies exactly one snapshot",
+    )
 
     finish = sub.add_parser("finish", help="Delete owned snapshot and release lock")
     finish.add_argument("--session", required=True)
     finish.add_argument(
         "--token",
-        help="Owned token; omitted to use the matching current-worktree lock owner",
+        help="Ignored when it differs from the current-worktree lock owner's token",
     )
     finish.add_argument(
         "--snapshot",
@@ -2520,7 +2642,7 @@ def build_parser() -> argparse.ArgumentParser:
     verify_review.add_argument("--session", required=True)
     verify_review.add_argument(
         "--token",
-        help="Owned token; omitted to use the matching current-worktree lock owner",
+        help="Ignored when it differs from the current-worktree lock owner's token",
     )
     verify_review.add_argument(
         "--snapshot",
@@ -2538,15 +2660,24 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify owned snapshot file sizes and SHA-256 hashes",
     )
     audit.add_argument("--session", required=True)
-    audit.add_argument("--token", required=True)
-    audit.add_argument("--snapshot", required=True)
+    audit.add_argument(
+        "--token",
+        help="Ignored when it differs from the current-worktree lock owner's token",
+    )
+    audit.add_argument(
+        "--snapshot",
+        help="Owned snapshot path; omitted when the owner identifies exactly one snapshot",
+    )
 
     abort = sub.add_parser("abort", help="Keep snapshot but release owned lock")
     abort.add_argument("--session", required=True)
-    abort.add_argument("--token", required=True)
+    abort.add_argument(
+        "--token",
+        help="Ignored when it differs from the current-worktree lock owner's token",
+    )
     abort.add_argument(
         "--snapshot",
-        help="Owned snapshot path; omitted when session/token identify exactly one snapshot",
+        help="Owned snapshot path; omitted when the owner identifies exactly one snapshot",
     )
 
     session_end = sub.add_parser(

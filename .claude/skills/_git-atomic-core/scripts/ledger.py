@@ -178,7 +178,7 @@ def resolve_ledger(
     """
     ctx = guard.repo_context(Path.cwd().resolve())
     safe = guard.safe_session(session)
-    resolved_token, snapshot = guard.resolve_owned_review_context(ctx, safe, token, None)
+    resolved_token, snapshot, _ = guard.resolve_owned_review_context(ctx, safe, token, None)
     guard.validate_snapshot(ctx, snapshot, safe, resolved_token)
     return ctx, snapshot, snapshot / LEDGER_DIR_NAME, resolved_token
 
