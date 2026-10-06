@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.23.0 — 2026-10-06
+
+- Guard `begin`이 **저장소 밖 복구 사본**을 만든다. recovery ref와 snapshot은 `.git`
+  안에 있어 저장소 안의 `rm -rf`·`update-ref -d` 한 번에 보호하려던 작업과 함께
+  사라질 수 있다. 시작 HEAD와 달랐던 경로의 시작 시점 내용을
+  `~/.claude/commitforge/recovery/<저장소>-<id>/<snapshot>/`에 `changes.tar`와
+  `manifest.json`으로 남긴다(`COMMITFORGE_RECOVERY_DIR`로 위치 변경, 합계 512MiB 초과 시
+  경고만). 보존 검사 결과는 `recovery_copy`와 `restore_copy_hint`(`tar -xf ...`)를 함께
+  보고한다. 정상 `finish`·`release-snapshot`은 사본을 지우고 `abort`는 남기며, 30일이
+  지난 사본은 다음 `begin`이 정리한다. 게이트는 이 디렉터리와 상위 디렉터리의 삭제·덮어쓰기도
+  막는다
+- 보안: 1.22.0의 훅 launcher는 `python -c`로 게이트를 실행해 현재 디렉터리가 import
+  경로 맨 앞에 왔다. 프로젝트 최상위의 `json.py` 같은 파일이 git을 언급하는 모든 Bash
+  호출에서 실행되고 게이트도 꺼졌다. launcher가 `sys.path[0]`을 게이트 디렉터리로
+  바꾼다. uninstall은 1.22.0 launcher 항목도 인식한다. **1.22.0 사용자는 다시 설치한다**
+- 잠금을 잡고 만든 snapshot은 표식에 `locked`를 기록한다. 잠금이 풀린 실행이
+  token·snapshot을 명시해 `conserve`를 불러도 `lock_not_owned`로 보고된다. 같은 세션의
+  잠금 없는 snapshot은 잠금을 잡은 동안에도 명시한 token으로 검사된다
+- 게이트 우회 보강: `find`의 이름 검사를 실제 증거 경로와 대조하고(`-exec` 덮어쓰기,
+  `refs/commitforge` 안에서 시작하는 경우 포함), `cp`·`install`·`ln`·`rsync`·`tee`·`dd`
+  덮어쓰기(glob 대상 포함), 해석할 수 없는 경로의 `rm`, xargs `update-ref`,
+  `push`·`fetch`·`notes`·`symbolic-ref`로 recovery ref를 쓰거나 지우는 경우(와일드카드
+  refspec 포함), `env -C`·`sudo -D`(붙여 쓴 형태 포함)의 작업 디렉터리를 처리한다
+- `clean`이 여러 owner snapshot을 검사할 때 현재 작업 트리를 한 번만 해시한다
+- 1.22.0 `MANIFEST.json`에 `CHANGELOG.md`가 중복으로 기록된 것을 바로잡았다
+
 ## 1.22.0 — 2026-10-06
 
 - **변경 보존 게이트**(`worktree_gate.py`)를 추가했다. 한 `/ccf` 실행이 커밋 순서를
