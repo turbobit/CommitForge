@@ -78,9 +78,18 @@ working tree가 깨끗하다는 것은 성공의 증거가 아니다. `git reset
 ```bash
 git diff HEAD <recovery_ref> -- <path>          # 사라진 내용 확인
 git restore --source=<recovery_ref> --worktree -- <path>   # 해당 경로 복원
+tar -xf <recovery_copy>/changes.tar -C <project_root> -- <path>   # ref까지 사라졌을 때
 ```
 
-정상 종료한 `finish`는 snapshot과 함께 recovery ref를 삭제한다. `abort`나
+recovery ref와 snapshot은 `.git` 안에 있어 저장소 안의 `rm -rf`·`update-ref -d` 한 번에
+보호 대상과 함께 사라질 수 있다. 그래서 `begin`은 시작 HEAD와 달랐던 경로의 시작 시점
+내용을 저장소 밖 `~/.claude/commitforge/recovery/<저장소>-<id>/<snapshot>/`에도
+`changes.tar`와 `manifest.json`(저장한 경로, 시작 시점에 삭제돼 있던 경로, ref)으로
+남긴다(`recovery_copy`, 위치는 `COMMITFORGE_RECOVERY_DIR`로 바꿀 수 있다). 변경 파일
+합계가 512MiB를 넘으면 만들지 않고 경고한다. 정상 `finish`·`release-snapshot`은 사본도
+지우고, `abort`는 남긴다. 30일이 지난 사본은 다음 `begin`이 정리한다.
+
+정상 종료한 `finish`는 snapshot과 함께 recovery ref와 복구 사본을 삭제한다. `abort`나
 `--keep-snapshot`으로 남은 ref는 복구가 끝난 뒤 사용자가 `! git update-ref -d <ref>`로 지운다
 (`worktree_gate.py`가 Claude의 recovery ref 삭제를 막는다).
 
@@ -114,8 +123,8 @@ ref를 직접 지웠다. 그 전에 커밋 순서를 고친다며 `checkout <com
   세션의 잠금을 풀 수 없다. 잠금 중 `clean`은 사용자의 직전 입력이
   `/<CommitForge 명령> clean`일 때만 통과한다. 평문 승인으로는 통과하지 않는다.
 - **복구 근거 보호(잠금과 무관).** snapshot 디렉터리, 잠금 디렉터리,
-  `refs/commitforge`(packed-refs 포함) 삭제·덮어쓰기와 이를 담은 상위 디렉터리(`.git`
-  등) 삭제를 거부한다. glob, `cd` 뒤 상대경로, 같은 명령 안에서 대입한 변수,
+  `refs/commitforge`(packed-refs 포함), 저장소 밖 복구 사본 디렉터리의 삭제·덮어쓰기와
+  이를 담은 상위 디렉터리(`.git`, `~/.claude` 등) 삭제를 거부한다. glob, `cd` 뒤 상대경로, 같은 명령 안에서 대입한 변수,
   `find -delete`·`-exec rm`, `update-ref --stdin`, 인터프리터 인라인 코드를 해석한다.
   xargs처럼 실행 시점에 경로가 정해지는 삭제는 명령 문자열에 snapshot·잠금·
   recovery ref 이름이 있을 때만 거부한다.
@@ -155,7 +164,7 @@ token을 계속 요구한다.
 
 잠금이 이미 풀렸거나 다른 세션으로 넘어가면 `conserve`와 `abort`는
 `reason=lock_not_owned`로 실패하되, 그 세션의 최신 snapshot으로 계산한
-`conservation`(lost, recovery_ref)과 `snapshot`을 함께 보고한다. 잠금을 잃은 동안
+`conservation`(lost, recovery_ref, recovery_copy)과 `snapshot`을 함께 보고한다. 잠금을 잃은 동안
 버려진 변경도 이름과 복원 위치가 남는다.
 
 `/cpr`은 같은 source read-only 불변식을 그대로 적용한다. `/cp`가 `main` 또는 `master`에서 새 branch를 만드는 경우에만 `--expected-branch`로 그 이름 하나를 허용하며 HEAD commit, staged/working diff와 untracked 내용은 모두 시작 상태와 같아야 한다.

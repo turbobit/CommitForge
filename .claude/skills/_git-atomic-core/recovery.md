@@ -88,6 +88,7 @@ commit으로 고정한다. 부모는 시작 HEAD이므로 `git diff <시작 HEAD
 git for-each-ref refs/commitforge/snapshots/          # 남은 ref 목록
 git diff HEAD <ref> --stat                            # 지금과 무엇이 다른가
 git restore --source=<ref> --worktree -- <path...>    # 사라진 경로만 복원
+tar -xf <recovery_copy>/changes.tar -C <project_root> -- <path...>   # ref까지 사라졌을 때
 ! git update-ref -d <ref>                             # 복구를 마친 뒤 사용자가 직접 정리
 ```
 

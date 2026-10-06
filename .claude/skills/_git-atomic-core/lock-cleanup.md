@@ -19,7 +19,7 @@ bash "<absolute-CF_CORE>/scripts/guard.sh" clean \
   건드리지 않는다.
 - 보존된 Diff snapshot은 삭제하지 않는다.
 - 결과의 `conservation`에 `ok: false`인 snapshot이 있으면 `lost`, `head_rewound`,
-  `recovery_ref`를 그대로 보고한다. 잠금 해제가 곧 정상 종료라는 뜻은 아니다.
+  `recovery_ref`, `recovery_copy`를 그대로 보고한다. 잠금 해제가 곧 정상 종료라는 뜻은 아니다.
 - 잠금이 없으면 성공한 no-op으로 보고한다.
 - `clean` 뒤의 다른 인자는 무시하고 일반 명령 흐름, Guard `begin`, reviewer,
   테스트, staging, commit, push를 실행하지 않는다.

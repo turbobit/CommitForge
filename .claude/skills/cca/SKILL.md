@@ -482,7 +482,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" abort \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
-snapshot은 삭제하지 않는다. `finish`가 `reason=worktree_changes_lost`로 거부하면 시작 시점의 변경 일부가 커밋되지 않은 채 사라진 것이다. 자동 수정이 파일 전체를 시작 HEAD 내용으로 되돌린 경우에도 같은 판정이 나므로 성공으로 보지 않는다. 더 이상 commit하지 않고 `abort`한 뒤 `conservation.lost`, `head_rewound`, `recovery_ref`와 복원 명령을 보고한다 (`safety-and-concurrency.md` 2.1절). `finish`를 다른 옵션으로 다시 실행해 우회하지 않는다.
+snapshot은 삭제하지 않는다. `finish`가 `reason=worktree_changes_lost`로 거부하면 시작 시점의 변경 일부가 커밋되지 않은 채 사라진 것이다. 자동 수정이 파일 전체를 시작 HEAD 내용으로 되돌린 경우에도 같은 판정이 나므로 성공으로 보지 않는다. 더 이상 commit하지 않고 `abort`한 뒤 `conservation.lost`, `head_rewound`, `recovery_ref`, `recovery_copy`와 복원 명령을 보고한다 (`safety-and-concurrency.md` 2.1절). `finish`를 다른 옵션으로 다시 실행해 우회하지 않는다.
 
 Guard 명령은 `--session`만 넘기고 token을 다시 입력하지 않는다. 다른 사유로 실패해도 성공이 아니며(`lock_not_owned`면 함께 온 `conservation`을 보고), `clean`·snapshot 삭제·`update-ref -d`·reset·rebase로 빠져나가지 않고 `abort` 후 보고한다. `worktree_gate.py` 훅이 잠금 중 이런 명령을 차단한다 (`safety-and-concurrency.md` 2.2절).
 

@@ -846,6 +846,8 @@ git update-ref -d <ref>     # 복구를 마친 뒤
 
 정상 종료하면 ref도 함께 삭제됩니다.
 
+ref와 snapshot은 `.git` 안에 있어 저장소 안에서 한 번에 지워질 수 있습니다. 그래서 Guard는 시작 시점에 바뀌어 있던 파일을 저장소 밖 `~/.claude/commitforge/recovery/`에도 `changes.tar`로 복사합니다(`COMMITFORGE_RECOVERY_DIR`로 위치 변경). ref가 사라졌다면 `tar -xf <recovery_copy>/changes.tar -C <프로젝트> -- <경로>`로 복원합니다. 정상 종료하면 사본도 지우고, 실패·중단 때는 남기며, 30일이 지난 사본은 다음 실행이 정리합니다.
+
 ### 변경 보존 게이트
 
 보존 검사는 사후 판정이라, 모델이 규칙을 무시하고 검사 자체를 건너뛰면 막지 못합니다. 실제로 한 `/ccf` 실행은 커밋 순서를 고친다며 `checkout <commit> -- .`, `reset --hard`, cherry-pick으로 커밋되지 않은 파일을 잃었습니다. token을 잘못 옮겨 적어 Guard 명령이 모두 실패하자 스스로 `clean`을 실행하고 snapshot과 recovery ref까지 지웠습니다.

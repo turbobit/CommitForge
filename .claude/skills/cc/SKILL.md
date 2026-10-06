@@ -96,7 +96,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" begin \
   --session "$COMMITFORGE_SESSION_ID"
 ```
 
-JSON 결과의 `snapshot`, `fingerprint`, `head`, `recovery_ref`를 작업 완료까지 보관한다.
+JSON 결과의 `snapshot`, `fingerprint`, `head`, `recovery_ref`, `recovery_copy`를 작업 완료까지 보관한다.
 이후 `conserve`·`finish`·`abort`에는 `--session "$COMMITFORGE_SESSION_ID"`만 넘긴다. Guard가 세션으로 현재 lock owner의 snapshot을 고르고, 옮겨 적은 `--token`은 무시한다(`token_ignored`). token을 다시 입력하지 않는다.
 
 - `ok: false`이면 어떤 Git 변경도 수행하지 않고 원인을 보고한다.
@@ -318,7 +318,7 @@ snapshot을 삭제하지 않는다.
 
 1. 더 이상 stage·commit하지 않는다. reset·checkout·stash로 "정리"하지 않는다.
 2. `abort`로 lock만 해제한다. snapshot과 recovery ref는 남는다.
-3. `conservation.lost` 경로, `head_rewound`, `recovery_ref`를 그대로 보고하고 복원 명령(`git restore --source=<recovery_ref> --worktree -- <path>`)을 안내한다. 복원은 사용자 승인 없이 실행하지 않는다.
+3. `conservation.lost` 경로, `head_rewound`, `recovery_ref`, `recovery_copy`를 그대로 보고하고 복원 명령(`restore_hint`, ref가 사라졌으면 `restore_copy_hint`)을 안내한다. 복원은 사용자 승인 없이 실행하지 않는다.
 
 `finish`를 다른 옵션으로 다시 실행해 이 검사를 우회하지 않는다.
 
@@ -326,7 +326,7 @@ snapshot을 삭제하지 않는다.
 
 `conserve`·`finish`·`abort`가 다른 사유로 실패하면 보존 검사가 끝나지 않은 것이다. 성공으로 보지 않는다.
 
-- `reason=lock_not_owned`는 이 실행의 잠금이 다른 세션이나 `clean`으로 풀렸다는 뜻이다. 결과에 함께 온 `conservation.lost`, `recovery_ref`, `snapshot`을 그대로 보고하고 멈춘다. 잠금을 다시 잡거나 다른 세션의 잠금을 풀지 않는다.
+- `reason=lock_not_owned`는 이 실행의 잠금이 다른 세션이나 `clean`으로 풀렸다는 뜻이다. 결과에 함께 온 `conservation.lost`, `recovery_ref`, `recovery_copy`, `snapshot`을 그대로 보고하고 멈춘다. 잠금을 다시 잡거나 다른 세션의 잠금을 풀지 않는다.
 
 - 더 이상 stage·commit하지 않고 `abort --session`을 한 번 실행한다. 그것도 실패하면 오류를 그대로 보고하고 멈춘다.
 - Guard `clean`, snapshot·lock 디렉터리 삭제, `git update-ref -d refs/commitforge/...`로 빠져나가지 않는다. `clean`은 사용자가 `/cc clean`을 직접 입력했을 때만 실행된다.
