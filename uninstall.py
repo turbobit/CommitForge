@@ -60,8 +60,18 @@ POWERSHELL_ENCODED_COMMAND = re.compile(
 )
 
 
+# Runs a hook script only when it exists. A bare `python <missing file>` exits 2,
+# which Claude Code treats as a block: a moved project or a downgrade would then
+# deny every Bash call. The code avoids quotes so every shell passes it intact.
+HOOK_LAUNCHER = (
+    "import io,os,sys;p=sys.argv[1];sys.argv=[p];os.path.isfile(p) and "
+    "exec(io.FileIO(p).read(),dict(__name__=__name__,__file__=p))"
+)
+GATE_SUFFIX = "_git-atomic-core/scripts/worktree_gate.py"
+
+
 def lifecycle_script_from_command(command: str) -> Path | None:
-    """Return the script target only for a generated two-argument hook."""
+    """Return the script target of a generated hook (plain or launcher form)."""
     powershell_match = POWERSHELL_ENCODED_COMMAND.fullmatch(command)
     if powershell_match is not None:
         try:
@@ -70,7 +80,7 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         except (UnicodeError, ValueError):
             return None
         match = re.fullmatch(
-            r"& '((?:[^']|'')*)' '((?:[^']|'')*)'\r?\n"
+            r"& '((?:[^']|'')*)'(?: '-c' '(?:[^']|'')*')? '((?:[^']|'')*)'\r?\n"
             r"exit \$LASTEXITCODE\r?\n?",
             command,
         )
@@ -82,6 +92,8 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         argv = shlex.split(command, posix=sys.platform != "win32")
     except ValueError:
         return None
+    if len(argv) == 4 and argv[1] == "-c" and argv[2] == HOOK_LAUNCHER:
+        argv = [argv[0], argv[3]]
     if len(argv) != 2:
         return None
     script = argv[1]
@@ -100,7 +112,12 @@ def is_commitforge_lifecycle_handler(
     if not isinstance(command, str):
         return False
     target = lifecycle_script_from_command(command)
-    return target is not None and os.path.normcase(str(target)) == os.path.normcase(
+    if target is None:
+        return False
+    if lifecycle_path.name == "worktree_gate.py" and target.as_posix().endswith(GATE_SUFFIX):
+        # Stale entries from a moved project or older install still match.
+        return True
+    return os.path.normcase(str(target)) == os.path.normcase(
         str(lifecycle_path.resolve())
     )
 
@@ -121,6 +138,7 @@ def remove_lifecycle_hooks(
         / "scripts"
         / "session_lifecycle.py"
     )
+    gate_path = lifecycle_path.with_name("worktree_gate.py")
     if not settings_path.exists():
         return
     if settings_path.is_symlink():
@@ -131,7 +149,7 @@ def remove_lifecycle_hooks(
     hooks = settings.get("hooks")
     changed = False
     if isinstance(hooks, dict):
-        for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
+        for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure", "PreToolUse"):
             groups = hooks.get(event)
             if not isinstance(groups, list):
                 continue
@@ -147,9 +165,9 @@ def remove_lifecycle_hooks(
                 kept_handlers = [
                     handler
                     for handler in handlers
-                    if not is_commitforge_lifecycle_handler(
-                        handler,
-                        lifecycle_path,
+                    if not any(
+                        is_commitforge_lifecycle_handler(handler, path)
+                        for path in (lifecycle_path, gate_path)
                     )
                 ]
                 changed = changed or len(kept_handlers) != len(handlers)

@@ -245,6 +245,10 @@ class LifecycleInstallerTest(unittest.TestCase):
                 in decoded_command(handler.get("command", ""))
             ]
             self.assertEqual(len(lifecycle_commands), 2)
+            [gate_group] = settings["hooks"]["PreToolUse"]
+            self.assertEqual(gate_group["matcher"], "Bash")
+            [gate_handler] = gate_group["hooks"]
+            self.assertIn("worktree_gate.py", decoded_command(gate_handler["command"]))
             expected_claude_dir = (project / ".claude").resolve().as_posix()
             self.assertTrue(
                 all(
@@ -337,6 +341,7 @@ class LifecycleInstallerTest(unittest.TestCase):
             )
             self.assertEqual(reinstalled.returncode, 0, reinstalled.stderr)
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
+            self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
             self.assertEqual(len(settings["hooks"]["SessionStart"]), 2)
             self.assertEqual(len(settings["hooks"]["SessionEnd"]), 1)
             self.assertEqual(settings["hooks"]["Stop"], unrelated["hooks"]["Stop"])
@@ -408,7 +413,8 @@ class LifecycleInstallerTest(unittest.TestCase):
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
             hooks = json.loads(settings_path.read_text(encoding="utf-8"))["hooks"]
-            self.assertEqual(set(hooks), {"SessionStart", "SessionEnd"})
+            self.assertEqual(set(hooks), {"SessionStart", "SessionEnd", "PreToolUse"})
+            self.assertEqual(len(hooks["PreToolUse"]), 1)
             self.assertEqual(len(hooks["SessionStart"]), 1)
             self.assertEqual(len(hooks["SessionEnd"]), 1)
 

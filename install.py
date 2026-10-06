@@ -62,23 +62,38 @@ POWERSHELL_ENCODED_COMMAND = re.compile(
     + r"(\S+)",
     re.IGNORECASE,
 )
+# Runs a hook script only when it exists. A bare `python <missing file>` exits 2,
+# which Claude Code treats as a block: a moved project or a downgrade would then
+# deny every Bash call. The code avoids quotes so every shell passes it intact.
+HOOK_LAUNCHER = (
+    "import io,os,sys;p=sys.argv[1];sys.argv=[p];os.path.isfile(p) and "
+    "exec(io.FileIO(p).read(),dict(__name__=__name__,__file__=p))"
+)
+GATE_SUFFIX = "_git-atomic-core/scripts/worktree_gate.py"
 
 
 def python_hook_command(
     executable: Path,
     script: Path,
+    *,
+    launcher: bool = False,
 ) -> str:
-    """Render a Python hook command without depending on the caller's shell."""
+    """Render a Python hook command without depending on the caller's shell.
+
+    With launcher, a missing script exits 0 instead of Python's 2.
+    """
     executable = executable.resolve()
     script = script.resolve()
+    middle = ["-c", HOOK_LAUNCHER] if launcher else []
     if sys.platform != "win32":
-        return shlex.join([str(executable), str(script)])
+        return shlex.join([str(executable), *middle, str(script)])
 
-    def powershell_literal(value: Path) -> str:
+    def powershell_literal(value: object) -> str:
         return "'" + str(value).replace("'", "''") + "'"
 
+    words = [executable, *middle, script]
     powershell = (
-        f"& {powershell_literal(executable)} {powershell_literal(script)}\n"
+        "& " + " ".join(powershell_literal(word) for word in words) + "\n"
         "exit $LASTEXITCODE\n"
     )
     encoded = base64.b64encode(powershell.encode("utf-16-le")).decode("ascii")
@@ -179,7 +194,7 @@ def configure_cr_edit_gate(claude_dir: Path, dry_run: bool) -> None:
 
 
 def lifecycle_script_from_command(command: str) -> Path | None:
-    """Return the script target only for a generated two-argument hook."""
+    """Return the script target of a generated hook (plain or launcher form)."""
     powershell_match = POWERSHELL_ENCODED_COMMAND.fullmatch(command)
     if powershell_match is not None:
         try:
@@ -188,7 +203,7 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         except (UnicodeError, ValueError):
             return None
         match = re.fullmatch(
-            r"& '((?:[^']|'')*)' '((?:[^']|'')*)'\r?\n"
+            r"& '((?:[^']|'')*)'(?: '-c' '(?:[^']|'')*')? '((?:[^']|'')*)'\r?\n"
             r"exit \$LASTEXITCODE\r?\n?",
             command,
         )
@@ -200,6 +215,8 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         argv = shlex.split(command, posix=sys.platform != "win32")
     except ValueError:
         return None
+    if len(argv) == 4 and argv[1] == "-c" and argv[2] == HOOK_LAUNCHER:
+        argv = [argv[0], argv[3]]
     if len(argv) != 2:
         return None
     script = argv[1]
@@ -218,17 +235,24 @@ def is_commitforge_lifecycle_handler(
     if not isinstance(command, str):
         return False
     target = lifecycle_script_from_command(command)
-    return target is not None and os.path.normcase(str(target)) == os.path.normcase(
+    if target is None:
+        return False
+    if lifecycle_path.name == "worktree_gate.py" and target.as_posix().endswith(GATE_SUFFIX):
+        # Stale entries from a moved project or older install still match.
+        return True
+    return os.path.normcase(str(target)) == os.path.normcase(
         str(lifecycle_path.resolve())
     )
 
 
-def remove_lifecycle_handlers(settings: dict, lifecycle_path: Path) -> None:
+def remove_lifecycle_handlers(
+    settings: dict, lifecycle_path: Path, gate_path: Path
+) -> None:
     hooks = settings.get("hooks")
     if not isinstance(hooks, dict):
         return
     # Remove current hooks and legacy turn-end cleanup registrations.
-    for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure"):
+    for event in ("SessionStart", "SessionEnd", "Stop", "StopFailure", "PreToolUse"):
         groups = hooks.get(event)
         if not isinstance(groups, list):
             continue
@@ -244,7 +268,10 @@ def remove_lifecycle_handlers(settings: dict, lifecycle_path: Path) -> None:
             kept_handlers = [
                 handler
                 for handler in handlers
-                if not is_commitforge_lifecycle_handler(handler, lifecycle_path)
+                if not any(
+                    is_commitforge_lifecycle_handler(handler, path)
+                    for path in (lifecycle_path, gate_path)
+                )
             ]
             if kept_handlers:
                 updated = dict(group)
@@ -275,6 +302,7 @@ def configure_lifecycle_hooks(
         / "scripts"
         / "session_lifecycle.py"
     )
+    gate_path = lifecycle_path.with_name("worktree_gate.py")
     command = python_hook_command(
         Path(sys.executable),
         lifecycle_path,
@@ -298,7 +326,7 @@ def configure_lifecycle_hooks(
     else:
         settings = {}
 
-    remove_lifecycle_handlers(settings, lifecycle_path)
+    remove_lifecycle_handlers(settings, lifecycle_path, gate_path)
     hooks = settings.setdefault("hooks", {})
     if not isinstance(hooks, dict):
         raise RuntimeError(f"Claude hooks 설정은 JSON object여야 합니다: {settings_path}")
@@ -316,6 +344,27 @@ def configure_lifecycle_hooks(
                 f"Claude {event} hook 설정은 JSON array여야 합니다: {settings_path}"
             )
         groups.append({"hooks": [handler]})
+    # Every session, not only the one running a commit skill: another session
+    # can discard work while a Guard run holds the worktree lock.
+    pre_tool_use = hooks.setdefault("PreToolUse", [])
+    if not isinstance(pre_tool_use, list):
+        raise RuntimeError(
+            f"Claude PreToolUse hook 설정은 JSON array여야 합니다: {settings_path}"
+        )
+    pre_tool_use.append(
+        {
+            "matcher": "Bash",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": python_hook_command(
+                        Path(sys.executable), gate_path, launcher=True
+                    ),
+                    "timeout": 10,
+                }
+            ],
+        }
+    )
     settings_path.parent.mkdir(parents=True, exist_ok=True)
     settings_path.write_text(
         json.dumps(settings, ensure_ascii=False, indent=2) + "\n",
@@ -445,6 +494,7 @@ def main() -> None:
         "/cca emergency, /cca learn"
     )
     print("세션 잠금 정리: /clear, /exit, /resume, 로그아웃 등 SessionEnd에서만 자동 해제")
+    print("변경 보존 게이트: Guard 잠금 중 reset·checkout·rebase 등과 snapshot 삭제를 모든 세션에서 차단")
     print("새 .claude/agents 디렉터리를 처음 만든 실행 중 세션에서는 Claude Code 재시작을 권장합니다.")
 
 
