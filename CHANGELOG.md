@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.23.1 — 2026-10-06
+
+- 게이트가 저장소 밖 복구 사본 경로를 symlink를 푼 실제 경로로 비교하고, macOS·Windows
+  에서는 대소문자를 무시한다. `ln -s` 링크를 거친 삭제나 `rm -rf ~/.CLAUDE`가
+  통과하던 문제를 막는다. 저장소 안 증거(snapshot·잠금·`refs/commitforge`)도 같은 방식으로
+  비교한다
+- 값을 정적으로 알 수 없는 삭제·덮어쓰기(변수, `$(...)`, xargs 입력)와 인터프리터
+  인라인 코드는 `commitforge`·`.claude`가 보이면 거부한다. `expanduser('~/.claude/...')`
+  로 사본을 지우는 코드가 통과하던 문제를 막는다
+- `finish`·`release-snapshot`은 snapshot 표식에 적힌 경로 대신 그 snapshot에 정해진
+  사본 경로만 지운다. 조작된 표식이 다른 실행의 사본을 지우지 못한다
+- 보안 리뷰가 찾은 나머지 옵션 해석 차이(`env -iC`, `cp -tDIR`, rsync `-t`·
+  `--remove-source-files`, find `-regex` 문법, 생략형 refspec)는 최선 노력 한계로
+  `safety-and-concurrency.md` 2.2절에 적었다
+
 ## 1.23.0 — 2026-10-06
 
 - Guard `begin`이 **저장소 밖 복구 사본**을 만든다. recovery ref와 snapshot은 `.git`
