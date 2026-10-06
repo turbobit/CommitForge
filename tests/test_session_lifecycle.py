@@ -11,6 +11,12 @@ import tempfile
 import unittest
 
 
+# Guard begin writes a recovery copy under the home directory; keep tests out of it.
+os.environ.setdefault(
+    "COMMITFORGE_RECOVERY_DIR", tempfile.mkdtemp(prefix="commitforge-recovery-test-")
+)
+
+
 ROOT = Path(__file__).resolve().parents[1]
 GUARD = ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
 LIFECYCLE = ROOT / ".claude/skills/_git-atomic-core/scripts/session_lifecycle.py"

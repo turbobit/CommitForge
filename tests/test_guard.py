@@ -13,6 +13,12 @@ import tempfile
 import unittest
 
 
+# Guard begin writes a recovery copy under the home directory; keep tests out of it.
+os.environ.setdefault(
+    "COMMITFORGE_RECOVERY_DIR", tempfile.mkdtemp(prefix="commitforge-recovery-test-")
+)
+
+
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 GUARD = PACKAGE_ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
 
@@ -186,6 +192,26 @@ class GuardIntegrationTest(unittest.TestCase):
                 report["conservation"]["recovery_ref"], started["recovery_ref"], command
             )
 
+    def test_explicit_pair_of_a_lost_lock_run_is_still_lock_not_owned(self) -> None:
+        """Retyping begin's token and snapshot must not pass as a lock-free check."""
+        started = self.begin_with_changes("conserve-lost-explicit")
+        self.guard("clean")
+        proc, report = self.guard("conserve", *self.owner_args(started), check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(report["reason"], "lock_not_owned")
+
+    def test_lock_free_snapshot_conserve_while_the_session_holds_a_lock(self) -> None:
+        (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
+        _, taken = self.guard("snapshot", "--session", "both")
+        _, started = self.guard("begin", "--session", "both")
+        _, report = self.guard(
+            "conserve", "--session", "both",
+            "--token", taken["token"], "--snapshot", taken["snapshot"],
+        )
+        self.assertTrue(report["conservation"]["ok"])
+        self.assertFalse(report["token_ignored"])
+        self.guard("abort", "--session", "both", "--snapshot", started["snapshot"])
+
     def test_lock_free_snapshot_conserve_keeps_the_explicit_pair(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nchanged\n", encoding="utf-8")
         _, taken = self.guard("snapshot", "--session", "lock-free")
@@ -214,6 +240,68 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertEqual(report["recovery_ref"], started["recovery_ref"])
         self.assertIn("사라진 변경", cleaned["message"])
         self.assertTrue(Path(started["snapshot"]).is_dir())
+
+    def test_recovery_copy_survives_loss_of_repository_evidence(self) -> None:
+        """The copy outside .git restores work after the snapshot and ref are gone."""
+        (self.tmp / "gone.txt").write_text("old\n", encoding="utf-8")
+        run(["git", "add", "gone.txt"], self.tmp)
+        run(["git", "commit", "-qm", "gone"], self.tmp)
+        (self.tmp / "gone.txt").unlink()
+        started = self.begin_with_changes("recovery-copy")
+        copy = Path(started["recovery_copy"])
+        self.assertTrue(copy.is_relative_to(Path(os.environ["COMMITFORGE_RECOVERY_DIR"])))
+        manifest = json.loads((copy / "manifest.json").read_text(encoding="utf-8"))
+        self.assertEqual(manifest["saved"], ["other.txt", "tracked.txt"])
+        self.assertEqual(manifest["deleted_at_start"], ["gone.txt"])
+        self.assertEqual(manifest["recovery_ref"], started["recovery_ref"])
+
+        # The incident's end state: work discarded, snapshot and ref deleted.
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+        (self.tmp / "other.txt").unlink()
+        shutil.rmtree(started["snapshot"])
+        run(["git", "update-ref", "-d", started["recovery_ref"]], self.tmp)
+        run(["tar", "-xf", str(copy / "changes.tar"), "-C", str(self.tmp), "--",
+             "tracked.txt", "other.txt"], self.tmp)
+        self.assertEqual(
+            (self.tmp / "tracked.txt").read_text(encoding="utf-8"), "base\nchanged\n"
+        )
+        self.assertEqual((self.tmp / "other.txt").read_text(encoding="utf-8"), "other\n")
+
+    def test_recovery_copy_is_reported_kept_on_abort_and_removed_on_finish(self) -> None:
+        started = self.begin_with_changes("recovery-copy-life")
+        copy = Path(started["recovery_copy"])
+        run(["git", "reset", "-q", "--hard", "HEAD"], self.tmp)
+        proc, report = self.guard("conserve", "--session", started["session"], check=False)
+        self.assertEqual(report["conservation"]["recovery_copy"], str(copy))
+        self.assertIn("changes.tar", report["conservation"]["restore_copy_hint"])
+        _, aborted = self.guard("abort", "--session", started["session"])
+        self.assertEqual(aborted["recovery_copy"], str(copy))
+        self.assertTrue(copy.is_dir())
+
+        run(["tar", "-xf", str(copy / "changes.tar"), "-C", str(self.tmp)], self.tmp)
+        _, again = self.guard("begin", "--session", "recovery-copy-finish")
+        second = Path(again["recovery_copy"])
+        run(["git", "add", "-A"], self.tmp)
+        run(["git", "commit", "-qm", "all"], self.tmp)
+        _, finished = self.guard("finish", "--session", "recovery-copy-finish")
+        self.assertTrue(finished["recovery_copy_removed"])
+        self.assertFalse(second.exists())
+        self.assertTrue(copy.is_dir(), "another run's copy must stay")
+
+    def test_clean_begin_has_no_recovery_copy_and_prunes_old_copies(self) -> None:
+        started = self.begin_with_changes("recovery-copy-old")
+        old = Path(started["recovery_copy"])
+        self.guard("abort", "--session", started["session"])
+        aged = dt.datetime.now().timestamp() - 31 * 86400
+        os.utime(old / "manifest.json", (aged, aged))
+        run(["git", "add", "-A"], self.tmp)
+        run(["git", "commit", "-qm", "all"], self.tmp)
+
+        _, clean = self.guard("begin", "--session", "recovery-copy-clean")
+        self.assertIsNone(clean["recovery_copy"])
+        self.assertEqual(clean["recovery_copies_pruned"], 1)
+        self.assertFalse(old.exists())
+        self.guard("abort", "--session", "recovery-copy-clean")
 
     def test_begin_leaves_real_index_and_worktree_untouched(self) -> None:
         (self.tmp / "tracked.txt").write_text("base\nstaged\n", encoding="utf-8")

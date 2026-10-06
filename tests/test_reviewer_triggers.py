@@ -6,6 +6,14 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+import os
+import tempfile
+
+
+# Guard begin writes a recovery copy under the home directory; keep tests out of it.
+os.environ.setdefault(
+    "COMMITFORGE_RECOVERY_DIR", tempfile.mkdtemp(prefix="commitforge-recovery-test-")
+)
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]

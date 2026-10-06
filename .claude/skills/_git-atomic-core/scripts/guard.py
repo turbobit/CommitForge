@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -37,6 +38,12 @@ SNAPSHOT_DIR_NAME = "claude-atomic-snapshots"
 MARKER_NAME = ".cca-snapshot.json"
 RECOVERY_REF_PREFIX = "refs/commitforge/snapshots/"
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+RECOVERY_COPY_ENV = "COMMITFORGE_RECOVERY_DIR"
+RECOVERY_COPY_SCHEMA = "commitforge-recovery-copy/v1"
+RECOVERY_COPY_ARCHIVE = "changes.tar"
+RECOVERY_COPY_MANIFEST = "manifest.json"
+RECOVERY_COPY_MAX_BYTES = 512 * 1024 * 1024
+RECOVERY_COPY_RETENTION_DAYS = 30
 DEFAULT_STALE_AFTER_SECONDS = 3600
 DEFAULT_GIT_LOCK_STALE_AFTER_SECONDS = 300
 
@@ -1049,6 +1056,165 @@ def drop_recovery_ref(ctx: dict[str, Path], metadata: dict[str, Any]) -> bool:
     return proc.returncode == 0
 
 
+def recovery_copy_root() -> Path:
+    override = os.environ.get(RECOVERY_COPY_ENV)
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / ".claude" / "commitforge" / "recovery"
+
+
+def recovery_copy_dir(ctx: dict[str, Path], snapshot_name: str) -> Path:
+    repo_id = hashlib.sha256(str(ctx["common_dir"].resolve()).encode("utf-8")).hexdigest()[:16]
+    label = "".join(c if c.isalnum() or c in "._-" else "_" for c in ctx["root"].name)[:40]
+    return recovery_copy_root() / f"{label}-{repo_id}" / snapshot_name
+
+
+def write_recovery_copy(
+    ctx: dict[str, Path], snapshot_name: str, start_tree: str, start_head: str, extra: dict[str, Any]
+) -> Path | None:
+    """Copy the starting content of every changed path outside the repository.
+
+    The recovery ref and snapshot live in .git, where one `rm -rf` or
+    `update-ref -d` in the project removes them with the work they protect.
+    This copy sits under the user's home instead, so the files a run discards
+    can still be restored after the repository-side evidence is gone. Only
+    paths that differed from the starting HEAD are stored.
+    """
+    root = ctx["root"]
+    base = start_head if start_head != "UNBORN" else EMPTY_TREE
+    raw = run_git(
+        ["diff-tree", "-r", "--no-renames", "--name-status", "-z", base, start_tree], cwd=root
+    )
+    items = [decode(item) for item in raw.split(b"\0") if item]
+    deleted: list[str] = []
+    changed: set[str] = set()
+    for status, path in zip(items[0::2], items[1::2]):
+        if status == "D":
+            deleted.append(path)
+        else:
+            changed.add(path)
+    if not changed and not deleted:
+        return None
+
+    entries = []
+    listing = run_git(["ls-tree", "-r", "-l", "-z", "--full-tree", start_tree], cwd=root)
+    for record in listing.split(b"\0"):
+        if not record:
+            continue
+        meta, _, name = record.partition(b"\t")
+        path = decode(name)
+        if path not in changed:
+            continue
+        mode, kind, oid, size = meta.split()
+        entries.append((path, mode.decode(), kind.decode(), oid.decode(), size.decode()))
+    total = sum(int(size) for _, _, kind, _, size in entries if kind == "blob")
+    if total > RECOVERY_COPY_MAX_BYTES:
+        raise GuardError(
+            f"변경 파일 총 크기가 복구 사본 한도를 넘었습니다 ({total} bytes > "
+            f"{RECOVERY_COPY_MAX_BYTES} bytes)."
+        )
+
+    target = recovery_copy_dir(ctx, snapshot_name)
+    target.mkdir(parents=True, exist_ok=False, mode=0o700)
+    skipped: list[str] = []
+    try:
+        blobs = [entry for entry in entries if entry[2] == "blob"]
+        skipped = [entry[0] for entry in entries if entry[2] != "blob"]
+        proc = subprocess.Popen(
+            ["git", "cat-file", "--batch"],
+            cwd=str(root),
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        assert proc.stdin is not None and proc.stdout is not None
+        now = int(dt.datetime.now().timestamp())
+        with tarfile.open(target / RECOVERY_COPY_ARCHIVE, mode="w") as tar:
+            for path, mode, _, oid, _ in blobs:
+                proc.stdin.write(oid.encode() + b"\n")
+                proc.stdin.flush()
+                header = proc.stdout.readline().split()
+                size = int(header[2])
+                data = proc.stdout.read(size)
+                proc.stdout.read(1)
+                info = tarfile.TarInfo(path)
+                info.mtime = now
+                if mode == "120000":
+                    info.type = tarfile.SYMTYPE
+                    info.linkname = data.decode("utf-8", "surrogateescape")
+                    tar.addfile(info)
+                else:
+                    info.size = size
+                    info.mode = 0o755 if mode == "100755" else 0o644
+                    tar.addfile(info, io.BytesIO(data))
+        proc.stdin.close()
+        proc.wait()
+        manifest = {
+            "schema": RECOVERY_COPY_SCHEMA,
+            "created_at": utc_now(),
+            "project_root": str(root),
+            "common_dir": str(ctx["common_dir"]),
+            "snapshot": snapshot_name,
+            "head": start_head,
+            "worktree_tree": start_tree,
+            "saved": sorted(entry[0] for entry in blobs),
+            "deleted_at_start": sorted(deleted),
+            "skipped": sorted(skipped),
+            **extra,
+        }
+        (target / RECOVERY_COPY_MANIFEST).write_text(
+            json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except BaseException:
+        shutil.rmtree(target, ignore_errors=True)
+        raise
+    return target
+
+
+def drop_recovery_copy(metadata: dict[str, Any]) -> bool:
+    copy = metadata.get("recovery_copy")
+    if not isinstance(copy, str) or not copy:
+        return False
+    path = Path(copy)
+    root = recovery_copy_root().resolve()
+    try:
+        path.resolve().relative_to(root)
+    except ValueError:
+        return False
+    if not (path / RECOVERY_COPY_MANIFEST).is_file():
+        return False
+    shutil.rmtree(path, ignore_errors=True)
+    parent = path.parent
+    if parent != root and parent.is_dir() and not any(parent.iterdir()):
+        parent.rmdir()
+    return True
+
+
+def prune_recovery_copies(retention_days: int = RECOVERY_COPY_RETENTION_DAYS) -> int:
+    """Remove copies older than the retention window; each run keeps its own."""
+    root = recovery_copy_root()
+    if not root.is_dir():
+        return 0
+    cutoff = dt.datetime.now().timestamp() - retention_days * 86400
+    removed = 0
+    for repo_dir in root.iterdir():
+        if not repo_dir.is_dir() or repo_dir.is_symlink():
+            continue
+        for copy in repo_dir.iterdir():
+            manifest = copy / RECOVERY_COPY_MANIFEST
+            if copy.is_symlink() or not manifest.is_file():
+                continue
+            try:
+                if manifest.stat().st_mtime >= cutoff:
+                    continue
+            except OSError:
+                continue
+            shutil.rmtree(copy, ignore_errors=True)
+            removed += 1
+        if not any(repo_dir.iterdir()):
+            repo_dir.rmdir()
+    return removed
+
+
 def changed_paths(root: Path, left: str, right: str) -> set[str]:
     raw = run_git(
         ["diff-tree", "-r", "--no-renames", "--name-only", "-z", left, right],
@@ -1057,7 +1223,11 @@ def changed_paths(root: Path, left: str, right: str) -> set[str]:
     return {decode(item) for item in raw.split(b"\0") if item}
 
 
-def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[str, Any]:
+def conservation_report(
+    ctx: dict[str, Path],
+    metadata: dict[str, Any],
+    current_trees: dict[bool, str] | None = None,
+) -> dict[str, Any]:
     """Check that every change present at the start still exists somewhere.
 
     A clean working tree is not proof that the changes were committed:
@@ -1080,9 +1250,15 @@ def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[
     root = ctx["root"]
     head = metadata.get("head")
     base = head if isinstance(head, str) and head != "UNBORN" else EMPTY_TREE
-    current = worktree_tree(
-        ctx, include_untracked=metadata.get("worktree_tree_scope") == "all"
-    )
+    include_untracked = metadata.get("worktree_tree_scope") == "all"
+    # Several snapshots of one worktree share the current tree; callers that
+    # check them together pass a cache so each scope is hashed once.
+    if current_trees is not None and include_untracked in current_trees:
+        current = current_trees[include_untracked]
+    else:
+        current = worktree_tree(ctx, include_untracked=include_untracked)
+        if current_trees is not None:
+            current_trees[include_untracked] = current
     started = changed_paths(root, base, start_tree)
     still_changed = changed_paths(root, base, current)
     lost = sorted(started - still_changed)
@@ -1104,6 +1280,7 @@ def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[
             head_rewound = proc.returncode != 0
 
     ref = metadata.get("recovery_ref")
+    copy = metadata.get("recovery_copy")
     return {
         "ok": not lost and not head_rewound,
         "available": True,
@@ -1119,6 +1296,13 @@ def conservation_report(ctx: dict[str, Path], metadata: dict[str, Any]) -> dict[
             if isinstance(ref, str)
             else None
         ),
+        # Survives `rm -rf .git/...` and `update-ref -d`: use it when the ref is gone.
+        "recovery_copy": copy,
+        "restore_copy_hint": (
+            f"tar -xf {Path(copy) / RECOVERY_COPY_ARCHIVE} -C {root} -- <path>"
+            if isinstance(copy, str)
+            else None
+        ),
     }
 
 
@@ -1127,21 +1311,26 @@ def snapshot_conservation(
 ) -> list[dict[str, Any]]:
     """Report, never enforce: `clean` must still release an orphaned lock."""
     results: list[dict[str, Any]] = []
+    current_trees: dict[bool, str] = {}
     for path in snapshots:
         metadata = read_json(Path(path) / MARKER_NAME)
         if not metadata:
             results.append({"snapshot": path, "ok": None, "available": False})
             continue
-        results.append({"snapshot": path, **informational_conservation(ctx, metadata)})
+        results.append(
+            {"snapshot": path, **informational_conservation(ctx, metadata, current_trees)}
+        )
     return results
 
 
 def informational_conservation(
-    ctx: dict[str, Path], metadata: dict[str, Any]
+    ctx: dict[str, Path],
+    metadata: dict[str, Any],
+    current_trees: dict[bool, str] | None = None,
 ) -> dict[str, Any]:
     """conservation_report for callers that must proceed even if it cannot run."""
     try:
-        return conservation_report(ctx, metadata)
+        return conservation_report(ctx, metadata, current_trees)
     except (GuardError, OSError) as exc:
         return {"ok": None, "available": False, "reason": str(exc)}
 
@@ -1171,6 +1360,7 @@ def capture_snapshot(
     token: str,
     *,
     max_untracked_bytes: int,
+    locked: bool,
 ) -> tuple[Path, list[str], dict[str, Any]]:
     root = ctx["root"]
     snapshot_root = ctx["git_dir"] / SNAPSHOT_DIR_NAME
@@ -1206,6 +1396,15 @@ def capture_snapshot(
         warnings.append(
             "추적되지 않은 파일이 한도를 넘어 변경 보존 검사는 추적 파일만 대상으로 합니다."
         )
+    recovery_copy: Optional[Path] = None
+    if start_tree:
+        try:
+            recovery_copy = write_recovery_copy(
+                ctx, name, start_tree, start_head,
+                {"session": session, "branch": branch_name(root), "recovery_ref": ref},
+            )
+        except (GuardError, OSError, ValueError, IndexError) as exc:
+            warnings.append(f"저장소 밖 복구 사본을 만들지 못했습니다: {exc}")
 
     files: dict[str, bytes] = {
         "status.txt": run_git(["status", "--short", "--branch", "--untracked-files=all"], cwd=root),
@@ -1257,6 +1456,10 @@ def capture_snapshot(
         "schema": SCHEMA_VERSION,
         "session": session,
         "token": token,
+        # `conserve` accepts an explicit token/snapshot pair without a lock only
+        # for snapshots taken without one; a begin run that lost its lock must
+        # not pass as such.
+        "locked": locked,
         "created_at": utc_now(),
         "project_root": str(root),
         "git_dir": str(ctx["git_dir"]),
@@ -1269,6 +1472,7 @@ def capture_snapshot(
         "worktree_tree_error": tree_error,
         "recovery_ref": ref,
         "recovery_commit": ref_commit,
+        "recovery_copy": str(recovery_copy) if recovery_copy else None,
         "untracked_total_bytes": untracked_total,
         "untracked_archived": archived_untracked,
         "untracked_manifest": manifest,
@@ -1278,6 +1482,15 @@ def capture_snapshot(
     marker = snapshot / MARKER_NAME
     marker.write_text(json.dumps(metadata, ensure_ascii=True, indent=2), encoding="utf-8")
     return snapshot, warnings, fingerprint, ref
+
+
+def snapshot_was_locked(snapshot: Path) -> bool:
+    """True when the snapshot was taken by `begin` under the worktree lock.
+
+    Snapshots from releases before the `locked` field count as lock-free.
+    """
+    metadata = read_json(snapshot / MARKER_NAME)
+    return bool(metadata) and metadata.get("locked") is True
 
 
 def validate_snapshot(
@@ -1375,6 +1588,7 @@ def cmd_begin(args: argparse.Namespace) -> None:
             session,
             token,
             max_untracked_bytes=args.max_untracked_mib * 1024 * 1024,
+            locked=True,
         )
     except Exception:
         try:
@@ -1382,6 +1596,7 @@ def cmd_begin(args: argparse.Namespace) -> None:
         except Exception:
             pass
         raise
+    pruned = prune_recovery_copies()
 
     emit(
         {
@@ -1394,6 +1609,8 @@ def cmd_begin(args: argparse.Namespace) -> None:
             "branch": branch_name(ctx["root"]),
             "fingerprint": fingerprint["fingerprint"],
             "recovery_ref": recovery_ref,
+            "recovery_copy": read_json(snapshot / MARKER_NAME).get("recovery_copy"),
+            "recovery_copies_pruned": pruned,
             "warnings": warnings,
             "reclaimed_lock": reclaimed is not None,
             "reclaim_reason": reclaimed["reason"] if reclaimed else None,
@@ -1433,6 +1650,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
         session,
         token,
         max_untracked_bytes=args.max_untracked_mib * 1024 * 1024,
+        locked=False,
     )
 
     emit(
@@ -1443,6 +1661,7 @@ def cmd_snapshot(args: argparse.Namespace) -> None:
             "token": token,
             "snapshot": str(snapshot),
             "recovery_ref": recovery_ref,
+            "recovery_copy": read_json(snapshot / MARKER_NAME).get("recovery_copy"),
             "project_root": str(ctx["root"]),
             "head": current_head(ctx["root"]),
             "branch": branch_name(ctx["root"]),
@@ -1483,7 +1702,11 @@ def cmd_conserve(args: argparse.Namespace) -> None:
     except GuardError as exc:
         if exc.details.get("reason") not in {"owner_not_found", "owner_session_mismatch"}:
             raise
-        legacy = args.token is not None and args.snapshot is not None
+        legacy = (
+            args.token is not None
+            and args.snapshot is not None
+            and not snapshot_was_locked(Path(args.snapshot))
+        )
         if legacy and not lock_paths(ctx)[0].exists():
             # A lock-free snapshot from `snapshot`: the explicit pair is its identity.
             token, snapshot = args.token, Path(args.snapshot)
@@ -1496,6 +1719,13 @@ def cmd_conserve(args: argparse.Namespace) -> None:
                 lock_error=exc.details.get("reason"),
                 **lock_lost_report(ctx, session, args.snapshot),
             ) from exc
+    else:
+        if args.snapshot is not None and args.token is not None and args.token != token:
+            # The session's own lock-free snapshot, checked while it also holds
+            # a lock: its explicit pair, not the lock owner's token, owns it.
+            marker = read_json(Path(args.snapshot) / MARKER_NAME) or {}
+            if marker.get("token") == args.token and marker.get("locked") is not True:
+                token, token_ignored = args.token, False
     metadata = validate_snapshot(ctx, snapshot, session, token)
     report = conservation_report(ctx, metadata)
     if not report["ok"]:
@@ -2027,15 +2257,18 @@ def cmd_finish(args: argparse.Namespace) -> None:
     # the audit trail of the very thing that was bypassed. Keep it.
     keep_snapshot = args.keep_snapshot or ledger_bypassed
     ref_removed = False
+    copy_removed = False
     if not keep_snapshot:
         shutil.rmtree(snapshot)
         ref_removed = drop_recovery_ref(ctx, metadata)
+        copy_removed = drop_recovery_copy(metadata)
     release_lock(ctx, session, token)
     emit(
         {
             "ok": True,
             "snapshot_removed": not keep_snapshot,
             "recovery_ref_removed": ref_removed,
+            "recovery_copy_removed": copy_removed,
             "conservation": conservation,
             "token_ignored": token_ignored,
             "snapshot": str(snapshot),
@@ -2090,6 +2323,7 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
 
     shutil.rmtree(snapshot.resolve())
     ref_removed = drop_recovery_ref(ctx, metadata)
+    copy_removed = drop_recovery_copy(metadata)
     emit(
         {
             "ok": True,
@@ -2097,6 +2331,7 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
             "snapshot": str(snapshot),
             "snapshot_removed": True,
             "recovery_ref_removed": ref_removed,
+            "recovery_copy_removed": copy_removed,
             "conservation": conservation,
             "lock_released": False,
             "worktree_clean": not bool(dirty),
@@ -2135,6 +2370,7 @@ def cmd_abort(args: argparse.Namespace) -> None:
             "snapshot_removed": False,
             "snapshot": str(snapshot),
             "recovery_ref": metadata.get("recovery_ref"),
+            "recovery_copy": metadata.get("recovery_copy"),
             "conservation": conservation,
             "token_ignored": token_ignored,
             "lock_released": True,
