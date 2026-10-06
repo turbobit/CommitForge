@@ -1170,16 +1170,20 @@ def write_recovery_copy(
     return target
 
 
-def drop_recovery_copy(metadata: dict[str, Any]) -> bool:
+def drop_recovery_copy(ctx: dict[str, Path], metadata: dict[str, Any], snapshot_name: str) -> bool:
+    """Delete only the copy this snapshot owns.
+
+    The marker lives in .git, where it can be edited; trusting its path would let
+    a tampered marker delete another run's copy. The path is recomputed instead,
+    and the marker only has to agree with it.
+    """
     copy = metadata.get("recovery_copy")
     if not isinstance(copy, str) or not copy:
         return False
-    path = Path(copy)
-    root = recovery_copy_root().resolve()
-    try:
-        path.resolve().relative_to(root)
-    except ValueError:
+    path = recovery_copy_dir(ctx, snapshot_name)
+    if Path(copy) != path or path.is_symlink():
         return False
+    root = recovery_copy_root()
     if not (path / RECOVERY_COPY_MANIFEST).is_file():
         return False
     shutil.rmtree(path, ignore_errors=True)
@@ -2261,7 +2265,7 @@ def cmd_finish(args: argparse.Namespace) -> None:
     if not keep_snapshot:
         shutil.rmtree(snapshot)
         ref_removed = drop_recovery_ref(ctx, metadata)
-        copy_removed = drop_recovery_copy(metadata)
+        copy_removed = drop_recovery_copy(ctx, metadata, snapshot.name)
     release_lock(ctx, session, token)
     emit(
         {
@@ -2323,7 +2327,7 @@ def cmd_release_snapshot(args: argparse.Namespace) -> None:
 
     shutil.rmtree(snapshot.resolve())
     ref_removed = drop_recovery_ref(ctx, metadata)
-    copy_removed = drop_recovery_copy(metadata)
+    copy_removed = drop_recovery_copy(ctx, metadata, snapshot.resolve().name)
     emit(
         {
             "ok": True,

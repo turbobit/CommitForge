@@ -288,6 +288,23 @@ class GuardIntegrationTest(unittest.TestCase):
         self.assertFalse(second.exists())
         self.assertTrue(copy.is_dir(), "another run's copy must stay")
 
+    def test_finish_ignores_a_tampered_recovery_copy_path(self) -> None:
+        first = self.begin_with_changes("recovery-copy-victim")
+        victim = Path(first["recovery_copy"])
+        self.guard("abort", "--session", first["session"])
+        (self.tmp / "tracked.txt").write_text("base\nagain\n", encoding="utf-8")
+        _, second = self.guard("begin", "--session", "recovery-copy-tamper")
+        marker = Path(second["snapshot"]) / ".cca-snapshot.json"
+        metadata = json.loads(marker.read_text(encoding="utf-8"))
+        metadata["recovery_copy"] = str(victim)
+        marker.write_text(json.dumps(metadata), encoding="utf-8")
+        run(["git", "add", "-A"], self.tmp)
+        run(["git", "commit", "-qm", "all"], self.tmp)
+        proc, finished = self.guard("finish", "--session", "recovery-copy-tamper", check=False)
+        self.assertTrue(victim.is_dir(), "a tampered marker must not delete another copy")
+        if proc.returncode == 0:
+            self.assertFalse(finished["recovery_copy_removed"])
+
     def test_clean_begin_has_no_recovery_copy_and_prunes_old_copies(self) -> None:
         started = self.begin_with_changes("recovery-copy-old")
         old = Path(started["recovery_copy"])
