@@ -65,9 +65,19 @@ POWERSHELL_ENCODED_COMMAND = re.compile(
 # Runs a hook script only when it exists. A bare `python <missing file>` exits 2,
 # which Claude Code treats as a block: a moved project or a downgrade would then
 # deny every Bash call. The code avoids quotes so every shell passes it intact.
+# `-c` puts the hook's cwd (the project) first on sys.path, so a project
+# `json.py` would shadow the stdlib; sys.path[0] is reset to the script's
+# directory exactly as `python <script>` would set it.
 HOOK_LAUNCHER = (
-    "import io,os,sys;p=sys.argv[1];sys.argv=[p];os.path.isfile(p) and "
+    "import io,os,sys;p=sys.argv[1];sys.argv=[p];sys.path[0]=os.path.dirname(p);"
+    "os.path.isfile(p) and "
     "exec(io.FileIO(p).read(),dict(__name__=__name__,__file__=p))"
+)
+# Launchers written by earlier releases, still recognised for removal.
+HOOK_LAUNCHERS = (
+    HOOK_LAUNCHER,
+    "import io,os,sys;p=sys.argv[1];sys.argv=[p];os.path.isfile(p) and "
+    "exec(io.FileIO(p).read(),dict(__name__=__name__,__file__=p))",
 )
 GATE_SUFFIX = "_git-atomic-core/scripts/worktree_gate.py"
 
@@ -215,7 +225,7 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         argv = shlex.split(command, posix=sys.platform != "win32")
     except ValueError:
         return None
-    if len(argv) == 4 and argv[1] == "-c" and argv[2] == HOOK_LAUNCHER:
+    if len(argv) == 4 and argv[1] == "-c" and argv[2] in HOOK_LAUNCHERS:
         argv = [argv[0], argv[3]]
     if len(argv) != 2:
         return None
