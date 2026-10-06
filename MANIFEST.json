@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.21.1",
+  "version": "1.22.0",
   "reproducible": true,
-  "file_count": 154,
-  "total_bytes": 1849238,
+  "file_count": 159,
+  "total_bytes": 2048535,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -127,8 +127,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/extended-modes.md",
-      "size": 15439,
-      "sha256": "cb288e134fadc2fc523fcd9ccdcd2b964949dcebb31187df1584aadbb0d25b7a"
+      "size": 15547,
+      "sha256": "3dcd3b6b45262836ad9b8c15fbf0cf4d3dbbedb8d0059730bcdea1aa76fbb603"
     },
     {
       "path": ".claude/skills/_git-atomic-core/fast-commit-rules.md",
@@ -152,8 +152,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/lock-cleanup.md",
-      "size": 2421,
-      "sha256": "853125288cf0068e8c2ca5594895a1eae3026dff01ec98e0e4224e7043024ed2"
+      "size": 2615,
+      "sha256": "08b4d68fc0519d722c12aae39c700ebf2c5a55d443f96eccbe665e8f658f366e"
     },
     {
       "path": ".claude/skills/_git-atomic-core/period-review-modes.md",
@@ -167,13 +167,13 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/pull-request-workflow.md",
-      "size": 12011,
-      "sha256": "e019f5d92c8595f7be8e14c2c8084fb69dde7d482ac29d0c9257899bfb8da218"
+      "size": 12139,
+      "sha256": "24dd9fcd95c09339ded05892478e72d84d70839af2b977dd683e473fd13f0f22"
     },
     {
       "path": ".claude/skills/_git-atomic-core/recovery.md",
-      "size": 8024,
-      "sha256": "2c495e0c2ad335cbe0bc83a67ecfccac47c8484e009ea5e0739743e2aac66bda"
+      "size": 8284,
+      "sha256": "11cb71a585759f4302e8c33b8038fe3634376a750ef0b9a04d45e28f7411a1aa"
     },
     {
       "path": ".claude/skills/_git-atomic-core/reporting-formats.md",
@@ -207,8 +207,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 15301,
-      "sha256": "e132488ead10d2c1100fbec7eb6820963dc5e0ea305baaac345e5c9d9ea8b6f4"
+      "size": 19990,
+      "sha256": "3489fc0303f0e207f6cf96f56356e0346c5d7e39d385d0fc50c6f31513c0d6bc"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
@@ -227,8 +227,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 101511,
-      "sha256": "aa2a263f05b23b56b28445e5ada40547e37b75007e3cf81de03a2378c57deda3"
+      "size": 107376,
+      "sha256": "239f789ea4d72fbbec21962f4d3a1955b57657475ec91b6ce7cb580db1ced7d1"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -237,8 +237,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 67988,
-      "sha256": "ada5707511c8964e756e3a6b15052d019e4cfba00ad8186793df1e7e3819c009"
+      "size": 67991,
+      "sha256": "b53f1a1fd45dccb9ea36c2d6d740986583d1f4451e948da73121bc4534ccea12"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -271,9 +271,19 @@
       "sha256": "cec3806038f6d03bc620e0d3dfd027b313d4429a75fa0c30bea9dc23ec8b9528"
     },
     {
+      "path": ".claude/skills/_git-atomic-core/scripts/worktree_gate.py",
+      "size": 3142,
+      "sha256": "9f9ce6f2624aed8c66aeb8dbcc72a3b0764feee7737647039e18c8e878c31230"
+    },
+    {
+      "path": ".claude/skills/_git-atomic-core/scripts/worktree_gate_impl.py",
+      "size": 66689,
+      "sha256": "9c89fef7a5a49ab2f194376465a356511a51be6764e1fb7ecc93070765f358e0"
+    },
+    {
       "path": ".claude/skills/_git-atomic-core/staging-strategy.md",
-      "size": 5849,
-      "sha256": "69ce3a5a0f6a94b02df5763676ab880e1686371328f499d5a336681ab25746d6"
+      "size": 5965,
+      "sha256": "9c7940143f1518c3654e70ae86fc5ec032f9f407af10ae7ddf7edd83c252e8d8"
     },
     {
       "path": ".claude/skills/_git-atomic-core/validation-strategy.md",
@@ -282,18 +292,18 @@
     },
     {
       "path": ".claude/skills/cc/SKILL.md",
-      "size": 14263,
-      "sha256": "83c43e7e215a4b77883aca6fced786916dcfe21b964a9b69da7ad353061f1445"
+      "size": 15891,
+      "sha256": "7d63afdbc67e6e415248e4b669df6152cbd82263ac52cf95aa356e237790bc76"
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 26342,
-      "sha256": "5520e3b04650aaa798f2c7ccc2d00534a238879d7838ecac9a3acf6089a903e4"
+      "size": 26674,
+      "sha256": "13426a3a84e2137609500724d4ff3480c18605edc98970f22ae527be7b684ea8"
     },
     {
       "path": ".claude/skills/ccf/SKILL.md",
-      "size": 18188,
-      "sha256": "b299e7a8160b9a7006c80a097778aefd269dd34f710e6c6b25379e2f6b9a3ccc"
+      "size": 19817,
+      "sha256": "9590d088352f26c6288e67d936cddd687cdd9033abf11dcb0c9e6c86c8c0c0be"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
@@ -302,8 +312,8 @@
     },
     {
       "path": ".claude/skills/cf/SKILL.md",
-      "size": 14257,
-      "sha256": "2bbef8a4828e171c28e34ed90622450ce57a60818781b35d156b8a7558783dc6"
+      "size": 15885,
+      "sha256": "4c20f3a500077c7ea0e9b0101ba652bc08783b43f29b7f7a6546a370e15e411d"
     },
     {
       "path": ".claude/skills/cfr/SKILL.md",
@@ -322,8 +332,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 31322,
-      "sha256": "093d9cafa7b7a4e7747c8f9812d60c22abb648cb5d0d52a870285231f87798d6"
+      "size": 31390,
+      "sha256": "2f367b5da58535910a94ac09caf3071ce198e2fecaf20d94bda8fd47f4e4ef2a"
     },
     {
       "path": ".gitattributes",
@@ -342,8 +352,18 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 38012,
-      "sha256": "54b88f458b9685a0121fbd801130ec8ca59e8f9da21ca5c501f27eac03af74de"
+      "size": 40867,
+      "sha256": "5d6a3cf12c2cc0d55c436b9f38f02496fe2ca99e9e8bc2ac97ddac5f6f78c04f"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 40867,
+      "sha256": "5d6a3cf12c2cc0d55c436b9f38f02496fe2ca99e9e8bc2ac97ddac5f6f78c04f"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "size": 40867,
+      "sha256": "5d6a3cf12c2cc0d55c436b9f38f02496fe2ca99e9e8bc2ac97ddac5f6f78c04f"
     },
     {
       "path": "INSTALL.md",
@@ -362,13 +382,13 @@
     },
     {
       "path": "README.md",
-      "size": 52775,
-      "sha256": "b0a90dbab06fdde1a626a4a76a24fac6a65ac0f6711f868feff68035204ae178"
+      "size": 55025,
+      "sha256": "192aa0631873daf314660d3bab31c38f44dd608cecc9a2bc6e8d82e426f35c29"
     },
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "d41ddd0252685d9b7797956399957e1a65ce1c124b4e14794430fb8275ef6618"
+      "sha256": "a482aec6f30758f5ba391b686d1f33d8ef1ab78ac649da44307ae41eb5ecad43"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -418,12 +438,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "db65716261659345ca37f52092f2f51dfd3ce8d1c06d8c4728e04803a3449e0e"
+      "sha256": "6268803bc2e875125e8346863daf660cb63050b9f638e2973abf545e49ddf557"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11669,
-      "sha256": "599fe72eb85651315fdf174aadfb9a2bd479bb99049f5f9b506f81d2f63bb8ba"
+      "sha256": "9ab7ef9028e4558515a199ae7ff2e25b54c57a9a635af8730522b5103e8ce811"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -682,8 +702,8 @@
     },
     {
       "path": "install.py",
-      "size": 15951,
-      "sha256": "c35fa3f72982dc6fbda3b88886800c72a8ca7eb6ec350dc04d2f63ddcc3d3ff1"
+      "size": 18054,
+      "sha256": "e9add9f7d1794c764e32d937b8ae889548ec9cdcf2605b2e1ce99c7d0ad4f432"
     },
     {
       "path": "install.sh",
@@ -702,8 +722,8 @@
     },
     {
       "path": "tests/test_guard.py",
-      "size": 51122,
-      "sha256": "1d6557d210709872c0b7caab4ad37b2bdd0ddd259fbbfe08b4a07f3dd80d43e3"
+      "size": 55861,
+      "sha256": "7fbd5535a075e9b40cd087d2ec38dec66b0eaf533077649e7b673a76cf2d0eb1"
     },
     {
       "path": "tests/test_install_marker.py",
@@ -718,7 +738,7 @@
     {
       "path": "tests/test_package.py",
       "size": 37122,
-      "sha256": "ae66e58aa1bc0fa3e7d20daf899d0c5df3f3f650867dc7b8fb50325681814b21"
+      "sha256": "5b437d25e8668e2a80c011d5d9c16419a17d3cec517646c7495c135fc1d83e1d"
     },
     {
       "path": "tests/test_pr_context.py",
@@ -752,8 +772,13 @@
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 16191,
-      "sha256": "d898aa5392d1bd5b4dfded18489936a15a2629395aa5ba597fc5af479a7c4f97"
+      "size": 16589,
+      "sha256": "67e820d99bfbcd24c27ba971dfa6ccd86e1ce4d18ae25498b7060593141b2f40"
+    },
+    {
+      "path": "tests/test_worktree_gate.py",
+      "size": 17687,
+      "sha256": "b2f4af6b071e1fdce74ba11f1b8cb1fa6fbc41fea539d1d725b0de1d34bbc369"
     },
     {
       "path": "uninstall.ps1",
@@ -762,8 +787,8 @@
     },
     {
       "path": "uninstall.py",
-      "size": 7676,
-      "sha256": "c299808351ee02a529b07f2dba7efc2d415ee735c85050af7519ea11484070f7"
+      "size": 8595,
+      "sha256": "99fe1ed33a0637921275872be5fd19f6143077b7ef808032d38cfee961268f83"
     },
     {
       "path": "uninstall.sh",
@@ -772,8 +797,8 @@
     },
     {
       "path": "verify.py",
-      "size": 18051,
-      "sha256": "b81302a151cfdecefc9b3ea17661356a213751ca3fbeb687ef9c86d09e1d56db"
+      "size": 18184,
+      "sha256": "910ce88c8e84ae115d5455c91916d67c24b3b685c50638246cdf9ddacb166542"
     }
   ]
 }

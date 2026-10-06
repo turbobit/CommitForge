@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.22.0 — 2026-10-06
+
+- **변경 보존 게이트**(`worktree_gate.py`)를 추가했다. 한 `/ccf` 실행이 커밋 순서를
+  고친다며 `git checkout <commit> -- .`, `reset --hard`, cherry-pick을 실행해
+  커밋되지 않은 파일 세 개를 잃었다. 보존 검사는 token을 잘못 옮겨 적어 실행되지
+  못했고, 모델은 사용자 요청 없이 `clean`을 실행한 뒤 snapshot과 recovery ref를
+  `rm -rf`·`update-ref -d`로 지웠다. 문서 규칙만으로는 막을 수 없는 사례다
+- 설치 시 모든 세션의 Bash 호출에 `PreToolUse` 훅을 등록한다. 훅은 bash 문법을 직접
+  해석하고, git 명령이 작용할 worktree에 잠금이 있으면 커밋 skill이 쓰는 명령만
+  허용 목록으로 통과시킨다. 정적으로 확인할 수 없는 명령(변수·`$(...)`로 정해지는
+  하위 명령·옵션·저장소, 정의되지 않은 alias, 해석할 수 없는 셸·인터프리터 코드)은
+  거부한다. 공유 ref를 바꾸는 명령은 다른 worktree의 잠금도 존중한다
+- Guard 명령의 `--session`은 훅이 받은 현재 세션이어야 하고, 잠금 중 `clean`은 사용자의
+  직전 입력이 `/<명령> clean`일 때만 통과한다
+- snapshot·잠금·`refs/commitforge` 삭제와 덮어쓰기는 잠금과 관계없이 거부한다.
+  glob, `cd`, 변수, find, `update-ref --stdin`까지 해석한다. xargs로 넘긴 경로는
+  명령에 그 이름이 있을 때만 막는다. `ledger/.lock` 제거만 허용한다
+- 훅은 launcher로 감싸 설치한다. 스크립트가 없으면(프로젝트 이동, 다운그레이드)
+  통과하고, uninstall은 옮겨진 경로의 옛 항목도 제거한다
+- Guard는 session을 신원으로 쓴다. `conserve`·`finish`·`abort`·`verify-review`·
+  `audit-snapshot`은 현재 잠금 owner와 세션이 같으면 넘겨받은 `--token`이 틀려도
+  무시하고(`token_ignored`) 진행한다. `release-snapshot`만 token을 요구한다
+- 잠금을 잃은 실행의 `conserve`·`abort`는 `lock_not_owned`로 실패하면서 그 세션
+  snapshot의 보존 검사 결과(lost, recovery_ref)를 함께 보고한다
+- Guard `clean`은 요청 세션 값을 먼저 검증하고, 잠금을 푼 뒤 owner snapshot의 보존
+  검사 결과를 `conservation`으로 보고한다. 유실이 있으면 경고를 붙인다
+- `/cc`·`/ccf`·`/cf`에 "Guard 명령 실패" 절차를 추가했다. 어떤 사유든 실패하면
+  커밋을 멈추고 `abort`한 뒤 보고한다. 커밋 순서가 틀렸어도 history를 고치지 않는다
+- `/cca learn`의 비교 파일, hunk patch, `/cp` PR 본문을 snapshot 최상위가 아니라
+  `learn/`·`patches/`·`pr/` 하위 디렉터리에 쓰도록 문서를 고쳤다. 최상위 파일은
+  `finish`의 무결성 감사가 거부해 `/cca learn`이 항상 실패했다
+
 ## 1.21.1 — 2026-10-02
 
 - Windows에서 SessionStart·SessionEnd 훅이 `powershell.exe: command not found`로
