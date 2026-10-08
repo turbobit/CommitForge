@@ -4,7 +4,6 @@ description: /cf가 만들 단일 묶음 커밋을 읽기 전용으로 미리 �
 argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--verify] [--compact]"
 disable-model-invocation: true
 model: inherit
-effort: medium
 allowed-tools:
   - Read
   - Grep

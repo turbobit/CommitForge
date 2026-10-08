@@ -4,7 +4,6 @@ description: dependency, lockfile, registry, CI, container와 artifact 변경에
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: orange

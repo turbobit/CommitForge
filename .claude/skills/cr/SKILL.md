@@ -4,7 +4,6 @@ description: CommitForge의 최고 강도 코드 리뷰 명령이다. 현재 변
 argument-hint: "[clean|today|3days|weekly|release|emergency|learn|pr] [추가 맥락] [--fix] [--team|--no-team] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--from <ref>] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--base <ref>|--range <A..B>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: max
 allowed-tools:
   - Read
   - Grep

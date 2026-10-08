@@ -4,7 +4,6 @@ description: 제공된 사용자 요구, ticket, acceptance criteria, ADR와 API
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: green

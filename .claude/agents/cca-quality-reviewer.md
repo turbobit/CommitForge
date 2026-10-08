@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 기존 코드 재사용 가능성, 중�
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 16
 permissionMode: plan
 color: green

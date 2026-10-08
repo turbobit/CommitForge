@@ -4,7 +4,6 @@ description: CommitForge의 최고 강도 Git 파이프라인이다. 모든 diff
 argument-hint: "[clean|today|3days|weekly|release|emergency|learn] [추가 맥락] [--team|--no-team] [--target <semver>] [--bump auto|major|minor|patch] [--channel stable|rc|beta|alpha] [--package <name>] [--tag-prefix <prefix>] [--from <ref>] [--prepare] [--tag] [--dry-run] [--incident <id>] [--severity sev1|sev2|sev3|sev4] [--diagnose] [--rollback-first] [--base <ref>] [--preview] [--since <ref>] [--branches <refs>] [--exclude-bots] [--commits 20-500] [--all-authors] [--week-start monday|sunday] [--timezone <IANA|±HH:MM>] [--scope <경로...>] [--format human|json|sarif] [--output <경로>] [--no-fix] [--no-verify] [--strict] [--iterations 1-5] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: max
 allowed-tools:
   - Read
   - Grep

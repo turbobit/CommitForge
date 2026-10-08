@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 cross-file 의존성, 계층·domain 경
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: blue

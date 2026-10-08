@@ -4,7 +4,6 @@ description: 현재 Git 변경사항 전체를 분석하고 의미·기능별로
 argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--no-verify] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: high
 allowed-tools:
   - Read
   - Grep

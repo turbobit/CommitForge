@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 사용자 상호작용 변경의 UX 상�
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 16
 permissionMode: plan
 color: pink

@@ -4,7 +4,6 @@ description: 현재 Git 변경사항을 읽기 전용으로 분석해 최적의 
 argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--compact] [--team|--no-team]"
 disable-model-invocation: true
 model: inherit
-effort: high
 allowed-tools:
   - Read
   - Grep

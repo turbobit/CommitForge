@@ -4,7 +4,6 @@ description: queue, job, network, cache와 분산 처리 변경에서 장애 격
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: cyan
