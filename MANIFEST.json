@@ -1,94 +1,94 @@
 {
   "name": "CommitForge",
-  "version": "1.23.1",
+  "version": "1.23.2",
   "reproducible": true,
   "file_count": 157,
-  "total_bytes": 2005385,
+  "total_bytes": 2006124,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
-      "size": 5018,
-      "sha256": "3782d17f8fc108d7b9466d86ba2c07f30397e8f1307cd915d7d72ef1feb31ea8"
+      "size": 5005,
+      "sha256": "cdddc3fd1bf21f5e389493696f28f9b2467858eb14aacec1bfe60b1767439c5e"
     },
     {
       "path": ".claude/agents/cca-correctness-reviewer.md",
-      "size": 5669,
-      "sha256": "7f32d81bfe2407c7c765c94f7947592702539f7971b658f95eaa5525f0f28eb7"
+      "size": 5656,
+      "sha256": "bf424ea0f31276c1ba88e5e4671047b6b30c6f8bd33d189311457e5742f0f801"
     },
     {
       "path": ".claude/agents/cca-data-migration-reviewer.md",
-      "size": 5452,
-      "sha256": "f65c9c0e824a2ae519209d69ee725df28acb6c349e7dacf27d497a5c86d6c525"
+      "size": 5439,
+      "sha256": "6fefacaa7d9a9fbdf51775f8d7f8e044dd719479c61e3f7d4851a988e89e7ede"
     },
     {
       "path": ".claude/agents/cca-dependency-supply-chain-reviewer.md",
-      "size": 4787,
-      "sha256": "93327320c541a3a0833eeaec46b4ec580a7ed1190c2b3c4a642388e78d8d6996"
+      "size": 4774,
+      "sha256": "afd9dc09efa2e8887d98835bec2139355ac69451aa18ed43727719be1e1d0319"
     },
     {
       "path": ".claude/agents/cca-git-reviewer.md",
-      "size": 4888,
-      "sha256": "79ef6aa42dd6b46fd7cbd9ef82152ff3296c35ab572a3d8d25c38df29c404e40"
+      "size": 4875,
+      "sha256": "71d2acbf18bdfae18167330a8d88ce8a27a92a9897436820cf7ca4aa4466e33e"
     },
     {
       "path": ".claude/agents/cca-language-api-reviewer.md",
-      "size": 4458,
-      "sha256": "21792b194f71d075645bb8acf5e869ab1c50413469c71740e548caa2724782c6"
+      "size": 4445,
+      "sha256": "8e43773ff2ae727c66c573ec95a536c08e8fa50a1087aeb7172a9fec20d2e47a"
     },
     {
       "path": ".claude/agents/cca-line-reviewer.md",
-      "size": 4776,
-      "sha256": "7cf80b65b38f77178e20e352213ebff14c118511c6cbcb49e36d110be4128bd8"
+      "size": 4764,
+      "sha256": "bb704a592311d1618bc7bb775ada82dbf878c6b7f648de9804cc380756dac041"
     },
     {
       "path": ".claude/agents/cca-observability-reviewer.md",
-      "size": 4658,
-      "sha256": "f05a6c0fe71a3a54bf9bb7f1386a92dac87fa13888d0de0679b0ba7fac30c088"
+      "size": 4645,
+      "sha256": "e39a5927a5600141f4c90bff83cb8e6984cec988e8196837765e761fa4e1641e"
     },
     {
       "path": ".claude/agents/cca-performance-reviewer.md",
-      "size": 8195,
-      "sha256": "3846d5f58dce7ccd8f0ea521c516e01ec4c5770b7d3bbdbe1116e23f097d4227"
+      "size": 8182,
+      "sha256": "362bf9a72e863757b2730e44ae063bf35eb15be888694483ba5b99c87d24f33d"
     },
     {
       "path": ".claude/agents/cca-privacy-governance-reviewer.md",
-      "size": 4894,
-      "sha256": "02424c7db5db70b935aac52192ebc46bf098b0b7a6eb726c40996c18bf279373"
+      "size": 4881,
+      "sha256": "c32dac8aa3ee4a640b1c2bf8330c3eb7e64b4de3b8aee53b81e82cdf036d2b72"
     },
     {
       "path": ".claude/agents/cca-quality-reviewer.md",
-      "size": 5433,
-      "sha256": "e25835a460d3c51a4e1d7a4fe1cc43048aa925734acd9a6038b43cd134f879f9"
+      "size": 5420,
+      "sha256": "03f5bf2d1a1108ffcb3c7d002242cbc60cf33fb48ea63682201d34641ce5d0e3"
     },
     {
       "path": ".claude/agents/cca-release-deployment-reviewer.md",
-      "size": 5375,
-      "sha256": "49e2620fa83a0f549bdd5f56aa969b70fdce6c3c69f77d43610c6dc8e6eb676c"
+      "size": 5362,
+      "sha256": "571a4e6587974b4fabb9aa6b0d65b5b3b36f4d43f3a60f64fb975d261c9f87d4"
     },
     {
       "path": ".claude/agents/cca-reliability-recovery-reviewer.md",
-      "size": 5087,
-      "sha256": "ec6d00d4bb94fad256a7e55f7575fd89de8273c0b0f913385b8ee68f185b9375"
+      "size": 5074,
+      "sha256": "38e89a614e447e6105ec7db0a70c3ec0fe925450047c8095bbcbc71e4225f908"
     },
     {
       "path": ".claude/agents/cca-requirements-product-reviewer.md",
-      "size": 4588,
-      "sha256": "082f36bf28af8f9e94ce655fcab34446c2867457a313172e0bf6fd104cc4c358"
+      "size": 4575,
+      "sha256": "269eda9b4787182136d6beae727f5c76b400a614e89e7a0bc79cea19426c32a3"
     },
     {
       "path": ".claude/agents/cca-security-reviewer.md",
-      "size": 6897,
-      "sha256": "f1fb5a6e997494518327f73dc399c2d61e293aa0ad4a887b6e6cc24acdfa8971"
+      "size": 6884,
+      "sha256": "ad572f6929e80469b98e196e3b8fe041ebfc439c54dcb9f55f521ceb34253e68"
     },
     {
       "path": ".claude/agents/cca-testing-reviewer.md",
-      "size": 5196,
-      "sha256": "8385eca19d44feacba97dc0840964fabd1f857e1f125ac121e1b98680f05a0de"
+      "size": 5183,
+      "sha256": "886c36ec97a74cccc7fae5168d8c0b63fc6ceea7aa4c8d84f750b5c003889fa0"
     },
     {
       "path": ".claude/agents/cca-ux-accessibility-reviewer.md",
-      "size": 4747,
-      "sha256": "254d8a9465dfcbf05c6ab865a8d62512120bd3c336408bea88d15e201dda57b5"
+      "size": 4734,
+      "sha256": "fbf87be9375293c56c2f538d8cf142cd174f785412b2d4b68d13e66a964eaab1"
     },
     {
       "path": ".claude/skills/_git-atomic-core/README.md",
@@ -292,48 +292,48 @@
     },
     {
       "path": ".claude/skills/cc/SKILL.md",
-      "size": 15942,
-      "sha256": "50e1aa81a52a2f94e648e2611da687f287637a89c446a8bada4864a7043c6e22"
+      "size": 15929,
+      "sha256": "54f0c7bd5ea0d42c0da77ec86177cfc70062476d2f512d5d2b229c33505c690a"
     },
     {
       "path": ".claude/skills/cca/SKILL.md",
-      "size": 26691,
-      "sha256": "8d3bcde1b7f9ef7a07e0d80ecc575451ec5025f133113c1ec2e18e43f1091719"
+      "size": 26679,
+      "sha256": "4a0b40ae4378e0d38b851fdecaf8e7f0cbed9dee4165d0a41056a80021096ba1"
     },
     {
       "path": ".claude/skills/ccf/SKILL.md",
-      "size": 19868,
-      "sha256": "28c4e23f989e748775d8128c6277c9028685fa7066cc81ccdf6d681b2805aa8e"
+      "size": 19855,
+      "sha256": "59fc753ee8cd2b70c4d5e236bd98cef12986b2ad987cedfc741e5aba463e17e8"
     },
     {
       "path": ".claude/skills/ccr/SKILL.md",
-      "size": 8323,
-      "sha256": "f850ad6107606c46ffdb31712acc67d928739414e905013b79b58ac52bc22b57"
+      "size": 8310,
+      "sha256": "6ec722c9edb7315e093656a1e11647dca7b19da9608a4a50060c9679aab76f83"
     },
     {
       "path": ".claude/skills/cf/SKILL.md",
-      "size": 15936,
-      "sha256": "ec0ff1b74154ae6551c70c463a0a17145ce92e59d8b4229abd4d1df526c5b9cb"
+      "size": 15921,
+      "sha256": "10564a8027a3aef8de06ff6dd0f2ac5df8e4074d5403bfa3f64b3d31d4f2f7d2"
     },
     {
       "path": ".claude/skills/cfr/SKILL.md",
-      "size": 7894,
-      "sha256": "b6ab8334dbd99c7d962471f463ef73773df85989eb35fbdffcb93fa0a7dfd7c3"
+      "size": 7879,
+      "sha256": "1817ae6656ff68fd6b8a37e0c40105ccef9850cbaf5c417d865a9b3d98605ba6"
     },
     {
       "path": ".claude/skills/cp/SKILL.md",
-      "size": 8526,
-      "sha256": "1c1d1290dabc5da9280425a02cc13ce6fcebc04cae6fa3b60aa23231fc7384d0"
+      "size": 8514,
+      "sha256": "07c98497df9aeb0576343403d0e2c4675dc2e5e53ae939d87ac2312bdc561326"
     },
     {
       "path": ".claude/skills/cpr/SKILL.md",
-      "size": 8354,
-      "sha256": "8d2e963b9d982179513cd258ac16994b1d88fd7631d52deee5bdb9614c35715f"
+      "size": 8342,
+      "sha256": "d4cb12f5505782500a169c99bff986a93fbaac1b316b70fdec70efd5e013aa50"
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 31390,
-      "sha256": "2f367b5da58535910a94ac09caf3071ce198e2fecaf20d94bda8fd47f4e4ef2a"
+      "size": 31378,
+      "sha256": "5250b1a46556d7f032c9c90bc238a5e9a814c4d92175dc53b72fc8d13f1f4452"
     },
     {
       "path": ".gitattributes",
@@ -352,8 +352,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 44254,
-      "sha256": "2c6d2e627de8d3d37af926ac31548284d5f4f65caaccd4ed06c893f12df88819"
+      "size": 45330,
+      "sha256": "d3468b67d840d9193070a08aea566ef5edaaf66198ec77fa3363a55aafe42088"
     },
     {
       "path": "INSTALL.md",
@@ -378,7 +378,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "f24986f850ee6e66a4c7fdbe8ea5f72f94bee5434a3bcd1892799e3bc46f3d12"
+      "sha256": "48d625eaf5c6c9ce0c6890c697201fd6087c6147773feb8ca9a85e4f8004e79f"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -428,12 +428,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "6015e5525e221bfb815fc689821bac6bb8f0b05838ddd0cf4f78fa75877cc8fb"
+      "sha256": "39a2245d961de87b6c5d56deaa89591eba6c3b84d7de8af43ce5a88323275952"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11669,
-      "sha256": "d6e3b4081fd325188401072e145d1f28e4ea7634d423157b71d42733cf8ce75f"
+      "sha256": "7f18731ef1730419d699f728647752ae5a62144bc4e823abf0aa34b70b140feb"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.23.2 — 2026-10-08
+
+- 스킬과 에이전트 frontmatter의 `effort` 고정값을 제거했다. `/cr`, `/cca`, `/cp`,
+  `/cpr`가 `effort: max`를 강제해, 명령만 실행해도 세션 설정과 무관하게 최대 강도로
+  돌던 문제를 막는다. 이제 `effort`를 명시하지 않으면 `settings.json`의 `effortLevel`을
+  따른다. 특정 명령의 강도를 고정하려면 해당 `SKILL.md` 또는 에이전트 frontmatter에
+  `effort`를 다시 추가한다
+
 ## 1.23.1 — 2026-10-06
 
 - 게이트가 저장소 밖 복구 사본 경로를 symlink를 푼 실제 경로로 비교하고, macOS·Windows
