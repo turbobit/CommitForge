@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.23.3 — 2026-10-08
+
+- 리뷰 원장이 reviewer 원문을 근거로 요구한다. `ACTIVE` reviewer는 반환을 snapshot의
+  `reviewer-output/` 아래 비어 있지 않은 파일로 저장한 뒤 `output_path`로 기록해야 하며,
+  없으면 `ledger_reviewer_output_missing`으로 `finish`가 막힌다. 컨텍스트 컴팩션으로
+  반환이 사라진 채 판정이 채워지던 경로를 막는다
+- reviewer `status`에 `FALLBACK`을 추가했다. agent가 실패해 lead가 직접 수행한 관점은
+  `FALLBACK`으로 기록하며, 필수 관점이 `FALLBACK`만이면 `ledger_reviewer_fallback`으로
+  막힌다. 선택 관점은 차단하지 않는다
+- hunk 판정에 `basis`(`reviewer`·`lead_fallback`)를 추가하고 `status`에 `by_basis`로
+  집계한다. lead가 쓴 PASS와 reviewer가 본 PASS를 보고에서 구분한다
+- 테스트 하네스가 subprocess 출력을 UTF-8로 읽도록 고정했다. 한국어 Windows 로캘
+  (cp949)에서 `guard.py`·`ledger.py` 출력을 읽다 reader thread가 죽던 문제를 막는다
+
 ## 1.23.2 — 2026-10-08
 
 - 스킬과 에이전트 frontmatter의 `effort` 고정값을 제거했다. `/cr`, `/cca`, `/cp`,

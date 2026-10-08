@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.23.2",
+  "version": "1.23.3",
   "reproducible": true,
   "file_count": 157,
-  "total_bytes": 2006124,
+  "total_bytes": 2025628,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -187,8 +187,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-execution.md",
-      "size": 30450,
-      "sha256": "b76c2d92ab50f35d131aa5b34f196b9e1c79e591f23abaa7cd8a04812a2941c8"
+      "size": 32448,
+      "sha256": "60f7a06e81a1d711860a7a4fcad3d12e424183a6fd08dd5e46a3cd834b17ba17"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-gates.md",
@@ -197,8 +197,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-ledger.md",
-      "size": 11319,
-      "sha256": "30503ee273707d15ccb2c86ddf2c7bed748c973aabd820c93763be4db7fe7803"
+      "size": 11740,
+      "sha256": "28dd5675d1ed2d4208a43e62dda4305e0a2aeb8789b0f22da4423e0eee89d8a1"
     },
     {
       "path": ".claude/skills/_git-atomic-core/review-policy.md",
@@ -227,8 +227,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.py",
-      "size": 117351,
-      "sha256": "748eccbcf0c1e33eeea86963f90048ea00fe5f44cb3d7c79730a92ea639821ba"
+      "size": 118656,
+      "sha256": "37230e4f43f19e115740a982eacf04f9be9346bcb8726c6ca1ba7c0af6008dd6"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/guard.sh",
@@ -237,8 +237,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/ledger.py",
-      "size": 67991,
-      "sha256": "b53f1a1fd45dccb9ea36c2d6d740986583d1f4451e948da73121bc4534ccea12"
+      "size": 72913,
+      "sha256": "52c6ba4a50c07245a62512654168514f50441695e4fed198ea4cf936e75f4f02"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/period_range.py",
@@ -332,8 +332,8 @@
     },
     {
       "path": ".claude/skills/cr/SKILL.md",
-      "size": 31378,
-      "sha256": "5250b1a46556d7f032c9c90bc238a5e9a814c4d92175dc53b72fc8d13f1f4452"
+      "size": 31670,
+      "sha256": "8a1c15aa48d281a77c3d1f5667778936dbbfebc30630c42539727e84135b90f5"
     },
     {
       "path": ".gitattributes",
@@ -352,8 +352,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 45330,
-      "sha256": "d3468b67d840d9193070a08aea566ef5edaaf66198ec77fa3363a55aafe42088"
+      "size": 46407,
+      "sha256": "76bf7ea161b42b40d6c85060c16170ef73de4b03c365ff9b1b65fdcc75eea1ed"
     },
     {
       "path": "INSTALL.md",
@@ -378,7 +378,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "48d625eaf5c6c9ce0c6890c697201fd6087c6147773feb8ca9a85e4f8004e79f"
+      "sha256": "42666b76fede2919935949ad91686c2619a0a27ce59de29c5f200f26ab8a8e43"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -707,33 +707,33 @@
     },
     {
       "path": "tests/test_cr_edit_gate.py",
-      "size": 7566,
-      "sha256": "5ffe8cb5e4de22508dead46a2142bd4d952388e37be1aaff01ee96edcd71fa57"
+      "size": 7602,
+      "sha256": "28b3e6ab03d407116f3265fa250c9c6ba3b12a4bb9e8ea38e6b86b9a7ff0a9db"
     },
     {
       "path": "tests/test_guard.py",
-      "size": 61731,
-      "sha256": "b6b8eaea7cbee7aab2d1b5363ca5d201c7edff89d5af8965573406d207075bba"
+      "size": 62143,
+      "sha256": "71b94af351a8024a5689690b4125aa0c6662c5d1d976cc01a5dd88fa6fd71a63"
     },
     {
       "path": "tests/test_install_marker.py",
-      "size": 4194,
-      "sha256": "f5134aba3d36a39415920a3116241f62a9057829b1b4a96721f9979b21728c05"
+      "size": 4212,
+      "sha256": "bd55e2eac7aebbe8cfd975feb5ef773d5eeb485caacfc2933c264f3e1ca9cefa"
     },
     {
       "path": "tests/test_ledger.py",
-      "size": 104214,
-      "sha256": "fcef0ff9481455370aeb4a116de2f819169cc2684b56442f14f7fe88d4b3bf14"
+      "size": 113057,
+      "sha256": "68eb636b43937d3c60b25a1c92dd8df3b68b95468b16c2b23fbad9a17aacd889"
     },
     {
       "path": "tests/test_package.py",
-      "size": 37336,
-      "sha256": "b4d7f0c1fc3d0d4dfb049e98cc80d00125e1e912b214551a86ad2398139de673"
+      "size": 37354,
+      "sha256": "d5575b4e3db40f35b33b7c052a976dc3495eabb18027293caf50637fc02031e3"
     },
     {
       "path": "tests/test_pr_context.py",
-      "size": 3703,
-      "sha256": "1b53092995c992f355a540e160625d359265c096ca8cc666ec3c5befa85f41e6"
+      "size": 3721,
+      "sha256": "a4ddf3a1c256da48361454804793d2c46c07925d56868b4d0d83d337c72c1b16"
     },
     {
       "path": "tests/test_release.py",
@@ -742,8 +742,8 @@
     },
     {
       "path": "tests/test_release_version.py",
-      "size": 4134,
-      "sha256": "9c4b04b62cbd175e73d584cc8c369ad0e4384f11cb1ba829b052702164e40563"
+      "size": 4206,
+      "sha256": "76519c55ebbccb73b2a30eadaae639dbee28081f9ba2270d3300d25dc030bdf7"
     },
     {
       "path": "tests/test_review_evals.py",
@@ -752,18 +752,18 @@
     },
     {
       "path": "tests/test_review_features.py",
-      "size": 10811,
-      "sha256": "f3e3dc97755750134ecfc08a2e67f24427c4f8114d4b12dc9a0bae9ac432f36b"
+      "size": 10847,
+      "sha256": "1271b76c008511c8281bc6bb62fcc5a981c9b806d8463205504903bbd5b6f853"
     },
     {
       "path": "tests/test_reviewer_triggers.py",
-      "size": 6421,
-      "sha256": "cf2e8ad72d98bb2ef21c1fbed54102332509b16e24684e2005f3e31887a5fa54"
+      "size": 6439,
+      "sha256": "2f8fca518f073eac574175fb26abc8af8a7ef96b34cf17aa3febfed333ea628e"
     },
     {
       "path": "tests/test_session_lifecycle.py",
-      "size": 16787,
-      "sha256": "6091bd8f07cae387cc246885d9ec17ba44a5400dfdaf53e30d266edba39fa38d"
+      "size": 16805,
+      "sha256": "1dc3665582b44c79f1d860e866b1d4084d66cbe0c792418042fc1ee1fd456bc6"
     },
     {
       "path": "tests/test_worktree_gate.py",
