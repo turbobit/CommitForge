@@ -26,7 +26,7 @@ MARKER_NAME = ".commitforge-install.json"
 def run(script: Path, *args: str) -> subprocess.CompletedProcess[str]:
     proc = subprocess.run(
         [sys.executable, str(script), *args],
-        text=True,
+        text=True, encoding="utf-8",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

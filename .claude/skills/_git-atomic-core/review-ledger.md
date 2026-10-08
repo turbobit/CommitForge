@@ -116,16 +116,21 @@ reviewer batch 결과를 받을 때마다 **즉시** 기록한다. 다음 batch�
 ```bash
 python3 "<CF_CORE>/scripts/ledger.py" record \
   --session "$COMMITFORGE_SESSION_ID" <<'JSON'
-{"verdicts": [{"id": "working:src/auth.py#3", "verdict": "PASS", "reviewer": "cca-line-reviewer"},
+{"verdicts": [{"id": "working:src/auth.py#3", "verdict": "PASS", "basis": "reviewer"},
               {"id": "working:src/auth.py#7", "verdict": "FINDING", "finding_ids": ["cr-001"]}],
  "findings": [{"id": "cr-001", "severity": "CRITICAL", "file": "src/auth.py"}],
- "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"}]}
+ "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE",
+                "output_path": "reviewer-output/cca-line-reviewer.md"}]}
 JSON
 ```
 
 - hunk 판정 철자는 `N_A`다. `N/A`는 `ledger_invalid_verdict`로 거부된다.
-- reviewer status는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. `N/A`는
+- hunk `basis`는 `reviewer` 또는 `lead_fallback`이다. 다른 값은
+  `ledger_invalid_basis`로 거부된다. 생략하면 `unspecified`로 집계된다.
+- reviewer status는 `ACTIVE`, `N_A`, `FALLBACK`, `UNKNOWN`만 허용한다. `N/A`는
   `ledger_invalid_reviewer_status`로 거부된다.
+- `ACTIVE`에는 `output_path`(snapshot의 `reviewer-output/` 아래 비어 있지 않은 파일)를
+  붙인다. 없거나 비어 있으면 `ledger_reviewer_output_invalid`로 거부된다.
 - **거부는 batch 전체에 적용된다.** 판정 하나가 틀리면 같은 batch의 `PASS`도 전부
   버려진다. 거부되면 batch를 고쳐 다시 보내며, 판정을 낮춰 통과시키지 않는다.
 - `FINDING`은 finding 레코드의 `id`를 `finding_ids`로 연결한다. 비어 있으면

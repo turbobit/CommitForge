@@ -1925,6 +1925,15 @@ def ledger_gate_failure(
             return "ledger_reviewer_missing"
         if summary["reviewer_roles_unknown"]:
             return "ledger_reviewer_unknown"
+        # A required role closed only by the lead's fallback pass is not an
+        # independent review; the agent has to run again for that perspective.
+        if summary["reviewer_roles_fallback"]:
+            return "ledger_reviewer_fallback"
+        # ACTIVE means the reviewer returned something. Without the saved copy
+        # that claim cannot be checked, and it is exactly what a compaction
+        # used to erase.
+        if summary["reviewer_outputs_missing"]:
+            return "ledger_reviewer_output_missing"
     return None
 
 
@@ -2071,6 +2080,20 @@ def ledger_gate(
             reason="ledger_reviewer_unknown",
             reviewer_roles_unknown=summary["reviewer_roles_unknown"],
             reviewer_roles=summary["reviewer_roles"],
+        )
+    if failure == "ledger_reviewer_fallback":
+        raise GuardError(
+            "필수 reviewer 관점이 lead fallback으로만 기록되어 완료할 수 없습니다. "
+            "해당 관점의 reviewer를 다시 실행해 ACTIVE로 기록하십시오.",
+            reason="ledger_reviewer_fallback",
+            reviewer_roles_fallback=summary["reviewer_roles_fallback"],
+            reviewer_roles=summary["reviewer_roles"],
+        )
+    if failure == "ledger_reviewer_output_missing":
+        raise GuardError(
+            "ACTIVE reviewer의 원문이 snapshot에 저장되어 있지 않아 완료할 수 없습니다.",
+            reason="ledger_reviewer_output_missing",
+            reviewer_outputs_missing=summary["reviewer_outputs_missing"],
         )
     if failure is not None:
         # The branches above enumerate every reason `ledger_gate_failure`

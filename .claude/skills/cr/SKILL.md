@@ -453,7 +453,7 @@ bash ".claude/skills/_git-atomic-core/scripts/guard.sh" finish \
 한글로 다음을 보고한다. 맨 앞에 `reporting.md`의 공통 판정(`통과`·`조건부 통과`·`차단`)과 한 줄 근거를 쓴다.
 
 - 시작/종료 HEAD와 staging 불변 여부
-- reviewer별 PASS/N/A/finding 수, unreviewed hunk 수, 격리 검증의 `ISOLATED`·`SELF`·`UNVERIFIED`·`REJECTED` 수. 검증 수치는 `ledger.py report`의 `verification`에서 가져오며 기억으로 집계하지 않고, `SELF`·`UNVERIFIED`가 있으면 그 이유도 적는다.
+- reviewer별 PASS/N/A/finding 수와 status(`ACTIVE`·`N_A`·`FALLBACK`·`UNKNOWN`)의 집계, 판정 근거(`by_basis`: `reviewer`·`lead_fallback`·`unspecified`) 수, unreviewed hunk 수. `FALLBACK`으로 기록된 관점과 `lead_fallback` 판정은 독립 리뷰가 아니므로 최종 보고에서 미검증 항목으로 따로 드러낸다. 격리 검증의 `ISOLATED`·`SELF`·`UNVERIFIED`·`REJECTED` 수. 검증 수치는 `ledger.py report`의 `verification`에서 가져오며 기억으로 집계하지 않고, `SELF`·`UNVERIFIED`가 있으면 그 이유도 적는다.
 - 원장 커버리지: 총 inventory 수, 판정별 분포, 활성 세대와 iteration. 수치는 `finish` 직전에 받아 둔 `ledger.py report`의 `coverage`에서 가져오며 기억으로 집계하지 않는다.
 - `--allow-unledgered`를 사용했다면 그 사실과 미판정 hunk 수·목록
 - 채택·기각한 중요 finding과 근거

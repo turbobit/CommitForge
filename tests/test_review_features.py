@@ -17,7 +17,7 @@ class ReviewFeatureTest(unittest.TestCase):
         return subprocess.run(
             [sys.executable, str(script), *args],
             cwd=ROOT,
-            text=True,
+            text=True, encoding="utf-8",
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             check=True,
@@ -117,7 +117,7 @@ class ReviewFeatureTest(unittest.TestCase):
             return subprocess.run(
                 [sys.executable, str(CORE_SCRIPTS / "report_validator.py"), str(path)],
                 cwd=ROOT,
-                text=True,
+                text=True, encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )

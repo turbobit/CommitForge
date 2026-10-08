@@ -180,7 +180,10 @@ git diff --binary > "<snapshot>/agent-input/working.diff"
   Performance를 더한 5개다. 집합은 원장을 만든 skill이 결정하며 `ledger.py`의
   `REQUIRED_REVIEWER_ROLES`가 정본이다.
 - 변경 유형상 활성화된 조건부 reviewer도 해당 변경에서는 필수
-- agent 시작 실패·timeout·turn 소진 시 main agent가 같은 관점을 직접 수행한다.
+- agent 시작 실패·timeout·turn 소진 시 main agent가 같은 관점을 직접 수행하고,
+  그 관점을 `FALLBACK`으로 기록한다. `FALLBACK`은 독립 리뷰가 아니므로 **필수
+  관점에서는 완료를 막는다**(`ledger_reviewer_fallback`). 해당 agent를 다시 실행해
+  `ACTIVE`로 기록해야 한다. 선택 관점의 `FALLBACK`은 차단하지 않지만 보고에 표시한다.
 - fallback도 완료하지 못하면 해당 관점은 `UNKNOWN`이며 성공 또는 commit을 차단한다.
 - 선택 관점을 조용히 누락하지 않는다. `PASS`, `FINDING`, `N_A`, `UNKNOWN` 중 하나를 기록한다.
 - 필수 3개 관점은 문서 규칙에 그치지 않고 원장 게이트가 강제한다. 분모가 비어 있지
@@ -188,7 +191,7 @@ git diff --binary > "<snapshot>/agent-input/working.diff"
   `UNKNOWN`이면 `ledger_reviewer_unknown`으로 `finish`와 `verify-review`가
   차단된다. 관점은 역할 키워드로 해석하므로 Agent Team의 묶음 teammate 이름도
   그대로 인정된다. 기록 방법은 이 문서 §3.5를 따른다.
-- reviewer `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. hunk 판정과 마찬가지로
+- reviewer `status`는 `ACTIVE`, `N_A`, `FALLBACK`, `UNKNOWN`만 허용한다. hunk 판정과 마찬가지로
   `N/A` 철자는 `ledger_invalid_reviewer_status`로 batch 전체가 거부된다.
 - `UNKNOWN`은 `N_A`가 아니다. 적용되지 않는다는 근거가 있을 때만 `N_A`다.
 - hunk 판정의 철자는 `N_A`다. 원장은 `N/A`를 `ledger_invalid_verdict`로 거부하며,
@@ -312,8 +315,17 @@ hunk 분모는 "누가 봤는지"를 표현하지 못한다. reviewer 하나가 
 채우면 분모는 가득 차지만 Correctness와 Security는 한 번도 돌지 않았을 수 있다.
 그래서 관점은 별도 축으로 기록하고 게이트가 따로 확인한다.
 
-- `reviewers`의 `status`는 `ACTIVE`, `N_A`, `UNKNOWN`만 허용한다. `N/A` 철자는
+- `reviewers`의 `status`는 `ACTIVE`, `N_A`, `FALLBACK`, `UNKNOWN`만 허용한다. `N/A` 철자는
   `ledger_invalid_reviewer_status`로 **batch 전체**가 거부된다. verdict와 같은 함정이다.
+- **`ACTIVE`에는 저장된 원문이 붙는다.** reviewer가 돌려준 전체 보고를 lead가 먼저
+  `reviewer-output/<name>.md`처럼 snapshot 아래 파일로 저장하고, 그 경로를
+  `output_path`로 넘긴다. 경로는 `reviewer-output/` 안이어야 하며, 파일이 없거나
+  0바이트이면 `ledger_reviewer_output_invalid`로 batch 전체가 거부된다. 저장된 원문이
+  없는 `ACTIVE`는 `finish`가 `ledger_reviewer_output_missing`으로 차단한다. 원문이
+  없으면 기억으로 판정을 채우지 말고 reviewer를 다시 실행한다. 컴팩션은 대화만
+  지우므로 파일이 남아 있으면 재개 후에도 근거를 다시 확인할 수 있다.
+- 원장에 쓰기 전에 reviewer 반환을 받았다면 그 즉시 저장한다. 완료 알림을 받은 뒤
+  기록을 미루면 그 사이의 컴팩션이 반환 내용을 지울 수 있다.
 - 필수 관점은 매 실행에서 반드시 기록한다. 하나라도 없으면
   `ledger_reviewer_missing`, `UNKNOWN`이면 `ledger_reviewer_unknown`으로
   `finish`와 `verify-review`가 차단된다. 기본 집합은 **Line, Correctness,
@@ -336,6 +348,12 @@ hunk 분모는 "누가 봤는지"를 표현하지 못한다. reviewer 하나가 
   목록이 그 출발점이며, 비활성 목록을 기억으로 나열하지 않는다.
 - 적용 대상이 없어 `N_A`인 경우와, 확인하지 못해 `UNKNOWN`인 경우를 섞지 않는다.
   `UNKNOWN`은 성공을 차단하는 상태이고 `N_A`는 근거 있는 종결이다.
+- **hunk 판정에는 `basis`를 붙인다.** `reviewer`는 reviewer의 반환에서 나온 판정이고,
+  `lead_fallback`은 lead가 FALLBACK 관점을 직접 수행하며 낸 판정이다. 생략하면
+  `unspecified`로 집계된다. 보고의 판정 근거 수는 이 집계를 그대로 써야 한다. 기억으로
+  채우지 않는다.
+- 순위는 `ACTIVE` < `N_A` < `FALLBACK` < `UNKNOWN`이다. 같은 역할을 덮는 여러 기록 중
+  가장 약한 상태가 채택되므로 `ACTIVE`가 `FALLBACK`을 가리지 못한다.
 - 분모가 비어 있는 실행(변경 없음)에는 관점 게이트를 적용하지 않는다. 빈 리뷰의
   "검토 대상 없음" 종료는 그대로 유지된다.
 
@@ -343,9 +361,12 @@ hunk 분모는 "누가 봤는지"를 표현하지 못한다. reviewer 하나가 
 python3 "<absolute-CF_CORE>/scripts/ledger.py" record \
   --session "$COMMITFORGE_SESSION_ID" <<'JSON'
 {"verdicts": [],
- "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE"},
-               {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
-               {"name": "cca-security-reviewer", "status": "ACTIVE"},
+ "reviewers": [{"name": "cca-line-reviewer", "status": "ACTIVE",
+                "output_path": "reviewer-output/cca-line-reviewer.md"},
+               {"name": "cca-correctness-reviewer", "status": "ACTIVE",
+                "output_path": "reviewer-output/cca-correctness-reviewer.md"},
+               {"name": "cca-security-reviewer", "status": "ACTIVE",
+                "output_path": "reviewer-output/cca-security-reviewer.md"},
                {"name": "cca-data-migration-reviewer", "status": "N_A"}]}
 JSON
 ```

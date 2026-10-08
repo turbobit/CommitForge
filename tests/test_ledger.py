@@ -25,7 +25,7 @@ LEDGER = SCRIPTS / "ledger.py"
 
 
 def run(cmd: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.run(cmd, cwd=cwd, text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if check and proc.returncode != 0:
         raise AssertionError(f"command failed: {cmd}\nstdout={proc.stdout}\nstderr={proc.stderr}")
     return proc
@@ -49,6 +49,7 @@ class LedgerTestCase(unittest.TestCase):
         (self.tmp / "tracked.txt").write_text("base\n", encoding="utf-8")
         run(["git", "add", "tracked.txt"], self.tmp)
         run(["git", "commit", "-m", "test: initial"], self.tmp)
+        self.snapshots: dict[str, Path] = {}
 
     def tearDown(self) -> None:
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -69,10 +70,12 @@ class LedgerTestCase(unittest.TestCase):
     def ledger(self, *args: str, check: bool = True) -> tuple[subprocess.CompletedProcess[str], dict]:
         return self.script(LEDGER, *args, check=check)
 
-    def record(self, session: str, payload: dict, check: bool = True):
+    def record(self, session: str, payload: dict, check: bool = True, attach_output: bool = True):
+        if attach_output:
+            payload = self.attach_outputs(session, payload)
         proc = subprocess.run(
             [sys.executable, str(LEDGER), "record", "--session", session],
-            cwd=self.tmp, text=True, input=json.dumps(payload),
+            cwd=self.tmp, text=True, encoding="utf-8", input=json.dumps(payload),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         if check and proc.returncode != 0:
@@ -81,7 +84,36 @@ class LedgerTestCase(unittest.TestCase):
 
     def begin(self, session: str = "session-a") -> dict:
         _, started = self.guard("begin", "--session", session)
+        self.snapshots[started["session"]] = Path(started["snapshot"])
         return started
+
+    def attach_outputs(self, session: str, payload: dict) -> dict:
+        """Save each ACTIVE reviewer's return and point the record at it.
+
+        review-execution.md 3.5 requires the lead to persist a reviewer's raw
+        return before recording it, so an ACTIVE status without a saved file is
+        exactly the state the gate must refuse. Tests that are not about that
+        rule get the file the lead would have written.
+        """
+        needs_output = [
+            reviewer
+            for reviewer in payload.get("reviewers", [])
+            if reviewer.get("status") == "ACTIVE" and "output_path" not in reviewer
+            and isinstance(reviewer.get("name"), str)
+        ]
+        if not needs_output:
+            return payload
+        snapshot = self.snapshots[session]
+        reviewers = []
+        for reviewer in payload.get("reviewers", []):
+            if reviewer in needs_output:
+                relative = f"reviewer-output/{reviewer['name']}.md"
+                target = snapshot / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"{reviewer['name']} findings\n", encoding="utf-8")
+                reviewer = {**reviewer, "output_path": relative}
+            reviewers.append(reviewer)
+        return {**payload, "reviewers": reviewers}
 
 
 class LedgerFoundationTest(LedgerTestCase):
@@ -506,7 +538,7 @@ class RecordTest(LedgerTestCase):
         processes = [
             subprocess.Popen(
                 [sys.executable, str(LEDGER), "record", "--session", started["session"]],
-                cwd=self.tmp, text=True, stdin=handle,
+                cwd=self.tmp, text=True, encoding="utf-8", stdin=handle,
                 stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             )
             for handle in handles
@@ -2213,6 +2245,167 @@ class SkillScopedReviewerRolesTest(LedgerTestCase):
         self.ledger("inventory", "--session", started["session"])
         _, verified = self.verify(started["session"])
         self.assertTrue(verified["ok"])
+
+
+class ReviewerEvidenceGateTest(LedgerTestCase):
+    """Gate the evidence behind a reviewer, not just its status name.
+
+    A recorded ACTIVE status used to close a required role even when the
+    reviewer's return never reached disk: a compaction then erased it and the
+    lead's own PASS verdicts filled the denominator. These tests pin three
+    rules: a required role closed only by lead fallback is refused, an ACTIVE
+    reviewer needs a non-empty saved return inside the snapshot, and every
+    hunk verdict says whether a reviewer or the lead produced it.
+    """
+
+    ALL_ACTIVE = ReviewerCoverageGateTest.ALL_ACTIVE
+
+    def prepared(self) -> tuple[dict, list[str]]:
+        return ReviewerCoverageGateTest.prepared(self)
+
+    def cover(self, session: str, ids: list[str], reviewers: list[dict], attach_output: bool = True) -> None:
+        self.record(
+            session,
+            {
+                "verdicts": [{"id": identifier, "verdict": "PASS"} for identifier in ids],
+                "reviewers": reviewers,
+            },
+            attach_output=attach_output,
+        )
+
+    def verify(self, session: str, check: bool = True):
+        return ReviewerCoverageGateTest.verify(self, session, check)
+
+    def test_fallback_on_a_required_role_blocks_the_gate(self) -> None:
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE[:2] + [
+            {"name": "cca-security-reviewer", "status": "FALLBACK"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        proc, refused = self.verify(started["session"], check=False)
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_fallback")
+        self.assertEqual(refused["reviewer_roles_fallback"], ["security"])
+
+    def test_fallback_on_an_optional_role_does_not_block(self) -> None:
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE + [
+            {"name": "cca-quality-reviewer", "status": "FALLBACK"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_fallback_is_not_hidden_by_an_active_duplicate(self) -> None:
+        # Worst status wins across names covering the same role, so an ACTIVE
+        # record cannot mask the fallback that actually produced the PASS.
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE + [
+            {"name": "core-security-teammate", "status": "FALLBACK"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, refused = self.verify(started["session"], check=False)
+        self.assertEqual(refused["reason"], "ledger_reviewer_fallback")
+
+    def test_active_reviewer_without_saved_output_blocks_the_gate(self) -> None:
+        started, ids = self.prepared()
+        self.cover(started["session"], ids, self.ALL_ACTIVE, attach_output=False)
+        _, refused = self.verify(started["session"], check=False)
+        self.assertEqual(refused["reason"], "ledger_reviewer_output_missing")
+        self.assertEqual(
+            sorted(refused["reviewer_outputs_missing"]),
+            ["cca-correctness-reviewer", "cca-line-reviewer", "cca-security-reviewer"],
+        )
+
+    def test_empty_saved_output_is_refused_at_record_time(self) -> None:
+        # The incident itself: a reviewer output file that exists but is 0 bytes.
+        started, ids = self.prepared()
+        target = self.snapshots[started["session"]] / "reviewer-output" / "empty.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("", encoding="utf-8")
+        proc, refused = self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "PASS"}],
+                "reviewers": [
+                    {"name": "cca-line-reviewer", "status": "ACTIVE",
+                     "output_path": "reviewer-output/empty.md"}
+                ],
+            },
+            check=False,
+            attach_output=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_output_invalid")
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["by_verdict"]["PASS"], 0)
+
+    def test_output_path_outside_the_snapshot_is_refused(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {
+                "verdicts": [{"id": ids[0], "verdict": "PASS"}],
+                "reviewers": [
+                    {"name": "cca-line-reviewer", "status": "ACTIVE",
+                     "output_path": "../tracked.txt"}
+                ],
+            },
+            check=False,
+            attach_output=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_reviewer_output_invalid")
+
+    def test_n_a_reviewer_needs_no_saved_output(self) -> None:
+        started, ids = self.prepared()
+        reviewers = self.ALL_ACTIVE[:2] + [
+            {"name": "cca-security-reviewer", "status": "N_A"}
+        ]
+        self.cover(started["session"], ids, reviewers)
+        _, verified = self.verify(started["session"])
+        self.assertTrue(verified["ok"])
+
+    def test_invalid_basis_discards_the_whole_batch(self) -> None:
+        started, ids = self.prepared()
+        proc, refused = self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "PASS", "basis": "guessed"}]},
+            check=False,
+        )
+        self.assertNotEqual(proc.returncode, 0)
+        self.assertEqual(refused["reason"], "ledger_invalid_basis")
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(status["by_verdict"]["PASS"], 0)
+
+    def test_status_counts_the_latest_basis_per_hunk(self) -> None:
+        started, ids = self.prepared()
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "PASS", "basis": "lead_fallback"}]},
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(
+            status["by_basis"], {"reviewer": 0, "lead_fallback": 1, "unspecified": 0}
+        )
+        # Last write wins for basis as it does for verdict: a later reviewer
+        # pass replaces the lead's fallback judgement on the same hunk.
+        self.record(
+            started["session"],
+            {"verdicts": [{"id": ids[0], "verdict": "PASS", "basis": "reviewer"}]},
+        )
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(
+            status["by_basis"], {"reviewer": 1, "lead_fallback": 0, "unspecified": 0}
+        )
+
+    def test_verdict_without_basis_counts_as_unspecified(self) -> None:
+        started, ids = self.prepared()
+        self.record(started["session"], {"verdicts": [{"id": ids[0], "verdict": "PASS"}]})
+        _, status = self.ledger("status", "--session", started["session"])
+        self.assertEqual(
+            status["by_basis"], {"reviewer": 0, "lead_fallback": 0, "unspecified": 1}
+        )
 
 
 if __name__ == "__main__":

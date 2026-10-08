@@ -200,7 +200,7 @@ class PackageMetadataTest(unittest.TestCase):
                 [sys.executable, str(script)],
                 cwd=ROOT,
                 env=env,
-                text=True,
+                text=True, encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=True,

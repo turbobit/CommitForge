@@ -22,7 +22,7 @@ def run(
     proc = subprocess.run(
         args,
         cwd=cwd,
-        text=True,
+        text=True, encoding="utf-8",
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )

@@ -36,7 +36,24 @@ VERDICTS = TERMINAL_VERDICTS + ("UNKNOWN",)
 # Reviewer status shares the verdict spelling trap: "N/A" is not "N_A". An
 # unvalidated status would read as "not UNKNOWN" and satisfy the coverage gate,
 # so the gate can only be sound if `record` rejects anything outside this set.
-REVIEWER_STATUSES = ("ACTIVE", "N_A", "UNKNOWN")
+REVIEWER_STATUSES = ("ACTIVE", "N_A", "FALLBACK", "UNKNOWN")
+
+# `FALLBACK` means the agent for this perspective could not finish and the lead
+# performed it in the main context (review-execution.md §2). It is not a
+# completed independent review, so a required role closed only this way is
+# refused by the gate. Fallback findings still count and stay visible in the
+# report.
+#
+# `basis` on a hunk verdict records who produced it: a reviewer's return, or the
+# lead's own fallback pass. Without it the report cannot tell a reviewed PASS
+# from one the lead wrote after the reviewer's return was lost.
+VERDICT_BASES = ("reviewer", "lead_fallback")
+
+# Each reviewer's raw return is saved under the snapshot before it is recorded,
+# so a compaction cannot erase the only copy. The ledger records the path and
+# byte count; the gate re-checks both before the review can finish.
+REVIEWER_OUTPUT_DIR_NAME = "reviewer-output"
+REVIEWER_OUTPUTS_NAME = "reviewer-outputs.json"
 
 # review-execution.md §2 makes Line, Correctness and Security mandatory on
 # every change, and Architecture (which owns contract and compatibility) and
@@ -872,6 +889,18 @@ def scopes_without_entries(
     ]
 
 
+def latest_bases(gen_dir: Path) -> dict[str, str]:
+    """Return the last recorded basis per id; a verdict without one is absent."""
+    resolved: dict[str, str] = {}
+    for record in read_jsonl(gen_dir / HUNKS_NAME):
+        identifier = record.get("id")
+        if isinstance(identifier, str) and record.get("basis") in VERDICT_BASES:
+            resolved[identifier] = record["basis"]
+        elif isinstance(identifier, str):
+            resolved.pop(identifier, None)
+    return resolved
+
+
 def latest_verdicts(gen_dir: Path) -> dict[str, str]:
     """Collapse the append-only log so the last write for an id wins."""
     resolved: dict[str, str] = {}
@@ -880,6 +909,22 @@ def latest_verdicts(gen_dir: Path) -> dict[str, str]:
         if isinstance(identifier, str):
             resolved[identifier] = record.get("verdict", "UNKNOWN")
     return resolved
+
+
+def saved_output_ok(record: Any) -> bool:
+    """Report whether a recorded reviewer return still exists and is non-empty.
+
+    The gate runs against the same snapshot that record validated, so a file
+    that vanished or was truncated since then is a real loss to report, not a
+    formality to skip.
+    """
+    if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+        return False
+    target = Path(record["path"])
+    try:
+        return target.is_file() and target.stat().st_size > 0
+    except OSError:
+        return False
 
 
 def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> dict[str, Any]:
@@ -896,8 +941,10 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
     inventory_path = gen_dir / INVENTORY_NAME if gen_dir else None
     entries = read_jsonl(inventory_path) if inventory_path else []
     resolved = latest_verdicts(gen_dir) if gen_dir else {}
+    bases = latest_bases(gen_dir) if gen_dir else {}
 
     by_verdict = {name: 0 for name in VERDICTS}
+    by_basis = {"reviewer": 0, "lead_fallback": 0, "unspecified": 0}
     pending: list[str] = []
     unknown: list[str] = []
     per_scope: dict[str, dict[str, int]] = {}
@@ -931,6 +978,7 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
             unknown.append(identifier)
             continue
         bucket["covered"] += 1
+        by_basis[bases.get(identifier, "unspecified")] += 1
 
     if generation:
         current = guard.repository_fingerprint(ctx["root"])["fingerprint"]
@@ -944,7 +992,13 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         matches = None
 
     reviewers = (guard.read_json(gen_dir / REVIEWERS_NAME) or {}) if gen_dir else {}
+    outputs = (guard.read_json(gen_dir / REVIEWER_OUTPUTS_NAME) or {}) if gen_dir else {}
     roles = reviewer_roles(reviewers, required_roles_for(data.get("skill")))
+    outputs_missing = sorted(
+        name
+        for name, status in reviewers.items()
+        if status == "ACTIVE" and not saved_output_ok(outputs.get(name))
+    )
 
     return {
         # `complete` stays a statement about the hunk denominator. Reviewer
@@ -973,6 +1027,11 @@ def coverage(ctx: dict[str, Path], ledger_dir: Path, data: dict[str, Any]) -> di
         "reviewer_roles_unknown": [
             role for role, status in roles.items() if status == "UNKNOWN"
         ],
+        "reviewer_roles_fallback": [
+            role for role, status in roles.items() if status == "FALLBACK"
+        ],
+        "reviewer_outputs_missing": outputs_missing,
+        "by_basis": by_basis,
     }
 
 
@@ -992,7 +1051,7 @@ def reviewer_roles(
     Security perspective and must not be able to hide it behind the other
     record.
     """
-    severity = {"ACTIVE": 0, "N_A": 1, "UNKNOWN": 2}
+    severity = {"ACTIVE": 0, "N_A": 1, "FALLBACK": 2, "UNKNOWN": 3}
     resolved: dict[str, str | None] = {role: None for role in required}
     for name, status in reviewers.items():
         if not isinstance(name, str):
@@ -1455,6 +1514,13 @@ def cmd_record(args: argparse.Namespace) -> None:
     for verdict in verdicts:
         _require_str_field(verdict, "id", "verdicts")
         _require_str_list_field(verdict, "finding_ids", "verdicts")
+        if "basis" in verdict and verdict["basis"] not in VERDICT_BASES:
+            raise guard.GuardError(
+                f"허용되지 않는 판정 근거입니다: {verdict['basis']}",
+                reason="ledger_invalid_basis",
+                id=verdict.get("id"),
+                allowed=list(VERDICT_BASES),
+            )
     for finding in findings:
         _require_str_field(finding, "id", "findings")
         _require_enum_field(
@@ -1477,12 +1543,38 @@ def cmd_record(args: argparse.Namespace) -> None:
                 name=reviewer.get("name"),
                 allowed=list(REVIEWER_STATUSES),
             )
+        if "output_path" in reviewer:
+            _require_str_field(reviewer, "output_path", "reviewers")
 
-    _, _, ledger_dir, _ = resolve_ledger(args.session, args.token)
+    _, snapshot, ledger_dir, _ = resolve_ledger(args.session, args.token)
     with LedgerLock(ledger_dir):
         data = read_run(ledger_dir)
         gen_dir = active_generation_dir(ledger_dir, data)
         known = inventory_ids(gen_dir)
+
+        # The reviewer's raw return must be a non-empty file the lead saved
+        # under reviewer-output/ in this snapshot. Resolving first means a
+        # symlink or ".." that escapes the directory is judged by where it
+        # really points, and nothing is written until every path has passed.
+        outputs_dir = (snapshot / REVIEWER_OUTPUT_DIR_NAME).resolve()
+        saved: dict[str, dict[str, Any]] = {}
+        for reviewer in reviewers:
+            relative = reviewer.get("output_path")
+            if relative is None:
+                continue
+            target = (snapshot / relative).resolve()
+            if (
+                not target.is_relative_to(outputs_dir)
+                or not target.is_file()
+                or target.stat().st_size == 0
+            ):
+                raise guard.GuardError(
+                    "reviewer 원문은 snapshot의 reviewer-output/ 아래 비어 있지 않은 파일이어야 합니다.",
+                    reason="ledger_reviewer_output_invalid",
+                    name=reviewer["name"],
+                    output_path=relative,
+                )
+            saved[reviewer["name"]] = {"path": str(target), "bytes": target.stat().st_size}
         finding_ids = {record.get("id") for record in read_jsonl(gen_dir / FINDINGS_NAME)}
         finding_ids.update(record.get("id") for record in findings)
 
@@ -1515,11 +1607,22 @@ def cmd_record(args: argparse.Namespace) -> None:
         append_jsonl(gen_dir / HUNKS_NAME, verdicts)
         if reviewers:
             existing = guard.read_json(gen_dir / REVIEWERS_NAME) or {}
+            outputs = guard.read_json(gen_dir / REVIEWER_OUTPUTS_NAME) or {}
             for reviewer in reviewers:
-                existing[reviewer["name"]] = reviewer.get("status", "UNKNOWN")
+                name = reviewer["name"]
+                existing[name] = reviewer.get("status", "UNKNOWN")
+                # Re-recording without a saved return drops the old pointer, so
+                # an ACTIVE status cannot keep a file from an earlier batch.
+                if name in saved:
+                    outputs[name] = saved[name]
+                else:
+                    outputs.pop(name, None)
             tmp = gen_dir / f"{REVIEWERS_NAME}.tmp"
             tmp.write_text(json.dumps(existing, ensure_ascii=True, indent=2), encoding="utf-8")
             os.replace(tmp, gen_dir / REVIEWERS_NAME)
+            tmp = gen_dir / f"{REVIEWER_OUTPUTS_NAME}.tmp"
+            tmp.write_text(json.dumps(outputs, ensure_ascii=True, indent=2), encoding="utf-8")
+            os.replace(tmp, gen_dir / REVIEWER_OUTPUTS_NAME)
 
         data["stage"] = "review"
         write_run(ledger_dir, data)

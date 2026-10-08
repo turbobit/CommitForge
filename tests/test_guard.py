@@ -24,7 +24,7 @@ GUARD = PACKAGE_ROOT / ".claude/skills/_git-atomic-core/scripts/guard.py"
 
 
 def run(cmd: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
-    proc = subprocess.run(cmd, cwd=cwd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.run(cmd, cwd=cwd, text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if check and proc.returncode != 0:
         raise AssertionError(f"command failed: {cmd}\nstdout={proc.stdout}\nstderr={proc.stderr}")
     return proc
@@ -895,7 +895,7 @@ class GuardIntegrationTest(unittest.TestCase):
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            text=True, encoding="utf-8",
         )
         try:
             self.assertEqual(holder.stdout.readline().strip(), "ready")
@@ -925,7 +925,7 @@ class GuardIntegrationTest(unittest.TestCase):
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            text=True, encoding="utf-8",
         )
         try:
             self.assertEqual(holder.stdout.readline().strip(), "ready")
@@ -1366,6 +1366,14 @@ class GuardIntegrationTest(unittest.TestCase):
             ).stdout
         )
         self.assertGreater(built["total"], 0)
+        # An ACTIVE reviewer must have its raw return saved under the snapshot
+        # before it is recorded; the gate re-checks that file at finish.
+        reviewers = []
+        for name in ("cca-line-reviewer", "cca-correctness-reviewer", "cca-security-reviewer"):
+            relative = f"reviewer-output/{name}.md"
+            (snapshot / relative).parent.mkdir(parents=True, exist_ok=True)
+            (snapshot / relative).write_text(f"{name} findings\n", encoding="utf-8")
+            reviewers.append({"name": name, "status": "ACTIVE", "output_path": relative})
         payload = json.dumps(
             {
                 "verdicts": [
@@ -1373,17 +1381,13 @@ class GuardIntegrationTest(unittest.TestCase):
                 ],
                 # Full hunk coverage alone no longer clears the gate; the three
                 # mandatory perspectives must be on record too.
-                "reviewers": [
-                    {"name": "cca-line-reviewer", "status": "ACTIVE"},
-                    {"name": "cca-correctness-reviewer", "status": "ACTIVE"},
-                    {"name": "cca-security-reviewer", "status": "ACTIVE"},
-                ],
+                "reviewers": reviewers,
             }
         )
         recorded = subprocess.run(
             [sys.executable, str(ledger_script), "record",
              "--session", started["session"]],
-            cwd=self.tmp, text=True, input=payload,
+            cwd=self.tmp, text=True, encoding="utf-8", input=payload,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE,
         )
         self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)

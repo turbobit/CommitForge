@@ -81,7 +81,7 @@ class CrEditGateTest(unittest.TestCase):
                         "transcript_path": str(transcript),
                     }
                 ),
-                text=True,
+                text=True, encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,
@@ -190,7 +190,7 @@ class CrEditGateTest(unittest.TestCase):
                 cwd=project.parent,
                 env=env,
                 input=json.dumps({"transcript_path": str(transcript)}),
-                text=True,
+                text=True, encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 check=False,

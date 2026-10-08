@@ -25,7 +25,7 @@ def classify(*paths: str, context: str = "") -> dict:
     argv = [sys.executable, str(TRIGGERS), *paths]
     if context:
         argv += ["--context", context]
-    proc = subprocess.run(argv, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.run(argv, text=True, encoding="utf-8", stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
         raise AssertionError(f"triggers failed: {proc.stdout}\n{proc.stderr}")
     return json.loads(proc.stdout)
