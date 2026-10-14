@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.23.3 — 2026-10-14
+
+- Windows: 게이트가 Git Bash 철자 `/c/Users/...`·`/cygdrive/c/...`를 드라이브 경로로,
+  `/tmp`를 사용자 temp 디렉터리로 해석한다. 이전에는 Python이 `/c/Users/x`를
+  `C:/c/Users/x`로 읽어, 이 철자로 복구 사본을 지우는 명령이 보호를 지나쳤다
+- Windows: uninstall·재설치가 list2cmdline으로 쓴 옛 launcher 훅을 알아보지 못하던
+  문제를 고쳤다. non-POSIX 분할이 남긴 따옴표를 벗긴 뒤 비교한다
+- CI: 게이트 테스트가 따옴표 없는 `C:\Users\...`를 bash 명령에 넣어 다른 경로를
+  검사하던 문제와 git 사용자 정보가 없는 러너에서 커밋이 실패하던 문제를 고쳤다.
+  1.22.0부터 실행되지 못한 Windows·macOS·Ubuntu portability 검증이 다시 돈다
+
 ## 1.23.2 — 2026-10-14
 
 - skill·reviewer agent frontmatter의 `effort:` 고정값(max·high·medium)을 모두 지웠다.

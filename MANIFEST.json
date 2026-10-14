@@ -1,9 +1,9 @@
 {
   "name": "CommitForge",
-  "version": "1.23.2",
+  "version": "1.23.3",
   "reproducible": true,
   "file_count": 157,
-  "total_bytes": 2014888,
+  "total_bytes": 2019790,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -207,8 +207,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/safety-and-concurrency.md",
-      "size": 21671,
-      "sha256": "60cd23f0f79cd14a0b230e67ba0423d9319689d6ad48cb72bb5d645822865a48"
+      "size": 22039,
+      "sha256": "c7e2b32c35b0f281145ca0b6bfdd4bb764998e7b00eb0c8a7a1e3af20c29d0f6"
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/agent_team_mode.py",
@@ -277,8 +277,8 @@
     },
     {
       "path": ".claude/skills/_git-atomic-core/scripts/worktree_gate_impl.py",
-      "size": 78279,
-      "sha256": "9602048bdd6dd544fdd74351da81a9088d1726860d30322f5244c35aa2d708a6"
+      "size": 79280,
+      "sha256": "1167240ec1db7dd8206ce88a0877afc5f8d309f4b13b6941cb156e28261ffe37"
     },
     {
       "path": ".claude/skills/_git-atomic-core/staging-strategy.md",
@@ -352,8 +352,8 @@
     },
     {
       "path": "CHANGELOG.md",
-      "size": 45354,
-      "sha256": "93df50484926f68ed7e4e70688c634509c1dea07b3a6dcd5d6d59eb188fa10b5"
+      "size": 46178,
+      "sha256": "a215dfc63fc203f3a8fd3982df5bfb9c47d9300a89fd3a58679595acc5905e1a"
     },
     {
       "path": "INSTALL.md",
@@ -378,7 +378,7 @@
     {
       "path": "VERSION",
       "size": 7,
-      "sha256": "48d625eaf5c6c9ce0c6890c697201fd6087c6147773feb8ca9a85e4f8004e79f"
+      "sha256": "42666b76fede2919935949ad91686c2619a0a27ce59de29c5f200f26ab8a8e43"
     },
     {
       "path": "docs/superpowers/plans/2026-09-11-editor-extension-phase1.md",
@@ -428,12 +428,12 @@
     {
       "path": "editor-extension/package-lock.json",
       "size": 196562,
-      "sha256": "39a2245d961de87b6c5d56deaa89591eba6c3b84d7de8af43ce5a88323275952"
+      "sha256": "5d70ea8de698f7c025b904362fcf0a55caeb077ff4f943035d61747d1d0d1796"
     },
     {
       "path": "editor-extension/package.json",
       "size": 11669,
-      "sha256": "7f18731ef1730419d699f728647752ae5a62144bc4e823abf0aa34b70b140feb"
+      "sha256": "0091b6ed69ddbd31588136347ee074eb1e263dc0510ae085ba0ae52778a772bb"
     },
     {
       "path": "editor-extension/scripts/sync-payload.mjs",
@@ -692,8 +692,8 @@
     },
     {
       "path": "install.py",
-      "size": 18547,
-      "sha256": "72297f0eb3d9053126278042da0641bf3fc6374e7b6197a6118bfd13710640bd"
+      "size": 18694,
+      "sha256": "f17d973ec091f9a7e98a409d9eb141f40caa84946ae53c9cbde93fd644f5da6a"
     },
     {
       "path": "install.sh",
@@ -767,8 +767,8 @@
     },
     {
       "path": "tests/test_worktree_gate.py",
-      "size": 20813,
-      "sha256": "986cba5e3d1247bf0e77f58b42398134fa2791d43c3e2747bfaccf8bd268320c"
+      "size": 23228,
+      "sha256": "16b82ef11f42d1f4837f2d48e5201ccc105c13ecc09a7b474fe63c444e773933"
     },
     {
       "path": "uninstall.ps1",
@@ -777,8 +777,8 @@
     },
     {
       "path": "uninstall.py",
-      "size": 9088,
-      "sha256": "196b1f21749a7e4250183fb3fd715cce456d0c0d7c96158bf4ee1e89ca13a48a"
+      "size": 9235,
+      "sha256": "c92b3b7c98ed69f0957a7d0e12e16ae415b4151c9295fa5f5da89ed9e0157c70"
     },
     {
       "path": "uninstall.sh",
