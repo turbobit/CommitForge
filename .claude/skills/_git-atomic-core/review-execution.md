@@ -71,6 +71,11 @@ Agent Team 선택 시:
   다시 실행하더라도 read-only 경계를 유지한다.
 - team 시작·messaging·task coordination이 실패하면 미완료 관점만 subagent로
   fallback한다. `UNKNOWN` 처리와 필수 관점 차단 규칙은 동일하다.
+- reviewer의 `maxTurns`는 폭주를 막는 안전 상한이지 diff 규모별 예산이 아니다.
+  세션 모델에 따라 턴당 처리량이 다르므로, reviewer가 `미검토` 목록을 반환하거나
+  턴 상한·오류로 결과 없이 끝나면 그 범위만 더 작은 shard로 나눠 같은 관점의
+  reviewer에게 다시 배정한다. 같은 범위의 재배정은 최대 2회까지 하고, 그래도 남은
+  범위는 lead가 직접 검토하거나 해당 관점을 `UNKNOWN`으로 남겨 차단한다.
 
 기본 구성:
 

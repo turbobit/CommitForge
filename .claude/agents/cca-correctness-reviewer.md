@@ -4,7 +4,7 @@ description: /cr 또는 /cca 실행 중 현재 변경으로 발생할 수 있는
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-maxTurns: 16
+maxTurns: 40
 permissionMode: plan
 color: green
 ---
@@ -111,3 +111,5 @@ finding에는 반드시 구체적인 실행 경로 또는 입력 시나리오를
 `resource_leak`, `removed_behavior` 같은 소문자 snake_case를 사용한다.
 
 현재 변경과 무관한 기존 문제는 `NOTE (범위 밖)`로 분리한다. 확실하지 않은 문제는 가능성을 과장하지 말고 필요한 확인 조건을 적는다.
+
+턴 예산이 바닥나거나 diff가 커서 배정 범위를 다 보지 못하면, 검토하지 않은 파일·hunk를 `미검토` 목록으로 결과 맨 끝에 명시한다. 검토하지 않은 범위를 PASS로 간주하거나 생략하지 않는다.

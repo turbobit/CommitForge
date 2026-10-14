@@ -4,7 +4,7 @@ description: /cr 또는 /cca 실행 중 현재 diff의 시간·공간 복잡도,
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-maxTurns: 12
+maxTurns: 40
 permissionMode: plan
 color: orange
 ---
@@ -147,3 +147,5 @@ Main agent가 제공한 diff를 사용한다. Shell, benchmark, test, build, pro
 `excessive_render`, `cache_misuse` 같은 소문자 snake_case를 사용한다.
 
 측정값을 추측하지 않는다. 명백한 대규모 회귀가 아니면 MINOR/NOTE로 분류한다.
+
+턴 예산이 바닥나거나 diff가 커서 배정 범위를 다 보지 못하면, 검토하지 않은 파일·hunk를 `미검토` 목록으로 결과 맨 끝에 명시한다. 검토하지 않은 범위를 PASS로 간주하거나 생략하지 않는다.

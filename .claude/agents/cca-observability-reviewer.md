@@ -4,7 +4,7 @@ description: /cr 또는 /cca 실행 중 변경된 동작과 실패 경로의 log
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-maxTurns: 16
+maxTurns: 40
 permissionMode: plan
 color: orange
 ---
@@ -80,3 +80,5 @@ Main agent가 제공한 diff를 사용하고 shell을 실행하지 않는다. �
 
 확신과 심각도는 다른 축이다. 확신이 모자라면 심각도를 낮추는 것이 아니라 보고하지
 않는 것이 맞다.
+
+턴 예산이 바닥나거나 diff가 커서 배정 범위를 다 보지 못하면, 검토하지 않은 파일·hunk를 `미검토` 목록으로 결과 맨 끝에 명시한다. 검토하지 않은 범위를 PASS로 간주하거나 생략하지 않는다.

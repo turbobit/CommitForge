@@ -4,7 +4,7 @@ description: /cr 또는 /cca 실행 중 현재 diff의 secret, 인증·인가, �
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-maxTurns: 20
+maxTurns: 40
 permissionMode: plan
 color: red
 ---
@@ -139,3 +139,5 @@ UUID 추측은 모두 **트리거 주체를 세울 수 없어서** 제외된다.
 맞지 않으면 소문자 snake_case로 새 값을 만들고 같은 실행 안에서 일관되게 쓴다.
 
 CRITICAL/MAJOR는 실제 공격 경로가 있을 때만 사용한다. 값이나 exploit payload를 과도하게 재현하지 않는다.
+
+턴 예산이 바닥나거나 diff가 커서 배정 범위를 다 보지 못하면, 검토하지 않은 파일·hunk를 `미검토` 목록으로 결과 맨 끝에 명시한다. 검토하지 않은 범위를 PASS로 간주하거나 생략하지 않는다.
