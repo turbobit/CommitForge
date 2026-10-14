@@ -212,10 +212,15 @@ def main() -> None:
         default=os.environ.get(
             "COMMITFORGE_EVAL_COMMAND",
             (
-                "claude -p --model sonnet --permission-mode dontAsk "
+                "claude -p --permission-mode dontAsk "
                 "--max-budget-usd 5 --no-session-persistence"
             ),
         ),
+    )
+    parser.add_argument(
+        "--model",
+        default=os.environ.get("COMMITFORGE_EVAL_MODEL"),
+        help="live 평가 모델(기본: Claude Code 기본 모델을 그대로 사용)",
     )
     parser.add_argument("--scenario")
     parser.add_argument("--keep-temp", action="store_true")
@@ -241,6 +246,8 @@ def main() -> None:
         command = shlex.split(args.command)
         if not command:
             raise SystemExit("live command가 비어 있습니다")
+        if args.model:
+            command += ["--model", args.model]
         for scenario in scenarios:
             results.append(
                 live_case(scenario, command, args.keep_temp, args.timeout)

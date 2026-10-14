@@ -1011,7 +1011,7 @@ python3 evals/run_evals.py --check
 python3 evals/run_evals.py --live --scenario "python mutable default regression"
 ```
 
-Live 평가는 기본적으로 scenario마다 Sonnet과 최대 5달러 상한을 사용합니다. `--command` 또는 `COMMITFORGE_EVAL_COMMAND`로 모델·권한·비용 정책을 명시적으로 바꿀 수 있습니다.
+Live 평가는 모델을 고정하지 않고 Claude Code의 기본 모델과 scenario마다 최대 5달러 상한을 사용합니다. 특정 모델로 평가하려면 `--model <모델>` 또는 `COMMITFORGE_EVAL_MODEL`을 지정하고, 권한·비용 정책은 `--command` 또는 `COMMITFORGE_EVAL_COMMAND`로 바꿀 수 있습니다.
 
 ## 한계
 
