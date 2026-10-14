@@ -3,7 +3,7 @@
   "version": "1.23.2",
   "reproducible": true,
   "file_count": 157,
-  "total_bytes": 2014754,
+  "total_bytes": 2014888,
   "files": [
     {
       "path": ".claude/agents/cca-architecture-reviewer.md",
@@ -767,8 +767,8 @@
     },
     {
       "path": "tests/test_worktree_gate.py",
-      "size": 20679,
-      "sha256": "93d59f1081965f22fda9798fb09fab6ab2d7685d1ba7dbf83d9c258cab128059"
+      "size": 20813,
+      "sha256": "986cba5e3d1247bf0e77f58b42398134fa2791d43c3e2747bfaccf8bd268320c"
     },
     {
       "path": "uninstall.ps1",
