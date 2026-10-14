@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 현재 diff의 secret, 인증·인가, �
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 20
 permissionMode: plan
 color: red

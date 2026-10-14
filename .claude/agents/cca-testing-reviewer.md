@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 현재 변경의 테스트 완결성, fl
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 14
 permissionMode: plan
 color: purple

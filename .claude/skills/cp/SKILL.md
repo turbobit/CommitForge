@@ -4,7 +4,6 @@ description: CommitForge의 안전한 Pull Request 생성 명령이다. 현재 c
 argument-hint: "[clean] [추가 맥락] [--base <branch>] [--remote <name>] [--branch <name>] [--draft] [--title <text>] [--no-verify] [--strict] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: max
 allowed-tools:
   - Read
   - Grep

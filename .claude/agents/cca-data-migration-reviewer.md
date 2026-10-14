@@ -4,7 +4,6 @@ description: schema, migration, ORM, 저장 형식과 backfill 변경에서 데�
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: purple

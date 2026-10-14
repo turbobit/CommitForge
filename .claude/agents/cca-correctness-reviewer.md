@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 현재 변경으로 발생할 수 있는
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 16
 permissionMode: plan
 color: green

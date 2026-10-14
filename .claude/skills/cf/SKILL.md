@@ -4,7 +4,6 @@ description: 아직 커밋되지 않은 모든 Git 변경을 의미 단위로 �
 argument-hint: "[clean] [추가 맥락] [--scope <경로...>] [--verify] [--no-verify] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: medium
 allowed-tools:
   - Read
   - Grep

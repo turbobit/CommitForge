@@ -4,7 +4,6 @@ description: version, manifest, checksum, installer, CI/CD와 feature flag 변�
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: orange

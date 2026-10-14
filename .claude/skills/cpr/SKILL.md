@@ -4,7 +4,6 @@ description: CommitForge의 Pull Request read-only 준비 명령이다. 현재 b
 argument-hint: "[clean] [추가 맥락] [--team|--no-team] [--base <branch>] [--remote <name>] [--branch <name>] [--draft] [--title <text>] [--no-verify] [--strict] [--keep-snapshot]"
 disable-model-invocation: true
 model: inherit
-effort: max
 allowed-tools:
   - Read
   - Grep

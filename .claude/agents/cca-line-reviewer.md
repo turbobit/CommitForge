@@ -4,7 +4,6 @@ description: /cr 또는 /cca 실행 중 모든 diff hunk와 삭제된 동작을 
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: max
 maxTurns: 20
 permissionMode: plan
 color: cyan

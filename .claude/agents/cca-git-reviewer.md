@@ -4,7 +4,6 @@ description: /cca 실행 중 현재 staged·unstaged diff의 Atomic Commit 분�
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 14
 permissionMode: plan
 color: blue

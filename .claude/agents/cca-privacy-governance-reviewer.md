@@ -4,7 +4,6 @@ description: 개인정보·민감정보·analytics·tracking 변경에서 최소
 tools: Read, Grep, Glob
 disallowedTools: Write, Edit, NotebookEdit
 model: inherit
-effort: high
 maxTurns: 18
 permissionMode: plan
 color: pink
