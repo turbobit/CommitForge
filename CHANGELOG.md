@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.23.2 — 2026-10-14
+
+- skill·reviewer agent frontmatter의 `effort:` 고정값(max·high·medium)을 모두 지웠다.
+  세션 모델이 지원하지 않는 값이면 `/cr`이 `Unexpected reasoning effort max` 400 오류로
+  시작조차 못 했다. 이제 effort는 세션 설정을 따른다
+- `/cca`·`/cr` 본문의 `ultrathink` 키워드를 지웠다. 모델과 무관하게 추론 강도를 강제하는
+  설정을 남기지 않는다
+- reviewer `maxTurns`를 12~20에서 40으로 통일했다. 턴 상한은 폭주를 막는 안전 상한이고,
+  다 보지 못한 범위는 reviewer가 `미검토`로 반환하면 lead가 더 작은 shard로 최대 2회
+  재배정한 뒤 남으면 `UNKNOWN`으로 차단한다(`review-execution.md`)
+- live eval이 `--model sonnet`을 고정하지 않고 Claude Code 기본 모델을 쓴다. 특정 모델은
+  `--model` 또는 `COMMITFORGE_EVAL_MODEL`로 지정한다
+- `verify.py`와 테스트가 `effort:` 고정, `inherit`이 아닌 `model:`, `ultrathink`,
+  30 미만의 reviewer `maxTurns`, `미검토` 보고 규칙 누락을 거부한다
+
 ## 1.23.1 — 2026-10-06
 
 - 게이트가 저장소 밖 복구 사본 경로를 symlink를 푼 실제 경로로 비교하고, macOS·Windows
