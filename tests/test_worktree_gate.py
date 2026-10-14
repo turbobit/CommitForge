@@ -496,6 +496,16 @@ class HookLauncherTest(unittest.TestCase):
             unrelated = {"type": "command", "command": f"{sys.executable} /opt/other/worktree_gate.py"}
             self.assertFalse(module.is_commitforge_lifecycle_handler(unrelated, gate_path))
 
+    def test_windows_parsing_unquotes_the_launcher_code(self) -> None:
+        import uninstall
+
+        moved = "C:/old/place/.claude/skills/_git-atomic-core/scripts/worktree_gate.py"
+        for module in (install, uninstall):
+            command = subprocess.list2cmdline(["C:/Python/python.exe", "-c", module.HOOK_LAUNCHER, moved])
+            with mock.patch.object(module.sys, "platform", "win32"):
+                target = module.lifecycle_script_from_command(command)
+            self.assertIsNotNone(target, module.__name__)
+            self.assertTrue(target.as_posix().endswith(install.GATE_SUFFIX), module.__name__)
 
 
 if __name__ == "__main__":

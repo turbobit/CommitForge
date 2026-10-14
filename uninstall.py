@@ -102,14 +102,17 @@ def lifecycle_script_from_command(command: str) -> Path | None:
         argv = shlex.split(command, posix=sys.platform != "win32")
     except ValueError:
         return None
+    # Non-POSIX splitting keeps the quotes around each word, including the
+    # launcher code that list2cmdline wraps in double quotes.
+    argv = [
+        word[1:-1] if len(word) >= 2 and word[0] == word[-1] and word[0] in "'\"" else word
+        for word in argv
+    ]
     if len(argv) == 4 and argv[1] == "-c" and argv[2] in HOOK_LAUNCHERS:
         argv = [argv[0], argv[3]]
     if len(argv) != 2:
         return None
-    script = argv[1]
-    if len(script) >= 2 and script[0] == script[-1] and script[0] in "'\"":
-        script = script[1:-1]
-    return Path(script).expanduser().resolve()
+    return Path(argv[1]).expanduser().resolve()
 
 
 def is_commitforge_lifecycle_handler(
