@@ -689,6 +689,36 @@ class PackageMetadataTest(unittest.TestCase):
             frontmatter = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
             self.assertNotRegex(frontmatter, r"(?m)^\s*-\s*Bash(?:\(|\s|$)")
 
+    def test_frontmatter_does_not_pin_model_or_effort(self) -> None:
+        paths = [
+            *(ROOT / ".claude/agents").glob("cca-*.md"),
+            *(ROOT / ".claude/skills").glob("*/SKILL.md"),
+        ]
+        self.assertTrue(paths)
+        for path in paths:
+            frontmatter = path.read_text(encoding="utf-8").split("\n---\n", 1)[0]
+            with self.subTest(path=path.name if path.parent.name == "agents" else path.parent.name):
+                self.assertNotRegex(frontmatter, r"(?m)^effort\s*:")
+                for value in re.findall(r"(?m)^model\s*:\s*(.*?)\s*$", frontmatter):
+                    self.assertEqual("inherit", value.strip("'\""))
+                self.assertNotRegex(path.read_text(encoding="utf-8"), r"(?i)\bultrathink\b")
+
+    def test_reviewers_have_scalable_turn_budget_and_report_gaps(self) -> None:
+        paths = sorted((ROOT / ".claude/agents").glob("cca-*.md"))
+        self.assertTrue(paths)
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            frontmatter = text.split("\n---\n", 1)[0]
+            with self.subTest(path=path.name):
+                turns = re.search(r"(?m)^maxTurns:\s*(\d+)\s*$", frontmatter)
+                self.assertIsNotNone(turns)
+                self.assertGreaterEqual(int(turns.group(1)), 30)
+                self.assertIn("`미검토`", text)
+        execution = (
+            ROOT / ".claude/skills/_git-atomic-core/review-execution.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("같은 범위의 재배정은 최대 2회", execution)
+
     def test_deep_reviewers_are_installed_and_connected(self) -> None:
         cca = (ROOT / ".claude/skills/cca/SKILL.md").read_text(encoding="utf-8")
         reviewers = (

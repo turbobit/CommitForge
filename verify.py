@@ -81,6 +81,33 @@ def frontmatter(text: str) -> str:
     return text[4:end]
 
 
+def model_neutral_errors(path: Path, fm: str) -> list[str]:
+    """Reject frontmatter that pins a model or reasoning effort.
+
+    effort 단계(max·xhigh 등)와 특정 모델은 사용자 세션의 모델에 따라 지원되지
+    않을 수 있으므로, skill·agent는 세션 설정을 그대로 물려받아야 한다.
+    """
+    errors = []
+    if re.search(r"^effort\s*:", fm, re.MULTILINE):
+        errors.append(f"{path}: frontmatter에 모델 의존 effort 고정값이 있음")
+    model_match = re.search(r"^model\s*:\s*(.*?)\s*$", fm, re.MULTILINE)
+    if model_match and model_match.group(1).strip("'\"") != "inherit":
+        errors.append(
+            f"{path}: frontmatter model은 inherit이어야 함 ({model_match.group(1)})"
+        )
+    return errors
+
+
+MIN_REVIEWER_TURNS = 30
+
+
+def reasoning_override_errors(path: Path, text: str) -> list[str]:
+    """Reject body keywords that force reasoning depth regardless of model."""
+    if re.search(r"\bultrathink\b", text, re.IGNORECASE):
+        return [f"{path}: 모델과 무관하게 추론 강도를 강제하는 ultrathink 키워드가 있음"]
+    return []
+
+
 def main() -> None:
     errors = []
     for rel in REQUIRED:
@@ -101,6 +128,8 @@ def main() -> None:
         for field in ("description:", "disable-model-invocation: true", "argument-hint:"):
             if field not in fm:
                 errors.append(f"{path}: frontmatter 필드 누락 {field}")
+        errors.extend(model_neutral_errors(path, fm))
+        errors.extend(reasoning_override_errors(path, text))
         if re.search(r"\$\{[A-Za-z_][A-Za-z0-9_]*", fm):
             errors.append(
                 f"{path}: frontmatter가 런타임 환경변수 형태의 경로에 의존함"
@@ -127,6 +156,16 @@ def main() -> None:
         for field in ("name:", "description:", "tools:", "disallowedTools:", "model:"):
             if field not in fm:
                 errors.append(f"{path}: frontmatter 필드 누락 {field}")
+        errors.extend(model_neutral_errors(path, fm))
+        errors.extend(reasoning_override_errors(path, text))
+        turns_match = re.search(r"^maxTurns:\s*(\d+)\s*$", fm, re.MULTILINE)
+        if not turns_match or int(turns_match.group(1)) < MIN_REVIEWER_TURNS:
+            errors.append(
+                f"{path}: maxTurns는 모델별 처리량 차이를 감안해 "
+                f"{MIN_REVIEWER_TURNS} 이상이어야 함"
+            )
+        if "`미검토`" not in text:
+            errors.append(f"{path}: 미검토 범위 보고 규칙 누락")
         color_match = re.search(r"^color:\s*([a-z]+)\s*$", fm, re.MULTILINE)
         if not color_match:
             errors.append(f"{path}: color 누락 또는 형식 오류")
