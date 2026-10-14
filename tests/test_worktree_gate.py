@@ -197,6 +197,8 @@ class WorktreeGateTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tmp = Path(tempfile.mkdtemp(prefix="commitforge-gate-"))
         git("init", "-q", cwd=self.tmp)
+        git("config", "user.name", "CCA Test", cwd=self.tmp)
+        git("config", "user.email", "cca@example.invalid", cwd=self.tmp)
         git("config", "alias.co", "checkout", cwd=self.tmp)
         git("config", "alias.st", "status", cwd=self.tmp)
         (self.tmp / "sub").mkdir()
