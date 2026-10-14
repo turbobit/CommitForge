@@ -11,6 +11,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 
@@ -24,6 +25,10 @@ EVIDENCE_TEXT = re.compile(r"claude-atomic|refs/commitforge|commitforge/recovery
 RECOVERY_TEXT = re.compile(r"commitforge|\.claude\b", re.IGNORECASE)
 # macOS and Windows default filesystems ignore case: `~/.CLAUDE` is `~/.claude`.
 CASE_INSENSITIVE = sys.platform in ("darwin", "win32")
+# Claude Code runs Bash commands through Git Bash on Windows, where `/c/Users`
+# and `/cygdrive/c/Users` name `C:/Users` and `/tmp` is the user's temp dir.
+WINDOWS = sys.platform == "win32"
+BASH_DRIVE = re.compile(r"^/(?:cygdrive/)?([A-Za-z])(?=/|$)")
 LEDGER_LOCK = re.compile(r"/" + SNAPSHOT_DIR_NAME + r"/[^/]+/ledger/\.lock$")
 COMMITFORGE_COMMANDS = {"cc", "ccr", "cf", "cfr", "ccf", "cr", "cca", "cp", "cpr"}
 GUARD_SCRIPTS = {"guard.sh", "guard.py"}
@@ -523,6 +528,23 @@ def recovery_copy_root() -> str:
     return os.path.normpath(os.path.abspath(root)).replace("\\", "/")
 
 
+def bash_native_path(value: str, *, pattern: bool = False) -> str:
+    """The Windows path a Git Bash spelling names; unchanged elsewhere.
+
+    Without this, Python reads `/c/Users/x` as `C:/c/Users/x`, so a command
+    naming a protected directory that way would reach it unnoticed.
+    """
+    if not WINDOWS or not value.startswith("/"):
+        return value
+    match = BASH_DRIVE.match(value)
+    if match:
+        return match.group(1).upper() + ":" + (value[match.end():] or "/")
+    if value == "/tmp" or value.startswith("/tmp/"):
+        temp = tempfile.gettempdir().replace("\\", "/")
+        return (glob.escape(temp) if pattern else temp) + value[4:]
+    return value
+
+
 def canonical(path: str) -> str:
     """Path with symlinks resolved, case-folded where the filesystem folds case."""
     real = os.path.realpath(path).replace("\\", "/")
@@ -920,7 +942,7 @@ class Gate:
 
     @staticmethod
     def resolve_path(base: Optional[Path], value: str) -> Optional[Path]:
-        path = Path(os.path.expanduser(value))
+        path = Path(os.path.expanduser(bash_native_path(value)))
         if path.is_absolute():
             return Path(os.path.normpath(path))
         if base is None:
@@ -1463,7 +1485,7 @@ class Gate:
                 pattern_parts.append(glob.escape(self.value(_var_word(text), local, cwd) or ""))
             else:
                 pattern_parts.append(glob.escape(text))
-        pattern = "".join(pattern_parts)
+        pattern = bash_native_path("".join(pattern_parts), pattern=True)
         if not os.path.isabs(os.path.expanduser(pattern)):
             pattern = os.path.join(glob.escape(str(base)), pattern)
         found: List[str] = []

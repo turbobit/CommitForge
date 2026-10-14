@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -189,6 +191,15 @@ UNLOCKED_ALLOWED = [
 ]
 
 
+def sh(path: object) -> str:
+    """Spell a path the way a Bash command must: `/` separators, quoted.
+
+    Unquoted `C:\\Users` is `C:Users` to bash, so a Windows-native string pasted
+    into a command names a different path than the test means.
+    """
+    return shlex.quote(Path(str(path)).as_posix())
+
+
 def git(*args: str, cwd: Path) -> None:
     subprocess.run(["git", *args], cwd=cwd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -284,12 +295,12 @@ class WorktreeGateTest(unittest.TestCase):
         (copy / "changes.tar").write_bytes(b"")
         (copy / "manifest.json").write_text("{}", encoding="utf-8")
         for command in (
-            f"rm -rf {root}",
-            f"rm -rf {copy}",
-            f"rm -rf {root.parent}",
-            f"cd {root} && rm -rf ./*",
-            f"find {root.parent} -name '*.tar' -delete",
-            f"cp /dev/null {copy}/changes.tar",
+            f"rm -rf {sh(root)}",
+            f"rm -rf {sh(copy)}",
+            f"rm -rf {sh(root.parent)}",
+            f"cd {sh(root)} && rm -rf ./*",
+            f"find {sh(root.parent)} -name '*.tar' -delete",
+            f"cp /dev/null {sh(copy / 'changes.tar')}",
             f"python3 -c 'import shutil; shutil.rmtree(\"{root}/commitforge/recovery\")'"
             .replace(f"{root}/commitforge/recovery", "~/.claude/commitforge/recovery"),
         ):
@@ -300,26 +311,52 @@ class WorktreeGateTest(unittest.TestCase):
         link = self.tmp / "copies-link"
         link.symlink_to(root, target_is_directory=True)
         bypasses = [
-            f"rm -rf {link}/*",
+            f"rm -rf {sh(link)}/*",
             "D=$(printf %s ~/.claude/commitforge); rm -rf \"$D\"",
             "echo ~/.claude/commitforge | xargs rm -rf",
             "python3 -c \"import shutil,os; shutil.rmtree(os.path.expanduser('~/.claude/commitforge'))\"",
             "python3 -c \"import shutil,os; shutil.rmtree(os.path.join(os.path.expanduser('~'),'.claude'))\"",
         ]
         if sys.platform in ("darwin", "win32"):
-            bypasses.append(f"rm -rf {str(root).upper()}")
+            bypasses.append(f"rm -rf {sh(str(root).upper())}")
+        if sys.platform == "win32":
+            # Spellings Git Bash accepts for the same Windows directory.
+            native = str(root)
+            drive, rest = native[0].lower(), Path(native[2:]).as_posix()
+            bypasses += [
+                f'rm -rf "{native}"',
+                f"rm -rf /{drive}{rest}",
+                f"rm -rf /cygdrive/{drive}{rest}",
+            ]
         for command in bypasses:
             with self.subTest(command=command):
                 proc = self.gate(command)
                 self.assertEqual(proc.returncode, 2, command)
                 self.assertIn("복구 근거", proc.stderr)
         for command in (
-            f"ls {copy}",
-            f"tar -xf {copy}/changes.tar -C {self.tmp} -- a.txt",
-            f"cat {copy}/manifest.json",
+            f"ls {sh(copy)}",
+            f"tar -xf {sh(copy / 'changes.tar')} -C {sh(self.tmp)} -- a.txt",
+            f"cat {sh(copy / 'manifest.json')}",
         ):
             with self.subTest(command=command):
                 self.assert_allowed(command)
+
+    def test_git_bash_paths_name_the_windows_paths(self) -> None:
+        native = worktree_gate_impl.bash_native_path
+        temp = tempfile.gettempdir().replace("\\", "/")
+        with mock.patch.object(worktree_gate_impl, "WINDOWS", True):
+            self.assertEqual(native("/c/Users/a"), "C:/Users/a")
+            self.assertEqual(native("/d"), "D:/")
+            self.assertEqual(native("/cygdrive/e/x"), "E:/x")
+            self.assertEqual(native("/tmp"), temp)
+            self.assertEqual(native("/tmp/x/y"), temp + "/x/y")
+            self.assertEqual(native("/tmpfile"), "/tmpfile")
+            self.assertEqual(native("/usr/bin"), "/usr/bin")
+            self.assertEqual(native("C:/x"), "C:/x")
+            self.assertEqual(native("rel/c/x"), "rel/c/x")
+        with mock.patch.object(worktree_gate_impl, "WINDOWS", False):
+            self.assertEqual(native("/c/Users/a"), "/c/Users/a")
+            self.assertEqual(native("/tmp/x"), "/tmp/x")
 
     def test_lock_in_another_repository_does_not_gate_this_one(self) -> None:
         self.hold_lock()
@@ -327,9 +364,9 @@ class WorktreeGateTest(unittest.TestCase):
         try:
             git("init", "-q", cwd=other)
             self.assert_allowed("git reset --hard", cwd=other)
-            self.assert_allowed(f"cd {other} && git reset --hard")
-            self.assert_denied(f"cd {other} && git -C {self.tmp} reset --hard")
-            self.assert_denied(f"GIT_DIR={self.tmp}/.git git reset --hard", cwd=other)
+            self.assert_allowed(f"cd {sh(other)} && git reset --hard")
+            self.assert_denied(f"cd {sh(other)} && git -C {sh(self.tmp)} reset --hard")
+            self.assert_denied(f"GIT_DIR={sh(self.tmp / '.git')} git reset --hard", cwd=other)
         finally:
             shutil.rmtree(other, ignore_errors=True)
 
@@ -340,10 +377,10 @@ class WorktreeGateTest(unittest.TestCase):
             git("worktree", "add", "-q", str(linked), "-b", "wtb", cwd=self.tmp)
             self.hold_lock(self.tmp / ".git/worktrees" / linked.name)
             self.assert_denied("git reset --hard", cwd=linked)
-            self.assert_denied(f"git worktree remove --force {linked}")
+            self.assert_denied(f"git worktree remove --force {sh(linked)}")
             self.assert_denied("git update-ref refs/heads/wtb HEAD")
             self.assert_denied("git branch -f wtb HEAD")
-            self.assert_denied(f"git --git-dir={linked}/.git reset --hard")
+            self.assert_denied(f"git --git-dir={sh(linked / '.git')} reset --hard")
             self.assert_allowed("git reset --hard")
             self.assert_allowed("git status", cwd=linked)
         finally:
@@ -458,6 +495,7 @@ class HookLauncherTest(unittest.TestCase):
             self.assertTrue(module.is_commitforge_lifecycle_handler(launcher, gate_path), module.__name__)
             unrelated = {"type": "command", "command": f"{sys.executable} /opt/other/worktree_gate.py"}
             self.assertFalse(module.is_commitforge_lifecycle_handler(unrelated, gate_path))
+
 
 
 if __name__ == "__main__":
