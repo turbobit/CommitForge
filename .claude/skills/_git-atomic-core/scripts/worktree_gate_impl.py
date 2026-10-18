@@ -1043,16 +1043,15 @@ class Gate:
         if EVIDENCE_TEXT.search(self.root_text):
             raise Deny(evidence_message(f"정적으로 확인할 수 없는 {what}"))
 
-    def check_arith(self, bodies: List[str], env: Dict[str, Optional[str]], cwd: Optional[Path]) -> None:
+    def check_arith(self, bodies: List[str], cwd: Optional[Path]) -> None:
+        # Any variable counts as unknown: `read`, `printf -v` and others the
+        # gate does not model can rewrite a value it saw assigned earlier.
         for body in bodies:
             names = arith_names(body)
             if names is None:
                 self.unknown(cwd, "산술식")
-                continue
-            for name in names:
-                value = env.get(name)
-                if value is None or not re.fullmatch(r"\s*-?[0-9]+\s*", value):
-                    self.unknown(cwd, "산술식 변수")
+            elif names:
+                self.unknown(cwd, "산술식 변수")
 
     # ---- script walking
 
@@ -1079,7 +1078,7 @@ class Gate:
         for word in cmd.words + [target for _, target, _ in cmd.redirects if target is not None]:
             for body in word.substs:
                 self.run(body, cwd, dict(env), depth + 1)
-            self.check_arith(word.ariths, env, cwd)
+            self.check_arith(word.ariths, cwd)
         stdin: List[Optional[str]] = []
         for op, target, heredoc in cmd.redirects:
             if heredoc is not None:
@@ -1087,7 +1086,7 @@ class Gate:
                     scanned = scan(heredoc["body"])
                     for body in scanned.substs:
                         self.run(body, cwd, dict(env), depth + 1)
-                    self.check_arith(scanned.ariths, env, cwd)
+                    self.check_arith(scanned.ariths, cwd)
                 stdin.append(heredoc["body"])
             elif op == "<<<":
                 stdin.append(self.value(target, env, cwd))

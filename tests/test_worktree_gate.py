@@ -108,6 +108,7 @@ LOCKED_DENIED = [
     "echo $(( a[$(date +%s)] ))",
     "echo $(( ${x:-1} ))",
     "echo $(( $1 + 1 ))",
+    "x=3; read x; echo $((x))",
     "x='a[$(git reset --hard)]'; cat <<EOF" + NL + "$((x))" + NL + "EOF",
 ]
 LOCKED_ALLOWED = [
@@ -158,7 +159,7 @@ LOCKED_ALLOWED = [
     "echo $(( ($(date +%s) - $(cat /tmp/ccf_start)) ))s",
     "echo $(( $(date +%s) - 1 ))",
     "echo $((1+(2*3)))",
-    "n=3; echo $(( n + 0x10 + 16#ff + $? ))",
+    "echo $(( 0x10 + 16#ff + $? ))",
 ]
 EVIDENCE_DENIED = [
     'rm -rf "/r/.git/claude-atomic-snapshots/20261006-x" 2>&1 && echo removed',
