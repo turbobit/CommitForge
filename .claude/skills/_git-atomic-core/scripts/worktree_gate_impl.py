@@ -128,12 +128,14 @@ class Deny(Exception):
 
 
 class Word:
-    __slots__ = ("parts", "substs")
+    __slots__ = ("parts", "substs", "ariths")
 
     def __init__(self) -> None:
         # (kind, text): lit (unquoted), qlit (quoted), var, home, subst, arith
         self.parts: List[Tuple[str, str]] = []
         self.substs: List[str] = []
+        # Bodies of every `$((...))`, nested ones included, for arith_names().
+        self.ariths: List[str] = []
 
     @classmethod
     def literal(cls, text: str) -> "Word":
@@ -325,8 +327,11 @@ class Lexer:
             # it is followed by `)`; `$((a) | (b))` is a command substitution.
             body, end = self.paren_body(self.i + 3)
             if s.startswith(")", end):
+                inner = scan(body)
                 word.add("arith", body)
-                word.substs.extend(substitutions(body))
+                word.substs.extend(inner.substs)
+                word.ariths.append(body)
+                word.ariths.extend(inner.ariths)
                 self.i = end + 1
                 return True
         if s.startswith("$(", self.i):
@@ -343,8 +348,10 @@ class Lexer:
                     depth -= 1
                 j += 1
             inner = s[self.i + 2:j - 1]
+            scanned = scan(inner)
             word.add("var", inner)
-            word.substs.extend(substitutions(inner))
+            word.substs.extend(scanned.substs)
+            word.ariths.extend(scanned.ariths)
             self.i = j
             return True
         match = NAME.match(s, self.i + 1)
@@ -385,8 +392,8 @@ class Lexer:
         return s[start:], self.n
 
 
-def substitutions(text: str) -> List[str]:
-    """Command substitutions bash runs inside an unquoted heredoc or ${...}."""
+def scan(text: str) -> Word:
+    """Expansions bash runs inside an unquoted heredoc, ${...} or $((...))."""
     lexer = Lexer(text)
     word = Word()
     while lexer.i < lexer.n:
@@ -397,7 +404,53 @@ def substitutions(text: str) -> List[str]:
             pass
         else:
             lexer.i += 1
-    return word.substs
+    return word
+
+
+def substitutions(text: str) -> List[str]:
+    """Command substitutions bash runs inside an unquoted heredoc or ${...}."""
+    return scan(text).substs
+
+
+NUMERIC_VARS = set("#?$!")
+
+
+def arith_names(body: str) -> Optional[List[str]]:
+    """Variables bash evaluates as nested arithmetic in `$((body))`.
+
+    Bash expands a variable's value as another arithmetic expression, so
+    `x='a[$(git reset --hard)]'; echo $((x))` runs the command in the subscript.
+    None when the body holds a subscript, quote or escape the gate cannot follow.
+    """
+    lexer = Lexer(body)
+    rest: List[str] = []
+    names: List[str] = []
+    while lexer.i < lexer.n:
+        c = body[lexer.i]
+        if c in "$`":
+            word = Word()
+            if not lexer.read_dollar(word):
+                return None
+            kind, text = word.parts[-1]
+            if kind == "var":
+                if text in NUMERIC_VARS:
+                    pass
+                elif NAME.fullmatch(text):
+                    names.append(text)
+                else:
+                    return None
+            # Command and nested arithmetic substitutions are checked through
+            # Word.substs and Word.ariths; keep tokens on either side apart.
+            rest.append(" ")
+            continue
+        if c in "\\['\"":
+            return None
+        rest.append(c)
+        lexer.i += 1
+    for token in re.findall(r"[A-Za-z0-9_#@]+", "".join(rest)):
+        if not token[0].isdigit():
+            names.append(token)
+    return names
 
 
 class Command:
@@ -990,6 +1043,17 @@ class Gate:
         if EVIDENCE_TEXT.search(self.root_text):
             raise Deny(evidence_message(f"정적으로 확인할 수 없는 {what}"))
 
+    def check_arith(self, bodies: List[str], env: Dict[str, Optional[str]], cwd: Optional[Path]) -> None:
+        for body in bodies:
+            names = arith_names(body)
+            if names is None:
+                self.unknown(cwd, "산술식")
+                continue
+            for name in names:
+                value = env.get(name)
+                if value is None or not re.fullmatch(r"\s*-?[0-9]+\s*", value):
+                    self.unknown(cwd, "산술식 변수")
+
     # ---- script walking
 
     def run(self, source: str, cwd: Optional[Path], env: Dict[str, Optional[str]], depth: int) -> Optional[Path]:
@@ -1015,12 +1079,15 @@ class Gate:
         for word in cmd.words + [target for _, target, _ in cmd.redirects if target is not None]:
             for body in word.substs:
                 self.run(body, cwd, dict(env), depth + 1)
+            self.check_arith(word.ariths, env, cwd)
         stdin: List[Optional[str]] = []
         for op, target, heredoc in cmd.redirects:
             if heredoc is not None:
                 if not heredoc["quoted"]:
-                    for body in substitutions(heredoc["body"]):
+                    scanned = scan(heredoc["body"])
+                    for body in scanned.substs:
                         self.run(body, cwd, dict(env), depth + 1)
+                    self.check_arith(scanned.ariths, env, cwd)
                 stdin.append(heredoc["body"])
             elif op == "<<<":
                 stdin.append(self.value(target, env, cwd))

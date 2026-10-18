@@ -103,6 +103,12 @@ LOCKED_DENIED = [
     "git worktree remove --force ../wt",
     "echo $(( $(git reset --hard) + 1 ))",
     "echo $((echo hi) | (git reset --hard))",
+    "x='a[$(git reset --hard)]'; echo $((x))",
+    "x='a[$(git reset --hard)]'; echo \"$(( $x ))\"",
+    "echo $(( a[$(date +%s)] ))",
+    "echo $(( ${x:-1} ))",
+    "echo $(( $1 + 1 ))",
+    "x='a[$(git reset --hard)]'; cat <<EOF" + NL + "$((x))" + NL + "EOF",
 ]
 LOCKED_ALLOWED = [
     "git status --short --branch --untracked-files=all",
@@ -152,6 +158,7 @@ LOCKED_ALLOWED = [
     "echo $(( ($(date +%s) - $(cat /tmp/ccf_start)) ))s",
     "echo $(( $(date +%s) - 1 ))",
     "echo $((1+(2*3)))",
+    "n=3; echo $(( n + 0x10 + 16#ff + $? ))",
 ]
 EVIDENCE_DENIED = [
     'rm -rf "/r/.git/claude-atomic-snapshots/20261006-x" 2>&1 && echo removed',
