@@ -101,6 +101,8 @@ LOCKED_DENIED = [
     "git clean -fd",
     "git update-index --assume-unchanged a",
     "git worktree remove --force ../wt",
+    "echo $(( $(git reset --hard) + 1 ))",
+    "echo $((echo hi) | (git reset --hard))",
 ]
 LOCKED_ALLOWED = [
     "git status --short --branch --untracked-files=all",
@@ -146,6 +148,10 @@ LOCKED_ALLOWED = [
     "git tag -a v1.0.0 -m 'release'",
     "git add .claude/skills/_git-atomic-core/scripts/guard.py",
     "git diff -- guard.py worktree_gate.py",
+    # A /ccf run on 2026-10-18 timed itself with arithmetic expansion.
+    "echo $(( ($(date +%s) - $(cat /tmp/ccf_start)) ))s",
+    "echo $(( $(date +%s) - 1 ))",
+    "echo $((1+(2*3)))",
 ]
 EVIDENCE_DENIED = [
     'rm -rf "/r/.git/claude-atomic-snapshots/20261006-x" 2>&1 && echo removed',

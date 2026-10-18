@@ -131,7 +131,7 @@ class Word:
     __slots__ = ("parts", "substs")
 
     def __init__(self) -> None:
-        # (kind, text): lit (unquoted), qlit (quoted), var, home, subst
+        # (kind, text): lit (unquoted), qlit (quoted), var, home, subst, arith
         self.parts: List[Tuple[str, str]] = []
         self.substs: List[str] = []
 
@@ -160,6 +160,8 @@ class Word:
                 out.append("${" + text + "}")
             elif kind == "subst":
                 out.append("$(" + text + ")")
+            elif kind == "arith":
+                out.append("$((" + text + "))")
             elif kind == "home":
                 out.append("~")
             else:
@@ -318,6 +320,15 @@ class Lexer:
             word.substs.append(body)
             self.i = j + 1
             return True
+        if s.startswith("$((", self.i):
+            # Bash reads `$((` as arithmetic only when the paren that closes
+            # it is followed by `)`; `$((a) | (b))` is a command substitution.
+            body, end = self.paren_body(self.i + 3)
+            if s.startswith(")", end):
+                word.add("arith", body)
+                word.substs.extend(substitutions(body))
+                self.i = end + 1
+                return True
         if s.startswith("$(", self.i):
             body, self.i = self.paren_body(self.i + 2)
             word.add("subst", body)
